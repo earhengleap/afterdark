@@ -1,0 +1,154 @@
+#upload_video.py
+
+import os
+import requests
+from config import BOT_TOKEN, CHAT_ID
+
+API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+def send_video(video_path):
+    if not os.path.exists(video_path):
+        print(f"❌ File not found: {video_path}")
+        return
+
+    print(f"⏳ Starting upload: {video_path} ...")
+    url = f"{API_URL}/sendVideo"
+    with open(video_path, "rb") as video_file:
+        response = requests.post(url, data={"chat_id": CHAT_ID}, files={"video": video_file})
+
+    if response.status_code == 200:
+        print(f"✅ Video uploaded successfully: {video_path}")
+    else:
+        print(f"❌ Failed to upload video: {response.text}")
+
+if __name__ == "__main__":
+    # Change this to your video file path
+    video_file = r"C:\Users\Xing\Desktop\Twitter\myvideo.mp4"
+    send_video(video_file)
+
+
+
+
++++++++++++++++++++++++++++++++++++++++++++
+
+
+import os
+from pyrogram import Client
+from config import BOT_TOKEN, CHAT_ID, API_ID, API_HASH
+
+# Create Pyrogram client using bot
+app = Client(
+    "video_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
+)
+
+def format_duration(seconds):
+    """
+    Format duration dynamically based on video length.
+    Returns formatted string with appropriate units.
+    """
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        minutes = seconds / 60
+        return f"{minutes:.2f} min"
+    else:
+        hours = seconds / 3600
+        remaining_minutes = (seconds % 3600) / 60
+        return f"{int(hours)}h {int(remaining_minutes)}m"
+
+def get_video_dimensions(video_path):
+    """
+    Extract video width and height using OpenCV.
+    Automatically handles any video resolution dynamically.
+    Returns (width, height, fps, duration) or (None, None, None, None) if failed.
+    """
+    try:
+        import cv2
+        
+        cap = cv2.VideoCapture(video_path)
+        
+        if not cap.isOpened():
+            print("⚠️ Could not open video file")
+            return None, None, None, None
+        
+        # Dynamically get actual video dimensions
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = frame_count / fps if fps > 0 else 0
+        
+        cap.release()
+        
+        return width, height, fps, duration
+        
+    except ImportError:
+        print("⚠️ OpenCV not installed. Install with: pip install opencv-python")
+        return None, None, None, None
+    except Exception as e:
+        print(f"⚠️ Error reading video: {e}")
+        return None, None, None, None
+
+def upload_video(video_path):
+    if not os.path.exists(video_path):
+        print(f"❌ File not found: {video_path}")
+        return
+
+    # Get video file info
+    file_size = os.path.getsize(video_path)
+    video_name = os.path.basename(video_path)
+    
+    print("=" * 60)
+    print(f"📁 File: {video_name}")
+    print(f"💾 Size: {file_size / (1024*1024):.2f} MB")
+    
+    width, height, fps, duration = get_video_dimensions(video_path)
+    
+    if width and height:
+        print(f"📺 Resolution: {width}x{height}")
+        print(f"🎬 FPS: {fps}")
+        print(f"⏱️  Duration: {format_duration(duration)}")
+    
+    print("=" * 60)
+    print()
+    
+    def progress_callback(current, total):
+        percentage = (current / total) * 100
+        bar_length = 40
+        filled_length = int(bar_length * current // total)
+        bar = '█' * filled_length + '░' * (bar_length - filled_length)
+        
+        print(f"\r📤 Progress: [{bar}] {percentage:.1f}% ({current/1024/1024:.2f}/{total/1024/1024:.2f} MB)", end="", flush=True)
+    
+    with app:
+        if width is None or height is None:
+            print("⚠️ Could not detect video dimensions. Uploading as document...")
+            
+            app.send_document(
+                chat_id=CHAT_ID,
+                document=video_path,
+                progress=progress_callback
+            )
+        else:
+            app.send_video(
+                chat_id=CHAT_ID,
+                video=video_path,
+                width=width,
+                height=height,
+                supports_streaming=True,
+                progress=progress_callback
+            )
+
+    print("\n✅ Upload finished!")
+    print()
+
+if __name__ == "__main__":
+    video_file = r"C:\Users\Xing\Desktop\Twitter\myvideo.mp4"
+    upload_video(video_file)
+    
+    
+    #OK
+    

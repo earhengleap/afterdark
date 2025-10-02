@@ -1,0 +1,6 @@
+requests
+pyrogram
+tgcrypto
+
+yt-dlp
+
