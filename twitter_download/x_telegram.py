@@ -5,12 +5,12 @@ from datetime import datetime
 import yt_dlp
 from pyrogram import Client, filters
 import subprocess
+import tempfile
 
 # --- CONFIG ---
 from config import BOT_TOKEN, API_ID, API_HASH
 
 # --- USERS ---
-
 from users.users import log_user_action
 
 # --- Folders ---
@@ -20,8 +20,19 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(DATA_FOLDER, exist_ok=True)
 
 LOG_FILE = os.path.join(DATA_FOLDER, "download_log.log")
-COOKIE_FILE = 'config/twitter_cookies.txt'  # Adjust if needed
-FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"   # Adjust if needed
+
+# --- COOKIES HANDLING ---
+cookies_content = os.environ.get("TWITTER_COOKIES")
+if cookies_content:
+    tmp_cookies_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix=".txt")
+    tmp_cookies_file.write(cookies_content)
+    tmp_cookies_file.close()
+    COOKIE_FILE = tmp_cookies_file.name
+else:
+    COOKIE_FILE = 'config/twitter_cookies.txt'  # fallback local file
+
+# --- FFMPEG ---
+FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"   # Adjust if needed (Render usually has ffmpeg installed)
 
 # --- Pyrogram Client ---
 app = Client(
@@ -174,8 +185,6 @@ def handle_url(client, message):
     except Exception as e:
         message.reply_text(f"❌ Upload failed: {e}")
         log_user_action(user_id, username, url, "failed")
-
-
 
 # --- Run Bot ---
 if __name__ == "__main__":
