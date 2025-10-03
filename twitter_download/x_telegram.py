@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import yt_dlp
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import subprocess
 import tempfile
 
@@ -32,7 +33,7 @@ else:
     COOKIE_FILE = 'config/twitter_cookies.txt'  # fallback local file
 
 # --- FFMPEG ---
-FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"   # Adjust if needed (Render usually has ffmpeg installed)
+FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"   # Adjust if needed
 
 # --- Pyrogram Client ---
 app = Client(
@@ -147,10 +148,47 @@ def download_x_video(url, message=None):
 # --- Bot Handlers ---
 @app.on_message(filters.private & filters.command("start"))
 def start(client, message):
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬇️ Download from X", callback_data="download")],
+        [InlineKeyboardButton("ℹ️ About", callback_data="about")],
+        [InlineKeyboardButton("❓ Help", callback_data="help")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="settings")]
+    ])
     message.reply_text(
-        "👋 Hello! Send me an X/Twitter video URL and I will download and send it back to you.\n\n"
-        "Example:\nhttps://x.com/username/status/1234567890"
+        "👋 Welcome to **X Video Downloader Bot**!\n\n"
+        "Choose an option below:",
+        reply_markup=keyboard
     )
+
+@app.on_callback_query()
+def handle_callback(client, callback_query):
+    data = callback_query.data
+
+    if data == "download":
+        callback_query.message.edit_text(
+            "⬇️ Please drop your X/Twitter video URL here..."
+        )
+
+    elif data == "about":
+        callback_query.message.edit_text(
+            "ℹ️ **About this bot**\n\n"
+            "This bot allows you to download videos from **X (Twitter)** and send them directly in Telegram.\n"
+            "Developed with ❤️ using Pyrogram + yt-dlp."
+        )
+
+    elif data == "help":
+        callback_query.message.edit_text(
+            "❓ **How to use:**\n\n"
+            "1. Send me a valid X/Twitter video link.\n"
+            "2. Wait a moment while I download it.\n"
+            "3. I’ll send the video back to you directly.\n\n"
+            "Example:\n`https://x.com/username/status/1234567890`"
+        )
+
+    elif data == "settings":
+        callback_query.message.edit_text(
+            "⚙️ Settings are not available yet. Coming soon!"
+        )
 
 @app.on_message(filters.private & filters.text)
 def handle_url(client, message):
@@ -166,18 +204,19 @@ def handle_url(client, message):
     message.reply_text(f"⏳ Downloading video from: {url} ...")
     video_path = download_x_video(url, message)
 
-    if not video_path:
-        message.reply_text("❌ Failed to download video.")
+    if not video_path or not os.path.exists(video_path):
+        message.reply_text("❌ Failed to download video file.")
         log_user_action(user_id, username, url, "failed")
         return
 
     width, height = get_video_resolution(video_path)
+
     try:
         app.send_video(
             chat_id=message.chat.id,
             video=video_path,
-            width=width,
-            height=height,
+            width=width if width else 720,
+            height=height if height else 1280,
             supports_streaming=True
         )
         message.reply_text(f"✅ Video uploaded: {os.path.basename(video_path)}")
