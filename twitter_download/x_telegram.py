@@ -229,3 +229,5 @@ def handle_url(client, message):
 if __name__ == "__main__":
     print("Bot is running...")
     app.run()
+
+#GOOD
