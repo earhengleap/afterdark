@@ -1,0 +1,176 @@
+"""
+Video upload functionality
+"""
+
+import os
+import time
+from typing import List, Tuple, Optional
+
+from pyrogram import Client
+from pyrogram.types import Message
+from pyrogram.errors import FloodWait
+
+from config.settings import CHAT_ID
+from utils.video_processor import VideoProcessor
+from utils.upload_logger import UploadLogger
+from utils.formatters import Formatter
+from core.progress_tracker import ProgressTracker
+from models.enums import user_downloads
+
+class VideoUploader:
+    """Handle video uploads to Telegram"""
+    
+    @staticmethod
+    def upload_to_group(video_path: str, user_id: int, 
+                       status_msg: Optional[Message] = None,
+                       client: Optional[Client] = None) -> Tuple[bool, str]:
+        """Upload video to Telegram group with retry logic"""
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                if not os.path.exists(video_path):
+                    return False, "File not found"
+
+                file_size = os.path.getsize(video_path)
+                width, height, fps, duration = VideoProcessor.get_dimensions(video_path)
+                video_name = os.path.basename(video_path)
+                progress_key = f"{user_id}_{video_name}"
+                start_time = time.time()
+
+                upload_type = "video"
+
+                # Use the provided client or import app as fallback
+                if client is None:
+                    from x_telegram import app as upload_client
+                else:
+                    upload_client = client
+
+                if width is None or height is None:
+                    upload_type = "document"
+                    upload_client.send_document(
+                        chat_id=CHAT_ID,
+                        document=video_path,
+                        progress=ProgressTracker.callback,
+                        progress_args=(progress_key, status_msg, video_name, start_time)
+                    )
+                else:
+                    upload_client.send_video(
+                        chat_id=CHAT_ID,
+                        video=video_path,
+                        width=width,
+                        height=height,
+                        supports_streaming=True,
+                        progress=ProgressTracker.callback,
+                        progress_args=(progress_key, status_msg, video_name, start_time)
+                    )
+
+                from models.enums import upload_progress
+                if progress_key in upload_progress:
+                    del upload_progress[progress_key]
+
+                UploadLogger.log(video_path, file_size, width, height, fps, duration, upload_type)
+                return True, "Upload successful"
+
+            except FloodWait as e:
+                wait_time = e.value
+                retry_count += 1
+                
+                print(f"⚠️ FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
+                
+                if status_msg:
+                    try:
+                        status_msg.edit_text(
+                            f"⏸️ **Rate Limit Hit**\n\n"
+                            f"Telegram requires a {wait_time}s cooldown.\n\n"
+                            f"⏳ Waiting {wait_time} seconds...\n"
+                            f"📊 Attempt {retry_count}/{max_retries}\n\n"
+                            f"Please be patient, upload will resume automatically."
+                        )
+                    except Exception:
+                        pass
+                
+                time.sleep(wait_time + 1)
+                
+                if status_msg:
+                    try:
+                        status_msg.edit_text(
+                            f"📤 **Resuming Upload**\n\n"
+                            f"📁 File: `{video_name[:35]}...`\n"
+                            f"💾 Size: {Formatter.size(file_size)}\n\n"
+                            f"⏳ Retrying upload..."
+                        )
+                    except Exception:
+                        pass
+                
+                continue
+
+            except Exception as e:
+                print(f"❌ Upload to group failed: {e}")
+                return False, str(e)
+        
+        return False, f"Failed after {max_retries} attempts due to rate limiting"
+    
+    @staticmethod
+    def upload_multiple(video_paths: List[str], message: Message, user_id: int) -> None:
+        """Upload multiple videos with progress tracking"""
+        total = len(video_paths)
+        success_count = 0
+        failed_count = 0
+        
+        status_msg = message.reply_text(
+            f"📤 **Starting Bulk Upload**\n\n"
+            f"Total videos: {total}\n"
+            f"Preparing upload..."
+        )
+        
+        overall_start = time.time()
+        
+        for idx, video_path in enumerate(video_paths, 1):
+            try:
+                video_name = os.path.basename(video_path)
+                file_size = os.path.getsize(video_path)
+                
+                status_msg.edit_text(
+                    f"📤 **Bulk Upload Progress**\n\n"
+                    f"**Video {idx}/{total}**\n"
+                    f"✅ Completed: {success_count}\n"
+                    f"❌ Failed: {failed_count}\n\n"
+                    f"📁 Current: `{video_name[:35]}...`\n"
+                    f"💾 Size: {Formatter.size(file_size)}\n\n"
+                    f"⏳ Preparing upload..."
+                )
+                
+                # Pass the client from the message context
+                success, msg = VideoUploader.upload_to_group(
+                    video_path, user_id, status_msg, client=message._client
+                )
+                
+                if success:
+                    success_count += 1
+                    print(f"✅ Uploaded {idx}/{total}: {video_name}")
+                else:
+                    failed_count += 1
+                    print(f"❌ Failed {idx}/{total}: {video_name} - {msg}")
+                
+                if idx < total:
+                    time.sleep(3)
+                    
+            except Exception as e:
+                print(f"Error uploading {video_path}: {e}")
+                failed_count += 1
+        
+        total_time = time.time() - overall_start
+        
+        from ui.keyboards import Keyboards
+        status_msg.edit_text(
+            f"✅ **Bulk Upload Complete!**\n\n"
+            f"📊 **Summary:**\n"
+            f"• Total: {total} videos\n"
+            f"• ✅ Uploaded: {success_count}\n"
+            f"• ❌ Failed: {failed_count}\n"
+            f"• ⏱️ Time: {Formatter.duration(total_time)}\n\n"
+            f"All selected videos have been sent to the group.",
+            reply_markup=Keyboards.back_to_main()
+        )

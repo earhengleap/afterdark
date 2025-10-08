@@ -1,0 +1,203 @@
+# twitter_download/ui/keyboards.py
+
+"""
+UI Keyboards Module
+Contains all inline keyboard layouts for the bot
+"""
+
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+class Keyboards:
+    """Dynamic keyboard layouts for the bot"""
+    
+    @staticmethod
+    def main_menu():
+        """Main menu keyboard with primary actions"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📥 Download Video", callback_data="download")
+            ],
+            [
+                InlineKeyboardButton("📤 Bulk Upload", callback_data="bulk_upload")
+            ],
+            [
+                InlineKeyboardButton("📊 Statistics", callback_data="stats"),
+                InlineKeyboardButton("❓ Help", callback_data="help")
+            ],
+            [
+                InlineKeyboardButton("ℹ️ About", callback_data="about"),
+                InlineKeyboardButton("⚙️ Settings", callback_data="settings")
+            ],
+            [
+                InlineKeyboardButton("📦 Version Info", callback_data="version")
+            ]
+        ])
+    @staticmethod
+    def back_to_main():
+        """Simple back button to return to main menu"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+        ])
+    
+    @staticmethod
+    def cancel_button():
+        """Cancel button for active operations"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
+        ])
+    
+    @staticmethod
+    def settings_menu():
+        """Settings menu keyboard"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🔔 Notifications", callback_data="settings_notifications"),
+                InlineKeyboardButton("🎨 Theme", callback_data="settings_theme")
+            ],
+            [
+                InlineKeyboardButton("📁 Storage", callback_data="settings_storage"),
+                InlineKeyboardButton("🌐 Language", callback_data="settings_language")
+            ],
+            [
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def download_options():
+        """Quality selection keyboard for downloads"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🎬 Best Quality", callback_data="quality_best"),
+                InlineKeyboardButton("⚡ Fast Download", callback_data="quality_fast")
+            ],
+            [
+                InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+            ]
+        ])
+    
+    @staticmethod
+    def video_actions(video_id):
+        """Actions available after video download"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📥 Download Another", callback_data="download"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def video_actions_with_upload(user_id):
+        """Actions available after video download with upload option"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_to_group_{user_id}")
+            ],
+            [
+                InlineKeyboardButton("📥 Download Another", callback_data="download"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def confirmation(action):
+        """Generic confirmation keyboard"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Yes", callback_data=f"confirm_{action}"),
+                InlineKeyboardButton("❌ No", callback_data=f"cancel_{action}")
+            ]
+        ])
+    
+    @staticmethod
+    def social_links():
+        """Social media and support links"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("💬 Support Channel", url="https://t.me/your_channel"),
+                InlineKeyboardButton("👥 Community", url="https://t.me/your_group")
+            ],
+            [
+                InlineKeyboardButton("⭐ Rate Us", url="https://t.me/your_bot?start=rate"),
+                InlineKeyboardButton("🐛 Report Bug", callback_data="report_bug")
+            ],
+            [
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def bulk_download_complete(user_id, downloaded_paths):
+        """Keyboard shown after bulk download completes"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📤 Upload All to Group", callback_data="upload_bulk_downloaded")
+            ],
+            [
+                InlineKeyboardButton("📥 Download More", callback_data="download"),
+                InlineKeyboardButton("📊 View All Videos", callback_data="bulk_upload")
+            ],
+            [
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    # -------------------- FIXED --------------------
+    @staticmethod
+    def video_list_keyboard(videos, selected_indices, page=0, per_page=5):
+        """
+        Inline keyboard for selecting multiple videos for bulk upload.
+        videos: list of dicts with 'filename'
+        selected_indices: set of video indices already selected
+        page: current page number (pagination)
+        per_page: number of videos per page
+        """
+        start = page * per_page
+        end = start + per_page
+        page_videos = videos[start:end]
+
+        buttons = []
+
+        # Add video buttons with selection checkbox (using INDEX instead of filename)
+        for idx, v in enumerate(page_videos, start=start):
+            filename = v["filename"]
+            # Truncate filename for display
+            display_name = filename if len(filename) <= 35 else filename[:32] + "..."
+            checked = "✅" if idx in selected_indices else "⬜"
+            # Use index instead of filename in callback_data
+            buttons.append([InlineKeyboardButton(
+                f"{checked} {display_name}", 
+                callback_data=f"sel_{idx}"
+            )])
+
+        # Pagination buttons
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"pg_{page-1}"))
+        if end < len(videos):
+            nav_buttons.append(InlineKeyboardButton("➡️ Next", callback_data=f"pg_{page+1}"))
+        if nav_buttons:
+            buttons.append(nav_buttons)
+
+        # Select / Deselect all + Confirm
+        buttons.append([
+            InlineKeyboardButton("✅ Select All", callback_data="sel_all"),
+            InlineKeyboardButton("❌ Deselect All", callback_data="desel_all")
+        ])
+        buttons.append([
+            InlineKeyboardButton("📤 Confirm Upload", callback_data="confirm_upload")
+        ])
+        buttons.append([
+            InlineKeyboardButton("🏠 Back", callback_data="main_menu")
+        ])
+
+        return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
+    def single_video_upload(video_key):
+        """Single video upload button."""
+        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_single_{video_key}")]
+        ])
