@@ -1,5 +1,3 @@
-# twitter_download/ui/keyboards.py
-
 """
 UI Keyboards Module
 Contains all inline keyboard layouts for the bot
@@ -16,10 +14,12 @@ class Keyboards:
         """Main menu keyboard with primary actions"""
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📥 Download Video", callback_data="download")
+                InlineKeyboardButton("📥 Download Video", callback_data="download"),
+                InlineKeyboardButton("🖼️ Download Images", callback_data="download_images")
             ],
             [
-                InlineKeyboardButton("📤 Bulk Upload", callback_data="bulk_upload")
+                InlineKeyboardButton("📤 Bulk Upload Videos", callback_data="bulk_upload"),
+                InlineKeyboardButton("🖼️ Bulk Upload Images", callback_data="bulk_upload_images")
             ],
             [
                 InlineKeyboardButton("📊 Statistics", callback_data="stats"),
@@ -33,6 +33,7 @@ class Keyboards:
                 InlineKeyboardButton("📦 Version Info", callback_data="version")
             ]
         ])
+    
     @staticmethod
     def back_to_main():
         """Simple back button to return to main menu"""
@@ -101,6 +102,19 @@ class Keyboards:
         ])
     
     @staticmethod
+    def image_actions_with_upload(user_id):
+        """Actions available after image download with upload option"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_images_to_group_{user_id}")
+            ],
+            [
+                InlineKeyboardButton("🖼️ Download More Images", callback_data="download_images"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
     def confirmation(action):
         """Generic confirmation keyboard"""
         return InlineKeyboardMarkup([
@@ -137,6 +151,22 @@ class Keyboards:
             [
                 InlineKeyboardButton("📥 Download More", callback_data="download"),
                 InlineKeyboardButton("📊 View All Videos", callback_data="bulk_upload")
+            ],
+            [
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def bulk_image_download_complete(user_id, downloaded_paths):
+        """Keyboard shown after bulk image download completes"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📤 Upload All Images to Group", callback_data="upload_bulk_images_downloaded")
+            ],
+            [
+                InlineKeyboardButton("🖼️ Download More Images", callback_data="download_images"),
+                InlineKeyboardButton("🖼️ View All Images", callback_data="bulk_upload_images")
             ],
             [
                 InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
@@ -195,9 +225,91 @@ class Keyboards:
         return InlineKeyboardMarkup(buttons)
     
     @staticmethod
+    def image_list_keyboard(images, selected_indices, page=0, per_page=5):
+        """
+        Inline keyboard for selecting multiple images for bulk upload.
+        images: list of dicts with 'filename'
+        selected_indices: set of image indices already selected
+        page: current page number (pagination)
+        per_page: number of images per page
+        """
+        start = page * per_page
+        end = start + per_page
+        page_images = images[start:end]
+
+        buttons = []
+
+        # Add image buttons with selection checkbox
+        for idx, img in enumerate(page_images, start=start):
+            filename = img["filename"]
+            display_name = filename if len(filename) <= 35 else filename[:32] + "..."
+            checked = "✅" if idx in selected_indices else "⬜"
+            buttons.append([InlineKeyboardButton(
+                f"{checked} {display_name}", 
+                callback_data=f"img_sel_{idx}"
+            )])
+
+        # Pagination buttons
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"img_pg_{page-1}"))
+        if end < len(images):
+            nav_buttons.append(InlineKeyboardButton("➡️ Next", callback_data=f"img_pg_{page+1}"))
+        if nav_buttons:
+            buttons.append(nav_buttons)
+
+        # Select / Deselect all + Confirm
+        buttons.append([
+            InlineKeyboardButton("✅ Select All Images", callback_data="img_sel_all"),
+            InlineKeyboardButton("❌ Deselect All Images", callback_data="img_desel_all")
+        ])
+        buttons.append([
+            InlineKeyboardButton("📤 Confirm Image Upload", callback_data="confirm_image_upload")
+        ])
+        buttons.append([
+            InlineKeyboardButton("🏠 Back", callback_data="main_menu")
+        ])
+
+        return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
     def single_video_upload(video_key):
         """Single video upload button."""
-        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_single_{video_key}")]
         ])
+    
+    @staticmethod
+    def single_image_upload(image_key):
+        """Single image upload button with short callback data"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 Upload to Group", callback_data=f"up_img_{image_key}")]
+        ])
+    @staticmethod
+    def bulk_download_complete_mixed(user_id, video_paths, image_paths):
+        """Keyboard shown after mixed bulk download completes"""
+        buttons = []
+        
+        if video_paths:
+            buttons.append([InlineKeyboardButton("📤 Upload All Videos to Group", callback_data="upload_bulk_videos_downloaded")])
+        
+        if image_paths:
+            buttons.append([InlineKeyboardButton("📤 Upload All Images to Group", callback_data="upload_bulk_images_downloaded")])
+        
+        if video_paths or image_paths:
+            buttons.append([InlineKeyboardButton("📤 Upload All Content to Group", callback_data="upload_bulk_all_downloaded")])
+        
+        buttons.extend([
+            [
+                InlineKeyboardButton("📥 Download More", callback_data="download"),
+                InlineKeyboardButton("📊 View All Videos", callback_data="bulk_upload")
+            ],
+            [
+                InlineKeyboardButton("🖼️ View All Images", callback_data="bulk_upload_images")
+            ],
+            [
+                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+
+        return InlineKeyboardMarkup(buttons)

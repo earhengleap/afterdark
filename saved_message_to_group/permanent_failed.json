@@ -1,0 +1,1338 @@
+[
+  {
+    "timestamp": "2025-10-18T17:01:16.762004",
+    "msg_id": 55786,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:01:36.802986",
+    "msg_id": 55786,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:01:56.841364",
+    "msg_id": 55786,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:02:16.890382",
+    "msg_id": 55787,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:02:36.954746",
+    "msg_id": 55787,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:02:57.011479",
+    "msg_id": 55787,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:03:17.064850",
+    "msg_id": 55788,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:03:37.102376",
+    "msg_id": 55788,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:03:57.160250",
+    "msg_id": 55788,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:26:57.264872",
+    "msg_id": 55789,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:27:17.298109",
+    "msg_id": 55789,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:27:37.331558",
+    "msg_id": 55789,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:27:57.358121",
+    "msg_id": 55790,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:28:17.391814",
+    "msg_id": 55790,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:28:37.433385",
+    "msg_id": 55790,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:28:57.501277",
+    "msg_id": 55791,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:29:17.547740",
+    "msg_id": 55791,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:29:37.601953",
+    "msg_id": 55791,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:29:57.653917",
+    "msg_id": 55792,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:34:01.482958",
+    "msg_id": 55792,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:34:21.524038",
+    "msg_id": 55792,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:34:41.557675",
+    "msg_id": 55793,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:35:01.603029",
+    "msg_id": 55793,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:35:21.642126",
+    "msg_id": 55793,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:35:41.698716",
+    "msg_id": 55794,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:36:01.754678",
+    "msg_id": 55794,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:36:21.816340",
+    "msg_id": 55794,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:36:41.880146",
+    "msg_id": 55795,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:37:01.920725",
+    "msg_id": 55795,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:37:21.970239",
+    "msg_id": 55795,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:41:06.089404",
+    "msg_id": 55796,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:41:26.122490",
+    "msg_id": 55796,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:41:46.160574",
+    "msg_id": 55796,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:42:06.206846",
+    "msg_id": 55797,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:42:26.248139",
+    "msg_id": 55797,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:42:46.303201",
+    "msg_id": 55797,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:43:06.366677",
+    "msg_id": 55799,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:43:26.437971",
+    "msg_id": 55799,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:43:46.488494",
+    "msg_id": 55799,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T17:44:06.531663",
+    "msg_id": 55800,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:08:51.571341",
+    "msg_id": 55800,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:09:11.605205",
+    "msg_id": 55800,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:09:31.635729",
+    "msg_id": 55801,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:09:51.659879",
+    "msg_id": 55801,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:10:11.700277",
+    "msg_id": 55801,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:10:31.756509",
+    "msg_id": 55802,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:10:51.816649",
+    "msg_id": 55802,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:11:11.876685",
+    "msg_id": 55802,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:11:31.948100",
+    "msg_id": 55803,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T18:11:52.004032",
+    "msg_id": 55803,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:30:07.477008",
+    "msg_id": 55803,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:30:27.571495",
+    "msg_id": 55804,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:30:47.614006",
+    "msg_id": 55804,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:31:07.675875",
+    "msg_id": 55804,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:31:27.730878",
+    "msg_id": 55805,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:31:47.755055",
+    "msg_id": 55805,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:32:07.781071",
+    "msg_id": 55805,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:32:27.832451",
+    "msg_id": 55806,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:32:47.887584",
+    "msg_id": 55806,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:33:07.920615",
+    "msg_id": 55806,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:33:27.947138",
+    "msg_id": 55807,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:33:47.991313",
+    "msg_id": 55807,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:34:08.032688",
+    "msg_id": 55807,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-18T21:34:28.077816",
+    "msg_id": 55808,
+    "group_id": -1002088860676,
+    "group_name": "Group 1",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-19T10:18:31.948468",
+    "msg_id": 50979,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-19T10:18:51.991623",
+    "msg_id": 50979,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-19T10:19:12.188447",
+    "msg_id": 51037,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-19T10:19:32.239379",
+    "msg_id": 51037,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Message deleted or not found in Saved Messages",
+    "reason": "FILE_REFERENCE_EXPIRED_OR_SELF_DESTRUCTING"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:45.064186",
+    "msg_id": 3693,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:47.156117",
+    "msg_id": 3693,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:49.254656",
+    "msg_id": 3693,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:51.355098",
+    "msg_id": 3693,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:53.471292",
+    "msg_id": 3821,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:55.584075",
+    "msg_id": 3821,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:57.676712",
+    "msg_id": 3821,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:41:59.805385",
+    "msg_id": 3821,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:01.920963",
+    "msg_id": 3934,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:04.026260",
+    "msg_id": 3934,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:06.144034",
+    "msg_id": 3934,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:08.255090",
+    "msg_id": 3934,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:10.348092",
+    "msg_id": 3976,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:12.485779",
+    "msg_id": 3976,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:14.598938",
+    "msg_id": 3976,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:16.692170",
+    "msg_id": 3976,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:18.805588",
+    "msg_id": 3977,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:20.925809",
+    "msg_id": 3977,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:23.057136",
+    "msg_id": 3977,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:25.202315",
+    "msg_id": 3977,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:27.318597",
+    "msg_id": 3981,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:29.426130",
+    "msg_id": 3981,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:31.544005",
+    "msg_id": 3981,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:33.656434",
+    "msg_id": 3981,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:35.773718",
+    "msg_id": 3987,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:37.890886",
+    "msg_id": 3987,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:39.995762",
+    "msg_id": 3987,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:42.152448",
+    "msg_id": 3987,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:44.268918",
+    "msg_id": 4015,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:46.372433",
+    "msg_id": 4015,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:48.573791",
+    "msg_id": 4015,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:50.682807",
+    "msg_id": 4015,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:52.783514",
+    "msg_id": 4019,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:54.899889",
+    "msg_id": 4019,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:57.029241",
+    "msg_id": 4019,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:42:59.149601",
+    "msg_id": 4019,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:01.257296",
+    "msg_id": 4020,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:03.356338",
+    "msg_id": 4020,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:05.463951",
+    "msg_id": 4020,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:07.577415",
+    "msg_id": 4020,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:09.739055",
+    "msg_id": 4071,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:11.851150",
+    "msg_id": 4071,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:13.983060",
+    "msg_id": 4071,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:16.094763",
+    "msg_id": 4071,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:18.197517",
+    "msg_id": 4074,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:20.294479",
+    "msg_id": 4074,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:22.397713",
+    "msg_id": 4074,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:24.498177",
+    "msg_id": 4074,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:26.611175",
+    "msg_id": 4075,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:28.720210",
+    "msg_id": 4075,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:30.838487",
+    "msg_id": 4075,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:32.933057",
+    "msg_id": 4075,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:35.092939",
+    "msg_id": 4078,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:37.211367",
+    "msg_id": 4078,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:39.314923",
+    "msg_id": 4078,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:41.407724",
+    "msg_id": 4078,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:43.549458",
+    "msg_id": 4079,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:45.663437",
+    "msg_id": 4079,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:47.765618",
+    "msg_id": 4079,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:49.880351",
+    "msg_id": 4079,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:51.986229",
+    "msg_id": 4080,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:54.075986",
+    "msg_id": 4080,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:56.219823",
+    "msg_id": 4080,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:43:58.317713",
+    "msg_id": 4080,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:00.430995",
+    "msg_id": 4156,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:02.575353",
+    "msg_id": 4156,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:04.670543",
+    "msg_id": 4156,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:06.791225",
+    "msg_id": 4156,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:08.884772",
+    "msg_id": 4265,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:11.004859",
+    "msg_id": 4265,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:13.100191",
+    "msg_id": 4265,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:15.210069",
+    "msg_id": 4265,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:17.390827",
+    "msg_id": 4266,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:19.498090",
+    "msg_id": 4266,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:21.595724",
+    "msg_id": 4266,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:23.713293",
+    "msg_id": 4266,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:25.814290",
+    "msg_id": 4314,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:27.934446",
+    "msg_id": 4314,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:30.033505",
+    "msg_id": 4314,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:32.164580",
+    "msg_id": 4314,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:34.275878",
+    "msg_id": 4315,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:36.390092",
+    "msg_id": 4315,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:38.495585",
+    "msg_id": 4315,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:40.662923",
+    "msg_id": 4315,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T22:44:42.750212",
+    "msg_id": 4433,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted all refetch attempts",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T23:01:03.000181",
+    "msg_id": 45780,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T23:01:05.105056",
+    "msg_id": 45780,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T23:05:19.490976",
+    "msg_id": 50136,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-23T23:05:21.701607",
+    "msg_id": 50136,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:15.845811",
+    "msg_id": 71996,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:18.062453",
+    "msg_id": 71996,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:20.180384",
+    "msg_id": 72011,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:22.319031",
+    "msg_id": 72011,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:28.607540",
+    "msg_id": 72023,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:30.715012",
+    "msg_id": 72023,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:32.817561",
+    "msg_id": 72036,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:19:34.935944",
+    "msg_id": 72036,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:36:19.411516",
+    "msg_id": 72416,
+    "group_id": -1002072611905,
+    "group_name": "Group 2",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  },
+  {
+    "timestamp": "2025-10-24T00:36:21.516411",
+    "msg_id": 72416,
+    "group_id": -1001990110341,
+    "group_name": "Group 3",
+    "error": "Exhausted 5 attempts without success",
+    "reason": "PERMANENT_FAILURE"
+  }
+]

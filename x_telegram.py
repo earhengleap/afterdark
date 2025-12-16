@@ -17,7 +17,9 @@ from config.paths import setup_directories
 
 # Core functionality imports
 from core.downloader import VideoDownloader
+from core.image_downloader import ImageDownloader # ADD THIS IMPORT
 from core.uploader import VideoUploader
+from core.image_uploader import ImageUploader
 from core.file_manager import FileManager
 from core.log_manager import LogManager
 from core.progress_tracker import ProgressTracker

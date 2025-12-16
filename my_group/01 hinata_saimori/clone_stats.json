@@ -1,0 +1,37 @@
+{
+  "total_messages": 67,
+  "total_items": 305,
+  "successful": 305,
+  "failed": 0,
+  "skipped": 0,
+  "duplicates": 1,
+  "media_groups": 31,
+  "media_group_items": 269,
+  "by_type": {
+    "video": {
+      "success": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo": {
+      "success": 271,
+      "failed": 0,
+      "skipped": 0
+    },
+    "animation": {
+      "success": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo_forwarded": {
+      "success": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_forwarded": {
+      "success": 2,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

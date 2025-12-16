@@ -1,0 +1,44 @@
+{
+  "total_messages": 15529,
+  "successful": 15529,
+  "failed": 0,
+  "skipped": 0,
+  "duplicates": 0,
+  "by_type": {
+    "photo": {
+      "success": 14521,
+      "failed": 0,
+      "skipped": 0
+    },
+    "audio": {
+      "success": 146,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video": {
+      "success": 824,
+      "failed": 0,
+      "skipped": 0
+    },
+    "animation": {
+      "success": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    "sticker": {
+      "success": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_note": {
+      "success": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "web_page": {
+      "success": 1,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

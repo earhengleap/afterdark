@@ -1,0 +1,32 @@
+{
+  "total_messages": 50,
+  "total_items": 53,
+  "successful": 49,
+  "failed": 0,
+  "skipped": 4,
+  "duplicates": 1,
+  "media_groups": 1,
+  "media_group_items": 4,
+  "by_type": {
+    "unknown": {
+      "success": 0,
+      "failed": 0,
+      "skipped": 4
+    },
+    "photo": {
+      "success": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video": {
+      "success": 39,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo_forwarded": {
+      "success": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

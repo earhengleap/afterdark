@@ -1,0 +1,23 @@
+{
+  "total_messages": 3293,
+  "successful": 0,
+  "failed": 0,
+  "skipped": 17041,
+  "duplicates": 506,
+  "media_groups": 0,
+  "videos_cloned": 0,
+  "images_cloned": 0,
+  "gifs_cloned": 0,
+  "links_cloned": 0,
+  "other_skipped": 0,
+  "real_time_cloned": 0,
+  "direct_forwards": 0,
+  "copied_messages": 0,
+  "download_uploads": 0,
+  "resumed_from": 205,
+  "fetch_strategy": "initial",
+  "by_type": {},
+  "last_activity": "2025-11-15T13:35:14.523611",
+  "start_time": "2025-11-15T13:35:14.496989",
+  "end_time": null
+}

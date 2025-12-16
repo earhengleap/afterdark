@@ -14,9 +14,10 @@ class VideoInfo:
 class DownloadResult:
     """Data class for download results"""
     def __init__(self, url: str, status: str, filename: Optional[str] = None, 
-                 size: float = 0, error: Optional[str] = None):
+                 size: float = 0, error: Optional[str] = None, content_type: str = "unknown"):
         self.url = url
         self.status = status
         self.filename = filename
         self.size = size
         self.error = error
+        self.content_type = content_type

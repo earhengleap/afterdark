@@ -1,5 +1,3 @@
-#twitter_download/uers/users.py
-
 import os
 import json
 from datetime import datetime
@@ -29,23 +27,36 @@ def save_user_log(user_id, log_data):
     with open(user_file, "w", encoding="utf-8") as f:
         json.dump(log_data, f, indent=2, ensure_ascii=False)
 
-def log_user_action(user_id, username, url, status):
+def log_user_action(user_id, username, url, status, content_type="unknown"):
     """
     Log an action for a user.
     - user_id: Telegram ID
     - username: Telegram username or full name
     - url: link input by user
     - status: "success" or "failed"
+    - content_type: "video", "image", or "unknown"
     """
     log_entry = {
         "username": username,
         "url": url,
         "status": status,
+        "content_type": content_type,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
     log = load_user_log(user_id)
     log.append(log_entry)
     save_user_log(user_id, log)
-    print(f"📝 Logged action for {username} ({user_id}): {url} -> {status}")
-#OLD
+    
+    # Cleaner logging - only show essential info
+    if status == "success":
+        if content_type == "video":
+            print(f"✅ Video downloaded from {url[:50]}...")
+        elif content_type == "image":
+            print(f"✅ Images downloaded from {url[:50]}...")
+        else:
+            print(f"✅ Content downloaded from {url[:50]}...")
+    else:
+        # Don't log failed attempts for normal cases (no video in image URLs)
+        if "No video could be found" not in str(url) and "Unsupported URL" not in str(url):
+            print(f"❌ Download failed from {url[:50]}...")

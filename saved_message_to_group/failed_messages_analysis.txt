@@ -1,0 +1,427 @@
+================================================================================
+FAILED MESSAGES DETAILED ANALYSIS
+Generated: 2025-10-15T10:32:54.335525
+================================================================================
+
+⚠️  RETRYABLE FAILURES
+================================================================================
+
+Message ID: 3693
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3821
+Type: TEXT - Text message
+Caption: 🧸**Сошкурили клад и закатили вписку😳**
+t.me/+QBTGgNGYI-YzNDhi
+ФУЛЛ - t.me/+QBTGgNGYI-YzNDhi
+😶‍🌫**еба
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3934
+Type: TEXT - Text message
+Caption: [👧🏼👧🏻](https://t.me/joinchat/SMeHcqMTwjc4NTBi)  **__Access to DarkNet stash 
+( Доступ к приватным ар
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3976
+Type: TEXT - Text message
+Caption: **I will delete it in 10 minutes**👧🏼💕
+https://t.me/+fuofywVj3T1lNWNi
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3977
+Type: TEXT - Text message
+Caption: **12🍪
+13🩸
+**https://t.me/+Bm5nuCzAeYo1ZmNi
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3981
+Type: TEXT - Text message
+Caption: **КАК И ОБЕЩАЛ ДОСТУП К** [**СКРЫТЫМ КАМЕРАМ**](https://t.me/+puXYdFSOJjQ1MDY6) **В МОЕМ ВТОРОМ  КАН
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 3987
+Type: TEXT - Text message
+Caption: __**Шкодницы сливают свои интимки 🎀**
+__
+https://t.me/+lfybai6QGBM5NDQy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4015
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4019
+Type: TEXT - Text message
+Caption: 13🙈
+14🍼
+15👶🏻
+https://t.me/joinchat/CNnMhSUw2Hs4NTcy
+https://t.me/joinchat/CNnMhSUw2Hs4NTcy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4020
+Type: TEXT - Text message
+Caption: **📁Архивы секретного возраста 🐥👇🏻
+—** https://t.me/joinchat/CNnMhSUw2Hs4NTcy
+[📂](https://t.me/joinch
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4071
+Type: TEXT - Text message
+Caption: **12-15
+**           🍼🧸👶🏻🌸
+
+https://t.me/+90ObmvoS_yYyNzAy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4074
+Type: TEXT - Text message
+Caption: 16-19🐝🦄
+
+https://t.me/joinchat/KCgSrnU4P3tlYzQy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4075
+Type: TEXT - Text message
+Caption: **18-20
+🤫👇**
+https://t.me/+ndxVk1AxXR1mYjcy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4078
+Type: TEXT - Text message
+Caption: [11😍
+https://t.me/+m1AlxkagK8JjOGUy
+
+13🍭
+https://t.me/+m1AlxkagK8JjOGUy
+
+15🎒
+https://t.me/+m1AlxkagK
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4079
+Type: TEXT - Text message
+Caption: 11😍
+https://t.me/+C3z0WUeQen8wNTMy
+
+13🩸
+https://t.me/+bGTKMfizb5wzYTE6
+
+17🍭
+https://t.me/+bGTKMfizb5
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4080
+Type: TEXT - Text message
+Caption: DELETE 13 Min 💦👱🏻‍♀️✅
+
+https://t.me/+KcPppjRlrdE5ZWQy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4156
+Type: TEXT - Text message
+Caption: Эти Девушки создали  канал   !! 😍
+
+АЛИНА - https://t.me/+eTcEQ0l6zJVlNTRi 
+
+МАША - https://t.me/+eTc
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4265
+Type: TEXT - Text message
+Caption: **Masha 18 👧🌺 Alina 19
+
+****https://t.me/+0D3KLLfweRY1MjEy**
+
+**Тебе нельзя туда🗂**
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4266
+Type: TEXT - Text message
+Caption: **I will delete it in 10 minutes👇🍪🍪🔐🔐
+
+****https://t.me/+-xu20uCSTelkOTVi**
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4314
+Type: TEXT - Text message
+Caption: 💦ANAL + VAGINA💦
+https://t.me/+C6oxrgaca6M3ZTky
+
+💋BDSM SEX💋
+https://t.me/+L-81k1z_R0s3MGJh
+☔️☔️☔️
+htt
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4315
+Type: TEXT - Text message
+Caption: 🩸🔞FORBI$$EN CHANNELS 18+🔞🩸
+☺️https://t.me/+FEbYtHc9zNpmMjYy
+😳https://t.me/+FdnrzigDifBjYWEy
+😎https:/
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4433
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4536
+Type: TEXT - Text message
+Caption: **Дочь заставила отца облизывать свою писюшку** - https://t.me/joinchat/zH_B8Zhtm8thNTli
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4613
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4712
+Type: TEXT - Text message
+Caption: Наш чат :
+https://t.me/joinchat/hFxFJ1SPgsk1NDUy
+
+Каналы:
+1. https://t.me/+nLC9fD3_cBZlNGUy
+2. https
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4858
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4859
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 4949
+Type: TEXT - Text message
+Caption: ⚠️🔞 Тю парни... Вы просили з@пре#Nи? 🍼🍪🎀🎥
+            😱 Я В АХУЕ 😱
+
+https://t.me/+QIP87VM3IBY0NjQy
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 5113
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 5344
+Type: TEXT - Text message
+Caption: **🐰👧🏻КАНАЛЫ:
+
+📁1 — ****t**.me/+KfCbw9RngRk5NjNi
+
+**📁2 — **t.me/+Y4MkMKuepF82ODFi
+
+**📁3 — ** t.me/+o6
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 6138
+Type: TEXT - Text message
+Caption: This channel can’t be displayed because it violated Telegram's Terms of Service.
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 6837
+Type: TEXT - Text message
+Caption: 就喜欢这种小马拉大车
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 7178
+Type: TEXT - Text message
+Caption: **ㅤ
+🔞 LIST NHÓM CHẤT LƯỢNG:
+
+🗣 Xóm Cừu Non
+└ ****https://t.me/+6ZhoavfKeG41M2Fi****
+
+😎 Xóm Farmer
+└ 
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------
+
+Message ID: 7803
+Type: TEXT - Text message
+Caption: 📂 t.me/+cEEJpKXksqswMWI6
+[📂 t.me/+DEOslovbesplaTNOfree
+📂 t.me/+ZAHodipossYLKeSYkA](http://t.me/+cEEJ
+Failed for 2 group(s):
+   - Group 2
+     Error: Max retry attempts reached
+   - Group 3
+     Error: Max retry attempts reached
+--------------------------------------------------------------------------------

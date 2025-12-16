@@ -456,3 +456,70 @@ Please wait a moment before trying again.
 
 ━━━━━━━━━━━━━━━━━━━━
 *This helps keep the bot running smoothly*"""
+    @staticmethod
+    def image_download_prompt(user_id=None):
+        """Prompt user to send URL for image download"""
+        if user_id and LANG_SUPPORT:
+            ready = get_text(user_id, 'ready_to_download', 'Ready to Download')
+            send_url = get_text(user_id, 'send_url', 'Please send me the X/Twitter image URL(s) now.')
+            single_url = get_text(user_id, 'single_url', 'Single URL:')
+            multiple_urls = get_text(user_id, 'multiple_urls', 'Multiple URLs (choose any format):')
+        else:
+            ready = 'Ready to Download Images'
+            send_url = 'Please send me the X/Twitter image URL(s) now.'
+            single_url = 'Single URL:'
+            multiple_urls = 'Multiple URLs (choose any format):'
+            
+        return f"""🖼️ **{ready}**
+
+{send_url}
+
+**{single_url}**
+`https://x.com/user/status/123456789`
+
+**{multiple_urls}**
+
+📌 **Space-separated:**
+`https://x.com/user/status/111 https://x.com/user/status/222`
+
+📌 **Pipe-separated:**
+`https://x.com/user/status/111 | https://x.com/user/status/222`
+
+📌 **Line-separated:**
+https://x.com/user/status/111
+https://x.com/user/status/222
+https://x.com/user/status/333
+
+
+ℹ️ **Note:** This will download all images from the tweet(s), including multiple images from single tweets.
+
+━━━━━━━━━━━━━━━━━━━━
+*Waiting for your URL(s)...*"""
+
+    @staticmethod
+    def bulk_image_upload_prompt(image_count, user_id=None):
+        """Prompt for bulk image upload"""
+        if user_id and LANG_SUPPORT:
+            bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
+            select_all = get_text(user_id, 'select_all', 'Select All')
+            deselect_all = get_text(user_id, 'deselect_all', 'Deselect All')
+            confirm_upload = get_text(user_id, 'confirm_upload', 'Confirm Upload')
+        else:
+            bulk_upload = 'Bulk Image Upload'
+            select_all = 'Select All'
+            deselect_all = 'Deselect All'
+            confirm_upload = 'Confirm Upload'
+            
+        return f"""🖼️ **{bulk_upload} Images**
+
+📁 Found **{image_count}** image{'s' if image_count != 1 else ''} in your download folder.
+
+**Instructions:**
+1️⃣ Tap on images to select/deselect them
+2️⃣ Use **✅ {select_all}** or **❌ {deselect_all}** buttons
+3️⃣ Click **📤 {confirm_upload}** to send selected images to group
+
+ℹ️ Images will be sent in batches with progress tracking
+
+━━━━━━━━━━━━━━━━━━━━
+*Select the images you want to upload below:*"""

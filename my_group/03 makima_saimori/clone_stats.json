@@ -1,0 +1,19 @@
+{
+  "total_messages": 2,
+  "successful": 2,
+  "failed": 0,
+  "skipped": 0,
+  "duplicates": 0,
+  "by_type": {
+    "video": {
+      "success": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo": {
+      "success": 1,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

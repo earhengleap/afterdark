@@ -7,7 +7,7 @@ import re
 from typing import List
 
 from models.data_models import VideoInfo
-from config.paths import DOWNLOAD_FOLDER
+from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER  # UPDATED: Import IMAGES_FOLDER
 
 class FileManager:
     """Handles file operations and naming"""
@@ -34,6 +34,11 @@ class FileManager:
         next_num = FileManager.get_next_number()
         new_filename = f"{next_num:02d}-{filename}"
         new_path = os.path.join(directory, new_filename)
+        
+        # Check if target already exists
+        if os.path.exists(new_path):
+            return original_path
+            
         os.rename(original_path, new_path)
         return new_path
     
@@ -54,6 +59,30 @@ class FileManager:
             return []
     
     @staticmethod
+    def get_all_images() -> List[VideoInfo]:
+        """Get all image files from images folder"""
+        try:
+            images = []
+            # Use IMAGES_FOLDER instead of videos/images
+            if os.path.exists(IMAGES_FOLDER):
+                for root, dirs, files in os.walk(IMAGES_FOLDER):
+                    for filename in files:
+                        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                            filepath = os.path.join(root, filename)
+                            size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                            images.append(VideoInfo(filepath, filename, size_mb))
+            images.sort(key=lambda x: x.filename)
+            return images
+        except Exception as e:
+            print(f"Error getting images: {e}")
+            return []
+    
+    @staticmethod
     def get_total_videos() -> int:
         """Count total video files"""
         return len(FileManager.get_all_videos())
+    
+    @staticmethod
+    def get_total_images() -> int:
+        """Count total image files"""
+        return len(FileManager.get_all_images())

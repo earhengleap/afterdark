@@ -1,2 +1,64 @@
-# Ignore downloaded videos
-twitter_download/videos/
+# Create/update .gitignore with these contents
+cat > .gitignore << 'EOF'
+# Media files - DO NOT UPLOAD
+videos/
+images/
+#uploadthing/
+audio/
+*.mp4
+*.mp3
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.part
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Telegram session files and user data
+#*.session
+#*.session-journal
+#*.session.*
+#users/
+#my_group/
+#backup/
+#saved_message_to_group/
+#O36F4/
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Log files and data
+#*.log
+#data/
+#get_url_log/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# IDE and OS files
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configuration with sensitive data
+#config/twitter_cookies.txt
+#twitter_cookies.txt
+EOF
