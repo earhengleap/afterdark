@@ -11,34 +11,62 @@ from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER  # UPDATED: Import IMAGE
 
 class FileManager:
     """Handles file operations and naming"""
-    
+
     @staticmethod
     def get_next_number() -> int:
         """Get next sequential number for file naming"""
         files = os.listdir(DOWNLOAD_FOLDER)
-        numbers = [int(m.group(1)) for f in files if (m := re.match(r'^(\d+)-', f))]
-        return max(numbers) + 1 if numbers else 1
-    
+        numbers = []
+
+        for f in files:
+            # Extract number from filename like "01-filename.mp4"
+            match = re.match(r'^(\d+)-', f)
+            if match:
+                try:
+                    numbers.append(int(match.group(1)))
+                except ValueError:
+                    pass
+
+        # Also check the log for the highest number
+        from core.log_manager import LogManager
+        log = LogManager.load()
+        log_numbers = [entry.get('number', 0) for entry in log if isinstance(entry.get('number', 0), (int, float))]
+
+        all_numbers = numbers + log_numbers
+        return max(all_numbers) + 1 if all_numbers else 1
+
     @staticmethod
     def rename_with_number(original_path: str) -> str:
         """Add sequential number prefix to filename"""
         if not os.path.exists(original_path):
             return original_path
-        
+
         directory = os.path.dirname(original_path)
         filename = os.path.basename(original_path)
-        
+
         if re.match(r'^\d+-', filename):
             return original_path
-        
-        next_num = FileManager.get_next_number()
+
+        # Get next available number in folder (not from log)
+        files = os.listdir(directory)
+        numbers = []
+
+        for f in files:
+            match = re.match(r'^(\d+)-', f)
+            if match:
+                try:
+                    numbers.append(int(match.group(1)))
+                except ValueError:
+                    pass
+
+        next_num = max(numbers) + 1 if numbers else 1
         new_filename = f"{next_num:02d}-{filename}"
         new_path = os.path.join(directory, new_filename)
-        
+
         # Check if target already exists
         if os.path.exists(new_path):
             return original_path
-            
+
         os.rename(original_path, new_path)
         return new_path
     
