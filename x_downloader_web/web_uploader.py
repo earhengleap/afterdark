@@ -103,8 +103,9 @@ class WebUploader:
             except Exception as e:
                 print(f"❌ Error disconnecting: {e}")
     
+    # In web_uploader.py - Update upload_file method
     async def upload_file(self, filepath: str, caption: str = "") -> Dict[str, Any]:
-        """Upload a single file to Telegram"""
+        """Upload a single file to Telegram with optional caption"""
         if not PYROGRAM_AVAILABLE:
             return {"success": False, "error": "Pyrogram not installed"}
             
@@ -120,40 +121,45 @@ class WebUploader:
             file_size = os.path.getsize(filepath)
             
             print(f"📤 Uploading: {filename} ({file_size / (1024*1024):.2f} MB)")
+            print(f"📝 Caption: {'(Empty)' if not caption else caption[:50] + '...' if len(caption) > 50 else caption}")
             
             # Determine file type
             is_video = filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm'))
             is_image = filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'))
             
-            # Create a simple caption (max 1024 chars for Telegram)
-            safe_caption = (caption or filename)[:1024]
+            # Create caption (max 1024 chars for Telegram)
+            # If caption is empty string, don't send caption parameter at all
+            caption_params = {}
+            if caption:  # Only add caption if not empty
+                safe_caption = caption[:1024]
+                caption_params = {"caption": safe_caption}
             
             try:
                 if is_video:
-                    # Upload video with minimal parameters
+                    # Upload video with optional caption
                     message = await self.app.send_video(
                         chat_id=CHAT_ID,
                         video=filepath,
-                        caption=safe_caption,
-                        supports_streaming=True
+                        supports_streaming=True,
+                        **caption_params  # Add caption only if provided
                     )
                     print(f"✅ Video uploaded: {filename}")
                     
                 elif is_image:
-                    # Upload image
+                    # Upload image with optional caption
                     message = await self.app.send_photo(
                         chat_id=CHAT_ID,
                         photo=filepath,
-                        caption=safe_caption
+                        **caption_params  # Add caption only if provided
                     )
                     print(f"✅ Image uploaded: {filename}")
                     
                 else:
-                    # Upload as document
+                    # Upload as document with optional caption
                     message = await self.app.send_document(
                         chat_id=CHAT_ID,
                         document=filepath,
-                        caption=safe_caption
+                        **caption_params  # Add caption only if provided
                     )
                     print(f"✅ Document uploaded: {filename}")
                     
@@ -165,7 +171,7 @@ class WebUploader:
                     message = await self.app.send_document(
                         chat_id=CHAT_ID,
                         document=filepath,
-                        caption=safe_caption
+                        **caption_params  # Add caption only if provided
                     )
                     print(f"✅ Uploaded as document: {filename}")
                 except Exception as doc_error:
@@ -179,6 +185,8 @@ class WebUploader:
                 "filename": filename,
                 "size_mb": file_size / (1024 * 1024),
                 "type": "video" if is_video else "image" if is_image else "document",
+                "caption_used": bool(caption),  # Track if caption was used
+                "caption": caption if caption else None,
                 "message_id": message.id if hasattr(message, 'id') else None
             }
             

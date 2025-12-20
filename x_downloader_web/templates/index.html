@@ -126,6 +126,22 @@
             text-align: center;
         }
         
+        /* Custom caption styling */
+        .custom-caption-item {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .custom-caption-item:hover {
+            border-color: rgba(29, 161, 242, 0.3);
+            background-color: rgba(29, 161, 242, 0.05);
+        }
+        
+        .badge-sm {
+            font-size: 0.65em;
+            padding: 0.2em 0.4em;
+        }
+        
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .action-buttons {
@@ -134,6 +150,10 @@
             
             .btn-group-sm .btn {
                 padding: 0.25rem 0.5rem;
+            }
+            
+            .upload-queue-container {
+                max-height: 200px;
             }
         }
     </style>
@@ -393,9 +413,14 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                                         (<span id="selectedVideos">0</span> videos, <span id="selectedImages">0</span> images)
                                     </small>
                                 </div>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
-                                    <i class="fas fa-times"></i> Clear Selection
-                                </button>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-warning ms-2" onclick="clearAllCustomCaptions()" id="clearCaptionsBtn" style="display: none;">
+                                        <i class="fas fa-comment-slash me-1"></i>Clear All Captions
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+                                        <i class="fas fa-times"></i> Clear Selection
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -562,11 +587,43 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                                 <small class="text-muted">Prevent rate limiting</small>
                             </div>
                         </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="addCaption" checked>
-                            <label class="form-check-label" for="addCaption">
-                                <i class="fas fa-comment me-1"></i> Add caption with filename
+                    </div>
+
+                    <!-- Caption Management -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-comment me-2"></i>Captions (Optional)
+                        </h6>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableCaptions" checked>
+                            <label class="form-check-label" for="enableCaptions">
+                                <i class="fas fa-comment-alt me-1"></i> Add captions to files
                             </label>
+                        </div>
+                        
+                        <div id="captionsContainer">
+                            <div class="mb-3">
+                                <label class="form-label">Default Caption Template:</label>
+                                <input type="text" class="form-control" id="defaultCaption" 
+                                       placeholder="e.g., 📤 {filename}" value="📤 {filename}">
+                                <small class="text-muted">Use {filename} to insert filename, {size} for file size</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Custom Captions (Optional):</label>
+                                <div id="customCaptionsContainer" class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Custom captions will be added here -->
+                                    <div class="text-center py-3">
+                                        <i class="fas fa-comment-dots fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted">No custom captions added</p>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCustomCaption()">
+                                            <i class="fas fa-plus me-1"></i>Add Custom Caption
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Add custom captions for specific files (optional)</small>
+                            </div>
                         </div>
                     </div>
 
@@ -718,7 +775,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        This file will be uploaded to your Telegram group/chat.
+                        This file will be uploaded to your Telegram group/chat. Leave caption empty if you don't want one.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -829,6 +886,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
         let allFiles = [];
         let uploadTaskId = null;
         let uploadWebSocket = null;
+        let customCaptions = {};
 
         // ==================== DOM READY ====================
         document.addEventListener('DOMContentLoaded', function() {
@@ -857,6 +915,10 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
             
             if (botToken) document.getElementById('botToken').value = botToken;
             if (chatId) document.getElementById('chatId').value = chatId;
+            
+            // Initialize caption UI
+            document.getElementById('enableCaptions').addEventListener('change', updateCaptionUI);
+            updateCaptionUI();
             
             // Update upload button state
             updateUploadButtonState();
@@ -1282,9 +1344,9 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                             <div class="selection-indicator"></div>
                             <input type="checkbox" 
                                    class="form-check-input file-checkbox" 
-                                   value="${file.name}" 
+                                   value="${escapeHtml(file.name)}" 
                                    ${isSelected ? 'checked' : ''}
-                                   onchange="toggleFileSelection(this, '${file.name}')">
+                                   onchange="toggleFileSelection(this, '${escapeHtml(file.name)}')">
                         </div>
                     </td>
                     <td onclick="selectFileRow(this)">
@@ -1318,19 +1380,19 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                                title="Download">
                                 <i class="fas fa-download"></i>
                             </a>
-                            <button onclick="previewFile('${file.name}', '${file.type}')" 
+                            <button onclick="previewFile('${escapeHtml(file.name)}', '${file.type}')" 
                                     class="btn btn-info"
                                     data-bs-toggle="tooltip"
                                     title="Preview">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button onclick="uploadSingle('${file.name}')" 
+                            <button onclick="uploadSingle('${escapeHtml(file.name)}')" 
                                     class="btn btn-telegram"
                                     data-bs-toggle="tooltip"
                                     title="Upload to Telegram">
                                 <i class="fab fa-telegram-plane"></i>
                             </button>
-                            <button onclick="deleteFile('${file.name}')" 
+                            <button onclick="deleteFile('${escapeHtml(file.name)}')" 
                                     class="btn btn-danger"
                                     data-bs-toggle="tooltip"
                                     title="Delete">
@@ -1401,7 +1463,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                                 <source src="/download/${encodeURIComponent(filename)}" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
-                            <p class="mt-2"><strong>${filename}</strong></p>
+                            <p class="mt-2"><strong>${escapeHtml(filename)}</strong></p>
                         </div>
                     `,
                     showCloseButton: true,
@@ -1414,9 +1476,9 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     html: `
                         <div class="text-center">
                             <img src="/download/${encodeURIComponent(filename)}" 
-                                 alt="${filename}" 
+                                 alt="${escapeHtml(filename)}" 
                                  style="max-width: 100%; max-height: 500px; border-radius: 10px;">
-                            <p class="mt-2"><strong>${filename}</strong></p>
+                            <p class="mt-2"><strong>${escapeHtml(filename)}</strong></p>
                         </div>
                     `,
                     showCloseButton: true,
@@ -1450,6 +1512,11 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                         // Remove from selection if selected
                         selectedFiles.delete(filename);
                         updateUploadButtonState();
+                        // Remove custom caption if exists
+                        if (customCaptions[filename]) {
+                            delete customCaptions[filename];
+                            updateCustomCaptionsDisplay();
+                        }
                     } else {
                         throw new Error('Failed to delete file');
                     }
@@ -1489,12 +1556,175 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     loadFiles(); // Refresh list
                     // Clear selection
                     selectedFiles.clear();
+                    // Clear custom captions
+                    customCaptions = {};
+                    updateCustomCaptionsDisplay();
                     updateUploadButtonState();
                 } catch (error) {
                     console.error('Error clearing files:', error);
                     showToast('Failed to clear all files', 'error');
                 }
             }
+        }
+
+        // ==================== CAPTION MANAGEMENT ====================
+        function updateCaptionUI() {
+            const enableCaptions = document.getElementById('enableCaptions').checked;
+            const captionsContainer = document.getElementById('captionsContainer');
+            
+            if (enableCaptions) {
+                captionsContainer.style.display = 'block';
+                updateCustomCaptionsDisplay();
+            } else {
+                captionsContainer.style.display = 'none';
+            }
+        }
+
+        function updateCustomCaptionsDisplay() {
+            const container = document.getElementById('customCaptionsContainer');
+            const clearBtn = document.getElementById('clearCaptionsBtn');
+            
+            if (Object.keys(customCaptions).length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-3">
+                        <i class="fas fa-comment-dots fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No custom captions added</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCustomCaption()">
+                            <i class="fas fa-plus me-1"></i>Add Custom Caption
+                        </button>
+                    </div>
+                `;
+                clearBtn.style.display = 'none';
+                return;
+            }
+            
+            let html = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">Custom Captions (${Object.keys(customCaptions).length} files)</small>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomCaption()">
+                        <i class="fas fa-plus me-1"></i>Add More
+                    </button>
+                </div>
+            `;
+            
+            for (const [filename, caption] of Object.entries(customCaptions)) {
+                html += `
+                    <div class="custom-caption-item mb-2 p-2 bg-dark rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted d-block">${escapeHtml(filename)}</small>
+                                <input type="text" 
+                                       class="form-control form-control-sm mt-1 caption-input" 
+                                       value="${escapeHtml(caption)}" 
+                                       data-filename="${escapeHtml(filename)}"
+                                       placeholder="Enter caption for ${escapeHtml(filename)}">
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeCustomCaption('${escapeHtml(filename)}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            clearBtn.style.display = 'inline-block';
+            
+            // Add event listeners for caption inputs
+            document.querySelectorAll('.caption-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const filename = this.getAttribute('data-filename');
+                    customCaptions[filename] = this.value;
+                });
+            });
+        }
+
+        function addCustomCaption() {
+            if (selectedFiles.size === 0) {
+                Swal.fire({
+                    title: 'No Files Selected',
+                    text: 'Please select files first to add custom captions.',
+                    icon: 'warning',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+            
+            // Create a modal or dropdown to select file and add caption
+            let optionsHtml = '';
+            Array.from(selectedFiles).forEach(filename => {
+                if (!customCaptions[filename]) {
+                    optionsHtml += `<option value="${escapeHtml(filename)}">${escapeHtml(filename)}</option>`;
+                }
+            });
+            
+            if (!optionsHtml) {
+                Swal.fire({
+                    title: 'All Files Have Captions',
+                    text: 'All selected files already have custom captions.',
+                    icon: 'info',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Add Custom Caption',
+                html: `
+                    <div class="mb-3">
+                        <label class="form-label">Select File:</label>
+                        <select class="form-select" id="captionFileSelect">
+                            <option value="">Choose a file...</option>
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Custom Caption:</label>
+                        <input type="text" class="form-control" id="customCaptionText" 
+                               placeholder="Enter custom caption...">
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Add Caption',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#1DA1F2',
+                cancelButtonColor: '#6c757d',
+                preConfirm: () => {
+                    const filename = document.getElementById('captionFileSelect').value;
+                    const caption = document.getElementById('customCaptionText').value.trim();
+                    
+                    if (!filename) {
+                        Swal.showValidationMessage('Please select a file');
+                        return false;
+                    }
+                    
+                    if (!caption) {
+                        Swal.showValidationMessage('Please enter a caption');
+                        return false;
+                    }
+                    
+                    return { filename, caption };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { filename, caption } = result.value;
+                    customCaptions[filename] = caption;
+                    updateCustomCaptionsDisplay();
+                    showToast(`Added custom caption for ${filename}`, 'success');
+                }
+            });
+        }
+
+        function removeCustomCaption(filename) {
+            delete customCaptions[filename];
+            updateCustomCaptionsDisplay();
+            showToast(`Removed custom caption for ${filename}`, 'info');
+        }
+
+        function clearAllCustomCaptions() {
+            customCaptions = {};
+            updateCustomCaptionsDisplay();
+            showToast('Cleared all custom captions', 'info');
         }
 
         // ==================== UPLOAD FUNCTIONALITY ====================
@@ -1675,6 +1905,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
             let videoCount = 0;
             let imageCount = 0;
             let totalSize = 0;
+            let hasCaptions = document.getElementById('enableCaptions').checked;
             
             Array.from(selectedFiles).forEach(filename => {
                 // Find file info from allFiles array
@@ -1689,17 +1920,28 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     totalSize += fileInfo.size_mb;
                 }
                 
+                // Check if this file has a custom caption
+                const hasCustomCaption = customCaptions[filename] ? true : false;
+                const captionStatus = hasCaptions ? 
+                    (hasCustomCaption ? 
+                        '<span class="badge bg-info badge-sm">Custom Caption</span>' : 
+                        '<span class="badge bg-secondary badge-sm">Default Caption</span>') : 
+                    '<span class="badge bg-dark badge-sm">No Caption</span>';
+                
                 itemsHTML += `
                     <div class="upload-queue-item p-2 mb-2 bg-dark rounded">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
                                 <i class="fas ${isVideo ? 'fa-video text-danger' : 'fa-image text-success'} me-2"></i>
                                 <div>
-                                    <span class="small d-block">${filename}</span>
-                                    ${fileInfo ? `<small class="text-muted">${fileInfo.size_mb.toFixed(2)} MB</small>` : ''}
+                                    <span class="small d-block">${escapeHtml(filename)}</span>
+                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                        ${fileInfo ? `<small class="text-muted">${fileInfo.size_mb.toFixed(2)} MB</small>` : ''}
+                                        ${captionStatus}
+                                    </div>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeFromQueue('${filename}')">
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeFromQueue('${escapeHtml(filename)}')">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -1710,10 +1952,11 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
             // Add summary at the top
             itemsHTML = `
                 <div class="alert alert-info mb-2 p-2">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
                         <small><strong>${selectedFiles.size}</strong> files selected</small>
                         <small><strong>${videoCount}</strong> videos, <strong>${imageCount}</strong> images</small>
                         <small>Total: <strong>${totalSize.toFixed(2)} MB</strong></small>
+                        <small>Captions: <strong>${hasCaptions ? 'Enabled' : 'Disabled'}</strong></small>
                     </div>
                 </div>
                 ${itemsHTML}
@@ -1743,7 +1986,37 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
 
             const uploadMode = document.getElementById('uploadMode').value;
             const uploadDelay = document.getElementById('uploadDelay').value;
-            const addCaption = document.getElementById('addCaption').checked;
+            const enableCaptions = document.getElementById('enableCaptions').checked;
+            const defaultCaption = document.getElementById('defaultCaption').value;
+            
+            // Prepare caption data
+            let captionsData = null;
+            
+            if (enableCaptions) {
+                // Use custom captions if available, otherwise generate from template
+                captionsData = {};
+                Array.from(selectedFiles).forEach(filename => {
+                    if (customCaptions[filename]) {
+                        // Use custom caption
+                        captionsData[filename] = customCaptions[filename];
+                    } else if (defaultCaption) {
+                        // Generate from template
+                        let caption = defaultCaption;
+                        caption = caption.replace(/{filename}/g, filename);
+                        
+                        // Get file size if {size} is in template
+                        if (caption.includes('{size}')) {
+                            const fileInfo = allFiles.find(f => f.name === filename);
+                            if (fileInfo) {
+                                caption = caption.replace(/{size}/g, `${fileInfo.size_mb.toFixed(2)} MB`);
+                            }
+                        }
+                        
+                        captionsData[filename] = caption;
+                    }
+                    // If no caption template and no custom caption, leave empty (no caption)
+                });
+            }
 
             // Close options modal
             const optionsModal = bootstrap.Modal.getInstance(document.getElementById('uploadOptionsModal'));
@@ -1769,7 +2042,8 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                         filenames: Array.from(selectedFiles),
                         upload_mode: uploadMode,
                         delay: parseInt(uploadDelay),
-                        add_caption: addCaption
+                        add_caption: enableCaptions,
+                        captions: captionsData  // Send captions data (can be null)
                     })
                 });
 
@@ -1869,9 +2143,10 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
             const details = document.getElementById('uploadDetails');
             if (task.downloaded_files?.length > 0) {
                 const lastFile = task.downloaded_files[task.downloaded_files.length - 1];
+                const captionInfo = lastFile.caption_used ? 'with caption' : 'without caption';
                 details.innerHTML = `
                     <i class="fas fa-check-circle text-success me-2"></i>
-                    Last uploaded: <strong>${lastFile.name}</strong>
+                    Last uploaded: <strong>${lastFile.name}</strong> (${captionInfo})
                     <br>
                     <small class="text-muted">Progress: ${uploaded}/${total} files</small>
                 `;
@@ -1896,10 +2171,15 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
             `;
 
             if (successCount > 0) {
+                const withCaption = task.downloaded_files.filter(f => f.caption_used).length;
+                const withoutCaption = successCount - withCaption;
+                
                 summaryHTML += `
                     <div class="alert alert-success">
                         <i class="fas fa-check-circle me-2"></i>
                         <strong>${successCount} files uploaded successfully</strong>
+                        <br>
+                        <small>${withCaption} with caption, ${withoutCaption} without caption</small>
                     </div>
                     
                     <h6 class="mt-3">Uploaded Files:</h6>
@@ -1910,17 +2190,23 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                                     <th>File</th>
                                     <th>Type</th>
                                     <th>Size</th>
+                                    <th>Caption</th>
                                 </tr>
                             </thead>
                             <tbody>
                 `;
 
                 task.downloaded_files.slice(0, 5).forEach(file => {
+                    const captionStatus = file.caption_used ? 
+                        '<span class="badge bg-info badge-sm">Yes</span>' : 
+                        '<span class="badge bg-secondary badge-sm">No</span>';
+                    
                     summaryHTML += `
                         <tr>
-                            <td><small>${file.name}</small></td>
+                            <td><small>${escapeHtml(file.name)}</small></td>
                             <td><span class="badge ${file.type === 'video' ? 'bg-danger' : 'bg-success'}">${file.type}</span></td>
                             <td><small>${file.size_mb ? file.size_mb.toFixed(2) : '0.00'} MB</small></td>
+                            <td>${captionStatus}</td>
                         </tr>
                     `;
                 });
@@ -1946,8 +2232,8 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                 task.errors.slice(0, 3).forEach(error => {
                     summaryHTML += `
                         <li class="list-group-item">
-                            <small class="text-danger">${error.url || error.filename || 'Unknown file'}</small><br>
-                            <small>${error.error}</small>
+                            <small class="text-danger">${escapeHtml(error.filename || 'Unknown file')}</small><br>
+                            <small>${escapeHtml(error.error)}</small>
                         </li>
                     `;
                 });
@@ -1959,6 +2245,9 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
 
             // Clear selection after upload
             deselectAllFiles();
+            // Clear custom captions after successful upload
+            customCaptions = {};
+            updateCustomCaptionsDisplay();
 
             const summaryModal = new bootstrap.Modal(document.getElementById('uploadCompleteModal'));
             summaryModal.show();
@@ -1982,7 +2271,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
 
         async function uploadSingleFile() {
             const filename = document.getElementById('singleFileName').textContent;
-            const caption = document.getElementById('singleFileCaption').value;
+            const caption = document.getElementById('singleFileCaption').value.trim();
 
             try {
                 const response = await fetch('/api/upload/single', {
@@ -1992,14 +2281,14 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     },
                     body: JSON.stringify({
                         filename: filename,
-                        caption: caption
+                        caption: caption || ""  // Send empty string if no caption
                     })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    showToast('File uploaded successfully', 'success');
+                    showToast(`File uploaded ${caption ? 'with caption' : 'without caption'}`, 'success');
                     const modal = bootstrap.Modal.getInstance(document.getElementById('singleUploadModal'));
                     if (modal) modal.hide();
                 } else {
@@ -2166,6 +2455,12 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                             <strong>Total Size:</strong>
                             <p>${task.total_size_mb || 0} MB</p>
                         </div>
+                        ${task.add_caption !== undefined ? `
+                        <div class="col-md-6">
+                            <strong>Captions:</strong>
+                            <p>${task.add_caption ? 'Enabled' : 'Disabled'}</p>
+                        </div>
+                        ` : ''}
                     </div>
                     
                     <h6 class="mt-3">Downloaded Files (${task.downloaded_files?.length || 0})</h6>
@@ -2182,7 +2477,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                             <tbody>
                                 ${task.downloaded_files.slice(0, 10).map(file => `
                                 <tr>
-                                    <td>${file.name}</td>
+                                    <td>${escapeHtml(file.name)}</td>
                                     <td><span class="badge ${file.type === 'video' ? 'badge-video' : 'badge-image'}">${file.type}</span></td>
                                     <td>${file.size_mb} MB</td>
                                 </tr>
@@ -2197,7 +2492,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     <h6 class="mt-3">Errors (${task.errors.length})</h6>
                     <div class="alert alert-danger">
                         <ul class="mb-0">
-                            ${task.errors.slice(0, 5).map(error => `<li>${error.url?.substring(0, 50)}... - ${error.error}</li>`).join('')}
+                            ${task.errors.slice(0, 5).map(error => `<li>${escapeHtml(error.url?.substring(0, 50) || error.filename || 'Unknown')}... - ${escapeHtml(error.error)}</li>`).join('')}
                         </ul>
                         ${task.errors.length > 5 ? `<p class="mt-2 mb-0">... and ${task.errors.length - 5} more errors</p>` : ''}
                     </div>
@@ -2350,7 +2645,7 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
                     <div class="d-flex">
                         <div class="toast-body">
                             <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} me-2"></i>
-                            ${message}
+                            ${escapeHtml(message)}
                         </div>
                         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                     </div>
@@ -2400,6 +2695,9 @@ https://x.com/username/status/1234567890 https://x.com/username/status/987654321
         window.previewFile = previewFile;
         window.deleteFile = deleteFile;
         window.viewTaskDetails = viewTaskDetails;
+        window.addCustomCaption = addCustomCaption;
+        window.removeCustomCaption = removeCustomCaption;
+        window.clearAllCustomCaptions = clearAllCustomCaptions;
     </script>
 </body>
 </html>

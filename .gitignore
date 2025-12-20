@@ -3,6 +3,9 @@ cat > .gitignore << 'EOF'
 # Media files - DO NOT UPLOAD
 videos/
 images/
+uploadthing_videos/
+x_downloader_web/data/videos/
+x_downloader_web/data/images/
 #uploadthing/
 audio/
 *.mp4

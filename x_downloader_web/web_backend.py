@@ -199,6 +199,7 @@ class UploadRequest(BaseModel):
     upload_mode: str = "mixed"  # mixed, videos_only, images_only
     delay: int = 2
     add_caption: bool = True
+    captions: Optional[Dict[str, str]] = None  # Optional custom captions
 
 class SingleUploadRequest(BaseModel):
     filename: str
@@ -304,9 +305,10 @@ async def start_download(request: DownloadRequest, background_tasks: BackgroundT
         "status_url": f"/api/tasks/{task_id}"
     }
 
+# In web_backend.py - Update start_upload endpoint
 @app.post("/api/upload/start")
 async def start_upload(request: UploadRequest, background_tasks: BackgroundTasks):
-    """Start uploading files to Telegram"""
+    """Start uploading files to Telegram with optional captions"""
     try:
         # Filter files based on upload mode
         filtered_files = []
@@ -349,7 +351,9 @@ async def start_upload(request: UploadRequest, background_tasks: BackgroundTasks
             "start_time": datetime.now().isoformat(),
             "end_time": None,
             "total_size_mb": 0.0,
-            "current_file": None
+            "current_file": None,
+            "add_caption": request.add_caption,
+            "has_custom_captions": bool(request.captions)
         }
         
         tasks[task_id] = task
@@ -360,12 +364,15 @@ async def start_upload(request: UploadRequest, background_tasks: BackgroundTasks
             task_id,
             filtered_files,
             request.delay,
-            request.add_caption
+            request.add_caption,
+            request.captions  # Pass custom captions
         )
         
         return {
             "task_id": task_id,
             "message": f"Upload started for {len(filtered_files)} files",
+            "add_caption": request.add_caption,
+            "custom_captions": bool(request.captions),
             "status_url": f"/api/tasks/{task_id}"
         }
         
@@ -950,8 +957,9 @@ async def process_download_task(task_id: str, urls: List[str], content_type: str
     await notify_task_update(task_id)
     print(f"Task {task_id} completed: {len(total_files)} files, {total_size:.2f} MB")
 
-async def process_upload_task(task_id: str, filepaths: List[str], delay: int, add_caption: bool):
-    """Process upload in background"""
+# In web_backend.py - Update process_upload_task function
+async def process_upload_task(task_id: str, filepaths: List[str], delay: int, add_caption: bool, custom_captions: Optional[Dict[str, str]] = None):
+    """Process upload in background with optional captions"""
     if task_id not in tasks:
         return
     
@@ -972,19 +980,32 @@ async def process_upload_task(task_id: str, filepaths: List[str], delay: int, ad
                 task["current_file"] = {"name": os.path.basename(filepath), "progress": 0}
                 await notify_task_update(task_id)
                 
+                # Generate caption
+                caption = ""
+                filename = os.path.basename(filepath)
+                
+                if add_caption:
+                    if custom_captions and filename in custom_captions:
+                        # Use custom caption if provided
+                        caption = custom_captions[filename]
+                    else:
+                        # Use default caption with filename
+                        caption = f"📤 {filename}"
+                
                 # Upload the file
-                result = await upload_single_file(filepath, f"Uploaded: {os.path.basename(filepath)}")
+                result = await upload_single_file(filepath, caption)
                 
                 if result["success"]:
                     success_count += 1
                     uploaded_files.append({
-                        "name": os.path.basename(filepath),
+                        "name": filename,
                         "size_mb": result.get("size_mb", 0),
-                        "type": result.get("type", "unknown")
+                        "type": result.get("type", "unknown"),
+                        "caption_used": bool(caption)
                     })
                 else:
                     errors.append({
-                        "url": os.path.basename(filepath),
+                        "filename": filename,
                         "error": result.get("error", "Unknown error")
                     })
                 
@@ -994,7 +1015,7 @@ async def process_upload_task(task_id: str, filepaths: List[str], delay: int, ad
                     
             except Exception as e:
                 errors.append({
-                    "url": os.path.basename(filepath),
+                    "filename": os.path.basename(filepath),
                     "error": str(e)
                 })
         
@@ -1010,7 +1031,7 @@ async def process_upload_task(task_id: str, filepaths: List[str], delay: int, ad
         
     except Exception as e:
         task["status"] = "failed"
-        task["errors"] = [{"url": "Upload task", "error": str(e)}]
+        task["errors"] = [{"filename": "Upload task", "error": str(e)}]
         task["end_time"] = datetime.now().isoformat()
     
     await notify_task_update(task_id)
