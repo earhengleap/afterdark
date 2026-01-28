@@ -1,75 +1,75 @@
 {
-  "total_messages": 26331,
-  "total_items": 32165,
-  "successful": 1854,
+  "total_messages": 24963,
+  "total_items": 30784,
+  "successful": 3739,
   "failed": 0,
   "skipped": 0,
-  "duplicates": 2226,
-  "media_groups": 116,
-  "media_group_items": 340,
+  "duplicates": 369,
+  "media_groups": 218,
+  "media_group_items": 527,
   "by_type": {
-    "photo_forwarded": {
-      "success": 163,
-      "failed": 0,
-      "skipped": 0
-    },
-    "video": {
-      "success": 3,
-      "failed": 0,
-      "skipped": 0
-    },
-    "animation_forwarded": {
-      "success": 123,
+    "photo": {
+      "success": 1776,
       "failed": 0,
       "skipped": 0
     },
     "animation": {
-      "success": 580,
-      "failed": 0,
-      "skipped": 0
-    },
-    "photo": {
-      "success": 840,
-      "failed": 0,
-      "skipped": 0
-    },
-    "poll": {
-      "success": 34,
-      "failed": 0,
-      "skipped": 0
-    },
-    "text": {
-      "success": 58,
-      "failed": 0,
-      "skipped": 0
-    },
-    "text_forwarded": {
-      "success": 3,
-      "failed": 0,
-      "skipped": 0
-    },
-    "video_forwarded": {
-      "success": 36,
-      "failed": 0,
-      "skipped": 0
-    },
-    "document_forwarded": {
-      "success": 5,
+      "success": 1266,
       "failed": 0,
       "skipped": 0
     },
     "sticker": {
-      "success": 7,
+      "success": 9,
       "failed": 0,
       "skipped": 0
     },
-    "poll_forwarded": {
-      "success": 1,
+    "animation_forwarded": {
+      "success": 205,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo_forwarded": {
+      "success": 214,
+      "failed": 0,
+      "skipped": 0
+    },
+    "poll": {
+      "success": 60,
+      "failed": 0,
+      "skipped": 0
+    },
+    "text": {
+      "success": 86,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_forwarded": {
+      "success": 88,
       "failed": 0,
       "skipped": 0
     },
     "document": {
-      "success": 1,
+      "success": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    "text_forwarded": {
+      "success": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video": {
+      "success": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "document_forwarded": {
+      "success": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "poll_forwarded": {
+      "success": 2,
       "failed": 0,
       "skipped": 0
     }

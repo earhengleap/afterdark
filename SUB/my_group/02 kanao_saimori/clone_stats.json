@@ -1,12 +1,12 @@
 {
-  "total_messages": 50,
-  "total_items": 53,
-  "successful": 49,
+  "total_messages": 571,
+  "total_items": 650,
+  "successful": 646,
   "failed": 0,
   "skipped": 4,
-  "duplicates": 1,
-  "media_groups": 1,
-  "media_group_items": 4,
+  "duplicates": 0,
+  "media_groups": 22,
+  "media_group_items": 101,
   "by_type": {
     "unknown": {
       "success": 0,
@@ -14,17 +14,27 @@
       "skipped": 4
     },
     "photo": {
-      "success": 7,
+      "success": 385,
       "failed": 0,
       "skipped": 0
     },
     "video": {
-      "success": 39,
+      "success": 239,
       "failed": 0,
       "skipped": 0
     },
     "photo_forwarded": {
-      "success": 3,
+      "success": 16,
+      "failed": 0,
+      "skipped": 0
+    },
+    "animation_forwarded": {
+      "success": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_forwarded": {
+      "success": 5,
       "failed": 0,
       "skipped": 0
     }

@@ -19,3 +19,13 @@
 {"timestamp": "2025-10-15T07:30:09.353214", "msg_id": 6803, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "video"}
 {"timestamp": "2025-10-15T07:30:12.440574", "msg_id": 6803, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "video"}
 {"timestamp": "2025-10-15T07:30:15.576935", "msg_id": 6804, "group_id": -1002088860676, "group_name": "Group 1", "message_type": "video"}
+{"timestamp": "2026-01-12T23:06:13.981013", "msg_id": 41119, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "photo"}
+{"timestamp": "2026-01-12T23:06:19.316763", "msg_id": 41119, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "photo"}
+{"timestamp": "2026-01-12T23:10:59.148822", "msg_id": 42311, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "photo"}
+{"timestamp": "2026-01-12T23:11:04.488285", "msg_id": 42311, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "photo"}
+{"timestamp": "2026-01-12T23:53:08.694964", "msg_id": 58058, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "photo"}
+{"timestamp": "2026-01-12T23:53:13.940906", "msg_id": 58058, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "photo"}
+{"timestamp": "2026-01-13T02:07:42.569429", "msg_id": 73080, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "photo"}
+{"timestamp": "2026-01-13T02:07:47.788331", "msg_id": 73080, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "photo"}
+{"timestamp": "2026-01-13T02:56:01.118653", "msg_id": 75876, "group_id": -1002072611905, "group_name": "Group 2", "message_type": "photo"}
+{"timestamp": "2026-01-13T02:56:06.378986", "msg_id": 75876, "group_id": -1001990110341, "group_name": "Group 3", "message_type": "photo"}

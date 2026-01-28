@@ -464,3 +464,35 @@
 2025-11-11 23:44:29,926 - INFO - ✅ Cloned media group 14064066740099138 with 2 items
 2025-11-11 23:44:33,328 - INFO - ✅ Cloned media group 14065720651436898 with 3 items
 2025-11-11 23:44:34,911 - INFO - ✅ Cloned media group 14067565687355506 with 4 items
+2026-01-12 22:46:27,192 - INFO - ✅ Cloned media group 14064066740099138 with 2 items
+2026-01-12 22:46:27,405 - INFO - ✅ Cloned media group 14065720651436898 with 3 items
+2026-01-12 22:46:27,576 - INFO - ✅ Cloned media group 14067565687355506 with 4 items
+2026-01-12 22:46:30,608 - INFO - ✅ Cloned media group 14070475575852482 with 2 items
+2026-01-12 22:46:32,145 - INFO - ✅ Cloned media group 14071262126295714 with 3 items
+2026-01-12 22:46:40,793 - INFO - ✅ Cloned media group 14074103082834954 with 6 items
+2026-01-12 22:46:50,573 - INFO - ✅ Forwarded message 2824 (preserving attribution)
+2026-01-12 22:46:52,500 - INFO - ✅ Cloned media group 14076224854605490 with 4 items
+2026-01-12 22:46:58,191 - INFO - ✅ Cloned media group 14076757108356338 with 2 items
+2026-01-12 22:46:58,469 - INFO - ✅ Cloned media group 14076799340464346 with 6 items
+2026-01-12 22:46:58,644 - INFO - ✅ Cloned media group 14076933533073250 with 4 items
+2026-01-12 22:47:04,340 - INFO - ✅ Cloned media group 14078297039031618 with 3 items
+2026-01-12 22:47:06,286 - INFO - ✅ Cloned media group 14078894637715378 with 2 items
+2026-01-12 22:47:06,435 - INFO - ✅ Cloned media group 14079008564046154 with 2 items
+2026-01-12 22:47:12,001 - INFO - ✅ Cloned media group 14080341650928994 with 2 items
+2026-01-12 22:47:13,713 - INFO - ✅ Cloned media group 14084378208905658 with 2 items
+2026-01-12 22:47:19,539 - INFO - ✅ Cloned media group 14088482333886586 with 2 items
+2026-01-12 22:47:19,648 - INFO - ✅ Cloned media group 14090178977722058 with 2 items
+2026-01-12 22:47:27,037 - INFO - ✅ Cloned media group 14093998059377466 with 2 items
+2026-01-12 22:47:27,184 - INFO - ✅ Cloned media group 14096267262823202 with 2 items
+2026-01-12 22:47:31,711 - INFO - ✅ Cloned media group 14097455335610490 with 2 items
+2026-01-12 22:47:31,853 - INFO - ✅ Cloned media group 14097459274734498 with 2 items
+2026-01-12 22:47:33,807 - INFO - ✅ Cloned media group 14097512930512378 with 2 items
+2026-01-12 22:47:41,283 - INFO - ✅ Cloned media group 14103622658479282 with 2 items
+2026-01-12 22:47:42,849 - INFO - ✅ Forwarded message 2941 (preserving attribution)
+2026-01-12 22:47:44,400 - INFO - ✅ Cloned media group 14105107840998762 with 2 items
+2026-01-12 22:47:47,542 - INFO - ✅ Cloned media group 14109323690744618 with 2 items
+2026-01-12 22:47:47,640 - INFO - ✅ Cloned media group 14109824901305882 with 2 items
+2026-01-12 22:47:56,550 - INFO - ✅ Cloned media group 14110650278596922 with 2 items
+2026-01-12 22:47:56,681 - INFO - ✅ Cloned media group 14111243145359194 with 2 items
+2026-01-12 22:47:56,775 - INFO - ✅ Cloned media group 14112746990938362 with 2 items
+2026-01-12 22:47:56,951 - INFO - ✅ Cloned media group 14113617767996954 with 6 items

@@ -12236,3 +12236,5 @@
 2025-11-15 13:34:51,581 - WARNING - [my_account.session] Waiting for 10 seconds before continuing (required by "channels.GetMessages")
 2025-11-15 14:23:54,453 - ERROR - Error in streaming fetch: Telegram says: [406 CHANNEL_PRIVATE] - The channel/supergroup is not accessible (caused by "messages.GetHistory")
 2025-11-15 14:23:54,509 - ERROR - Error getting latest message: Telegram says: [406 CHANNEL_PRIVATE] - The channel/supergroup is not accessible (caused by "messages.GetHistory")
+2026-01-12 22:46:44,400 - ERROR - Error verifying group access: Telegram says: [400 USERNAME_INVALID] - The username is invalid (caused by "contacts.ResolveUsername")
+2026-01-12 22:47:12,124 - ERROR - Error verifying group access: Telegram says: [400 USERNAME_INVALID] - The username is invalid (caused by "contacts.ResolveUsername")

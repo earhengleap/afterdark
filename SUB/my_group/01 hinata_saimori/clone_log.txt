@@ -49911,3 +49911,765 @@ pyrogram.errors.exceptions.unauthorized_401.SessionRevoked: Telegram says: [401 
 2025-11-12 01:45:14,727 - INFO - ✅ Cloned media group 14102892158967698 with 5 items
 2025-11-12 01:45:16,972 - INFO - ✅ Cloned media group 14102988240357338 with 9 items
 2025-11-12 01:45:17,030 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:54:26,121 - WARNING - [my_account.session] Waiting for 14 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:54:50,845 - WARNING - [my_account.session] Waiting for 21 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:55:19,601 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:55:51,265 - WARNING - [my_account.session] Waiting for 22 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:56:20,246 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:56:51,010 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:57:23,364 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:57:54,667 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:58:25,306 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:58:56,059 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:59:28,244 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:59:58,902 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:00:29,717 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:01:00,726 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:01:33,068 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:02:03,474 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:02:34,640 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:03:05,132 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:03:36,109 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:04:09,023 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:04:41,289 - WARNING - [my_account.session] Waiting for 22 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:05:10,038 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:05:41,472 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:06:11,418 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:06:42,341 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:07:13,381 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:07:43,384 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:08:14,656 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:08:45,811 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:09:16,223 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:09:48,251 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:10:18,482 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:10:49,749 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:11:21,134 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:11:51,522 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:12:22,904 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:12:53,941 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:13:24,879 - WARNING - [my_account.session] Waiting for 26 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:13:56,290 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:14:27,209 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-13 00:14:56,348 - WARNING - ⏳ Flood wait for media group: 1891s
+2026-01-13 00:46:27,384 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:46:30,728 - INFO - ✅ Cloned media group 14103103169184042 with 9 items
+2026-01-13 00:46:33,405 - INFO - ✅ Cloned media group 14103217992372026 with 9 items
+2026-01-13 00:46:35,726 - INFO - ✅ Cloned media group 14103332712485490 with 9 items
+2026-01-13 00:46:37,753 - INFO - ✅ Cloned media group 14103448944512170 with 9 items
+2026-01-13 00:46:40,316 - INFO - ✅ Cloned media group 14103562465708394 with 9 items
+2026-01-13 00:46:50,854 - INFO - ✅ Cloned media group 14103679344873746 with 9 items
+2026-01-13 00:46:53,489 - INFO - ✅ Cloned media group 14103794528311354 with 9 items
+2026-01-13 00:46:55,729 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:46:59,016 - INFO - ✅ Cloned media group 14103909736345122 with 9 items
+2026-01-13 00:47:01,311 - INFO - ✅ Cloned media group 14104024472632850 with 9 items
+2026-01-13 00:47:03,532 - INFO - ✅ Cloned media group 14104140592533138 with 9 items
+2026-01-13 00:47:07,850 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:47:13,303 - INFO - ✅ Cloned media group 14104254137064346 with 9 items
+2026-01-13 00:47:13,403 - INFO - ✅ Forwarded message 122894
+2026-01-13 00:47:15,256 - INFO - ✅ Forwarded message 122895
+2026-01-13 00:47:17,728 - INFO - ✅ Forwarded message 122896
+2026-01-13 00:47:22,099 - INFO - ✅ Forwarded message 122898
+2026-01-13 00:47:24,720 - INFO - ✅ Forwarded message 122899
+2026-01-13 00:47:27,044 - INFO - ✅ Forwarded message 122900
+2026-01-13 00:47:29,822 - INFO - ✅ Cloned media group 14104350625227058 with 4 items
+2026-01-13 00:47:33,936 - INFO - ✅ Forwarded message 122905
+2026-01-13 00:47:36,061 - INFO - ✅ Cloned media group 14104369665383938 with 9 items
+2026-01-13 00:47:36,177 - INFO - ✅ Forwarded message 122915
+2026-01-13 00:47:38,550 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:47:41,747 - INFO - ✅ Cloned media group 14104387953546162 with 7 items
+2026-01-13 00:47:41,885 - INFO - ✅ Cloned media group 14104403364213826 with 3 items
+2026-01-13 00:47:44,391 - INFO - ✅ Cloned media group 14104485664238122 with 9 items
+2026-01-13 00:47:47,322 - INFO - ✅ Cloned media group 14104599072927490 with 9 items
+2026-01-13 00:47:53,514 - INFO - ✅ Cloned media group 14104715392260514 with 9 items
+2026-01-13 00:47:56,321 - INFO - ✅ Cloned media group 14104831304555978 with 9 items
+2026-01-13 00:47:56,482 - INFO - ✅ Cloned media group 14104874358111458 with 4 items
+2026-01-13 00:47:58,583 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:48:01,630 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:48:04,769 - INFO - ✅ Cloned media group 14104893699436122 with 3 items
+2026-01-13 00:48:04,883 - INFO - ✅ Forwarded message 122974
+2026-01-13 00:48:07,281 - INFO - ✅ Cloned media group 14104919957471578 with 3 items
+2026-01-13 00:48:07,387 - INFO - ✅ Cloned media group 14104938394434746 with 2 items
+2026-01-13 00:48:07,621 - INFO - ✅ Cloned media group 14104945170184186 with 9 items
+2026-01-13 00:48:11,692 - INFO - ✅ Cloned media group 14104965105552234 with 5 items
+2026-01-13 00:48:14,521 - INFO - ✅ Cloned media group 14105062528189722 with 9 items
+2026-01-13 00:48:14,566 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:19,983 - INFO - ✅ Cloned media group 14105175401472018 with 9 items
+2026-01-13 00:48:22,586 - INFO - ✅ Cloned media group 14105291000402882 with 9 items
+2026-01-13 00:48:22,623 - WARNING - [my_account.session] Waiting for 5 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:30,378 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:48:33,686 - INFO - ✅ Cloned media group 14105405081644706 with 9 items
+2026-01-13 00:48:40,379 - INFO - ✅ Cloned media group 14105521352805282 with 9 items
+2026-01-13 00:48:43,137 - INFO - ✅ Cloned media group 14105637705137618 with 9 items
+2026-01-13 00:48:48,196 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:48:51,462 - INFO - ✅ Cloned media group 14105753048548234 with 9 items
+2026-01-13 00:48:54,392 - INFO - ✅ Cloned media group 14105867808937754 with 9 items
+2026-01-13 00:48:54,649 - INFO - ✅ Cloned media group 14105945797951466 with 9 items
+2026-01-13 00:48:54,852 - INFO - ✅ Cloned media group 14106039280588354 with 9 items
+2026-01-13 00:48:58,672 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:49:04,170 - INFO - ✅ Cloned media group 14106155049437602 with 9 items
+2026-01-13 00:49:06,513 - INFO - ✅ Cloned media group 14106271720311602 with 9 items
+2026-01-13 00:49:09,391 - INFO - ✅ Cloned media group 14106385155080522 with 9 items
+2026-01-13 00:49:11,812 - INFO - ✅ Cloned media group 14106531331465514 with 9 items
+2026-01-13 00:49:13,934 - INFO - ✅ Cloned media group 14106617040151602 with 9 items
+2026-01-13 00:49:21,417 - INFO - ✅ Cloned media group 14106731192354210 with 9 items
+2026-01-13 00:49:24,087 - INFO - ✅ Cloned media group 14106847032375978 with 9 items
+2026-01-13 00:49:26,986 - INFO - ✅ Cloned media group 14106962512487314 with 9 items
+2026-01-13 00:49:29,575 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:49:32,823 - INFO - ✅ Cloned media group 14107076650116754 with 9 items
+2026-01-13 00:49:35,020 - INFO - ✅ Cloned media group 14107193448402250 with 9 items
+2026-01-13 00:49:41,911 - INFO - ✅ Cloned media group 14107306386460626 with 9 items
+2026-01-13 00:49:41,954 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:49:47,750 - INFO - ✅ Cloned media group 14107421289606578 with 9 items
+2026-01-13 00:49:49,850 - INFO - ✅ Cloned media group 14107536745659738 with 9 items
+2026-01-13 00:49:52,783 - INFO - ✅ Cloned media group 14107652920925162 with 9 items
+2026-01-13 00:49:55,227 - INFO - ✅ Cloned media group 14107768352963946 with 9 items
+2026-01-13 00:50:03,406 - INFO - ✅ Cloned media group 14107883456906570 with 9 items
+2026-01-13 00:50:05,801 - INFO - ✅ Cloned media group 14107997705564722 with 9 items
+2026-01-13 00:50:06,282 - INFO - ✅ Cloned media group 14108083529003378 with 9 items
+2026-01-13 00:50:06,550 - INFO - ✅ Cloned media group 14108172020659602 with 9 items
+2026-01-13 00:50:06,774 - INFO - ✅ Cloned media group 14108258344774754 with 9 items
+2026-01-13 00:50:06,986 - INFO - ✅ Cloned media group 14108344065068562 with 9 items
+2026-01-13 00:50:07,050 - WARNING - [my_account.session] Waiting for 6 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:50:13,095 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:50:16,352 - INFO - ✅ Cloned media group 14108431344621178 with 9 items
+2026-01-13 00:50:16,763 - INFO - ✅ Cloned media group 14108518648375226 with 9 items
+2026-01-13 00:50:20,888 - INFO - ✅ Cloned media group 14108603969227546 with 9 items
+2026-01-13 00:50:23,316 - INFO - ✅ Cloned media group 14108690353064426 with 9 items
+2026-01-13 00:50:25,749 - WARNING - [my_account.session] Waiting for 6 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:50:31,794 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:50:35,090 - INFO - ✅ Cloned media group 14108803880543586 with 9 items
+2026-01-13 00:50:37,275 - INFO - ✅ Cloned media group 14108920552537690 with 9 items
+2026-01-13 00:50:37,377 - INFO - ✅ Forwarded message 123363
+2026-01-13 00:50:42,086 - INFO - ✅ Cloned media group 14109036680289194 with 9 items
+2026-01-13 00:50:48,312 - INFO - ✅ Cloned media group 14109151480464130 with 9 items
+2026-01-13 00:50:51,173 - INFO - ✅ Cloned media group 14109266976495554 with 9 items
+2026-01-13 00:50:53,206 - INFO - ✅ Cloned media group 14109380784788138 with 9 items
+2026-01-13 00:50:55,550 - INFO - ✅ Cloned media group 14109496560597762 with 9 items
+2026-01-13 00:50:58,471 - INFO - ✅ Cloned media group 14109610592998706 with 9 items
+2026-01-13 00:51:06,064 - INFO - ✅ Cloned media group 14109727184589114 with 9 items
+2026-01-13 00:51:08,136 - INFO - ✅ Cloned media group 14109841737094250 with 9 items
+2026-01-13 00:51:10,951 - INFO - ✅ Cloned media group 14109956841671458 with 9 items
+2026-01-13 00:51:13,286 - INFO - ✅ Cloned media group 14110072616476098 with 9 items
+2026-01-13 00:51:16,167 - INFO - ✅ Cloned media group 14110186784602050 with 9 items
+2026-01-13 00:51:24,383 - INFO - ✅ Cloned media group 14110301451537674 with 9 items
+2026-01-13 00:51:26,534 - INFO - ✅ Cloned media group 14110418976383802 with 9 items
+2026-01-13 00:51:28,504 - INFO - ✅ Cloned media group 14110533392950978 with 9 items
+2026-01-13 00:51:28,617 - INFO - ✅ Forwarded message 123507
+2026-01-13 00:51:33,755 - INFO - ✅ Cloned media group 14110648457369994 with 9 items
+2026-01-13 00:51:41,367 - INFO - ✅ Cloned media group 14110762720957618 with 9 items
+2026-01-13 00:51:43,722 - INFO - ✅ Cloned media group 14110877200428346 with 9 items
+2026-01-13 00:51:45,919 - INFO - ✅ Cloned media group 14110994200772698 with 9 items
+2026-01-13 00:51:50,827 - INFO - ✅ Cloned media group 14111108185192010 with 9 items
+2026-01-13 00:51:53,645 - INFO - ✅ Cloned media group 14111223881175050 with 9 items
+2026-01-13 00:52:00,150 - INFO - ✅ Cloned media group 14111312352148266 with 9 items
+2026-01-13 00:52:00,420 - INFO - ✅ Cloned media group 14111397336991514 with 9 items
+2026-01-13 00:52:00,780 - INFO - ✅ Cloned media group 14111482082592850 with 9 items
+2026-01-13 00:52:01,023 - INFO - ✅ Cloned media group 14111568520868018 with 9 items
+2026-01-13 00:52:01,062 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:52:06,964 - INFO - ✅ Cloned media group 14111683184800874 with 9 items
+2026-01-13 00:52:09,742 - INFO - ✅ Cloned media group 14111798384618178 with 9 items
+2026-01-13 00:52:12,371 - INFO - ✅ Cloned media group 14111913585558858 with 9 items
+2026-01-13 00:52:20,434 - INFO - ✅ Cloned media group 14112028785246114 with 9 items
+2026-01-13 00:52:23,000 - INFO - ✅ Cloned media group 14112143984736770 with 9 items
+2026-01-13 00:52:25,683 - INFO - ✅ Cloned media group 14112259184426066 with 9 items
+2026-01-13 00:52:28,055 - INFO - ✅ Cloned media group 14112374384367410 with 9 items
+2026-01-13 00:52:30,854 - INFO - ✅ Cloned media group 14112489585244282 with 9 items
+2026-01-13 00:52:37,639 - INFO - ✅ Cloned media group 14112607416546738 with 9 items
+2026-01-13 00:52:40,130 - INFO - ✅ Cloned media group 14112721457163474 with 9 items
+2026-01-13 00:52:43,055 - INFO - ✅ Cloned media group 14112836457184866 with 9 items
+2026-01-13 00:52:45,276 - INFO - ✅ Cloned media group 14112950784373746 with 9 items
+2026-01-13 00:52:48,397 - INFO - ✅ Cloned media group 14113066840898874 with 9 items
+2026-01-13 00:52:57,260 - INFO - ✅ Cloned media group 14113182001666338 with 9 items
+2026-01-13 00:53:01,887 - INFO - ✅ Cloned media group 14113297265383266 with 9 items
+2026-01-13 00:53:04,767 - INFO - ✅ Cloned media group 14113414480450082 with 9 items
+2026-01-13 00:53:07,360 - INFO - ✅ Cloned media group 14113529176360810 with 9 items
+2026-01-13 00:53:16,346 - INFO - ✅ Cloned media group 14113643904430090 with 9 items
+2026-01-13 00:53:19,169 - INFO - ✅ Cloned media group 14113756786442538 with 9 items
+2026-01-13 00:53:21,545 - INFO - ✅ Forwarded message 123801
+2026-01-13 00:53:23,678 - INFO - ✅ Cloned media group 14113871985693586 with 9 items
+2026-01-13 00:53:26,218 - INFO - ✅ Cloned media group 14113987185822850 with 9 items
+2026-01-13 00:53:26,491 - INFO - ✅ Cloned media group 14114073585314978 with 9 items
+2026-01-13 00:53:26,596 - INFO - ✅ Forwarded message 123830
+2026-01-13 00:53:32,781 - INFO - ✅ Cloned media group 14114159985371290 with 9 items
+2026-01-13 00:53:33,154 - INFO - ✅ Cloned media group 14114246384491946 with 9 items
+2026-01-13 00:53:33,422 - INFO - ✅ Cloned media group 14114333696427642 with 9 items
+2026-01-13 00:53:36,001 - INFO - ✅ Cloned media group 14114448970317922 with 9 items
+2026-01-13 00:53:38,458 - INFO - ✅ Cloned media group 14114564393113970 with 9 items
+2026-01-13 00:53:40,591 - INFO - ✅ Cloned media group 14114681528280770 with 9 items
+2026-01-13 00:53:48,406 - INFO - ✅ Cloned media group 14114796217075122 with 9 items
+2026-01-13 00:53:50,455 - INFO - ✅ Cloned media group 14114909840946706 with 9 items
+2026-01-13 00:53:52,861 - INFO - ✅ Cloned media group 14115024200887082 with 9 items
+2026-01-13 00:53:55,519 - INFO - ✅ Cloned media group 14115140145531506 with 9 items
+2026-01-13 00:53:58,376 - INFO - ✅ Cloned media group 14115256672657098 with 9 items
+2026-01-13 00:54:06,967 - INFO - ✅ Forwarded message 123940
+2026-01-13 00:54:11,765 - INFO - ✅ Cloned media group 14115370984962490 with 9 items
+2026-01-13 00:54:14,350 - INFO - ✅ Cloned media group 14115487560601306 with 9 items
+2026-01-13 00:54:16,447 - INFO - ✅ Cloned media group 14115601376806602 with 9 items
+2026-01-13 00:54:19,126 - INFO - ✅ Cloned media group 14115717128352186 with 9 items
+2026-01-13 00:54:25,448 - INFO - ✅ Cloned media group 14115832480673090 with 9 items
+2026-01-13 00:54:28,148 - INFO - ✅ Cloned media group 14115946841042730 with 9 items
+2026-01-13 00:54:30,364 - INFO - ✅ Cloned media group 14116062729649946 with 9 items
+2026-01-13 00:54:32,791 - INFO - ✅ Cloned media group 14116178544348466 with 9 items
+2026-01-13 00:54:33,021 - INFO - ✅ Cloned media group 14116265096568290 with 9 items
+2026-01-13 00:54:33,256 - INFO - ✅ Cloned media group 14116272282690266 with 9 items
+2026-01-13 00:54:33,693 - INFO - ✅ Cloned media group 14116350227599538 with 9 items
+2026-01-13 00:54:39,650 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:54:42,893 - INFO - ✅ Cloned media group 14116464225607002 with 9 items
+2026-01-13 00:54:45,366 - INFO - ✅ Cloned media group 14116581768387810 with 9 items
+2026-01-13 00:54:50,436 - INFO - ✅ Forwarded message 124070
+2026-01-13 00:54:53,039 - INFO - ✅ Forwarded message 124071
+2026-01-13 00:54:55,321 - INFO - ✅ Forwarded message 124072
+2026-01-13 00:54:58,032 - INFO - ✅ Forwarded message 124073
+2026-01-13 00:55:05,416 - INFO - ✅ Forwarded message 124074
+2026-01-13 00:55:08,390 - INFO - ✅ Cloned media group 14116691896410922 with 7 items
+2026-01-13 00:55:08,705 - INFO - ✅ Cloned media group 14116697096422394 with 9 items
+2026-01-13 00:55:08,826 - INFO - ✅ Cloned media group 14116705874964082 with 4 items
+2026-01-13 00:55:08,906 - INFO - ✅ Forwarded message 124095
+2026-01-13 00:55:11,255 - INFO - ✅ Cloned media group 14116748380188946 with 5 items
+2026-01-13 00:55:13,967 - INFO - ✅ Cloned media group 14116757999306418 with 4 items
+2026-01-13 00:55:14,103 - INFO - ✅ Cloned media group 14116768518904018 with 4 items
+2026-01-13 00:55:14,294 - INFO - ✅ Cloned media group 14116791174048602 with 4 items
+2026-01-13 00:55:21,057 - INFO - ✅ Cloned media group 14116812776336706 with 9 items
+2026-01-13 00:55:21,229 - INFO - ✅ Cloned media group 14116823149938394 with 6 items
+2026-01-13 00:55:21,380 - INFO - ✅ Cloned media group 14116839386027642 with 4 items
+2026-01-13 00:55:21,506 - INFO - ✅ Cloned media group 14116849645471562 with 4 items
+2026-01-13 00:55:21,610 - INFO - ✅ Forwarded message 124137
+2026-01-13 00:55:23,436 - INFO - ✅ Cloned media group 14116872676877978 with 5 items
+2026-01-13 00:55:23,579 - INFO - ✅ Cloned media group 14116895559995378 with 4 items
+2026-01-13 00:55:23,799 - INFO - ✅ Cloned media group 14116897625195698 with 9 items
+2026-01-13 00:55:24,051 - INFO - ✅ Cloned media group 14116983761151386 with 9 items
+2026-01-13 00:55:24,092 - WARNING - [my_account.session] Waiting for 4 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:55:35,923 - INFO - ✅ Cloned media group 14117098776608106 with 9 items
+2026-01-13 00:55:38,140 - INFO - ✅ Cloned media group 14117215136560538 with 9 items
+2026-01-13 00:55:40,658 - INFO - ✅ Cloned media group 14117330936290530 with 9 items
+2026-01-13 00:55:43,188 - INFO - ✅ Cloned media group 14117446617649002 with 9 items
+2026-01-13 00:55:46,048 - INFO - ✅ Cloned media group 14117561152581266 with 9 items
+2026-01-13 00:55:46,277 - INFO - ✅ Cloned media group 14117646800920122 with 9 items
+2026-01-13 00:55:50,723 - INFO - ✅ Cloned media group 14117732440972738 with 9 items
+2026-01-13 00:55:52,696 - INFO - ✅ Cloned media group 14117848232981794 with 9 items
+2026-01-13 00:55:54,938 - INFO - ✅ Cloned media group 14117964480232546 with 9 items
+2026-01-13 00:55:56,977 - INFO - ✅ Cloned media group 14118078968617802 with 9 items
+2026-01-13 00:55:59,614 - INFO - ✅ Cloned media group 14118193729069130 with 9 items
+2026-01-13 00:55:59,681 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:56:02,948 - INFO - ✅ Cloned media group 14118281528395506 with 9 items
+2026-01-13 00:56:09,181 - INFO - ✅ Cloned media group 14118366161377538 with 9 items
+2026-01-13 00:56:12,056 - INFO - ✅ Cloned media group 14118482176769658 with 9 items
+2026-01-13 00:56:14,013 - INFO - ✅ Cloned media group 14118596544820506 with 9 items
+2026-01-13 00:56:16,828 - INFO - ✅ Cloned media group 14118713496373090 with 9 items
+2026-01-13 00:56:19,470 - INFO - ✅ Cloned media group 14118828056616818 with 9 items
+2026-01-13 00:56:30,213 - INFO - ✅ Cloned media group 14118942177851042 with 9 items
+2026-01-13 00:56:30,403 - INFO - ✅ Cloned media group 14119021230813978 with 3 items
+2026-01-13 00:56:30,701 - INFO - ✅ Cloned media group 14119029800560274 with 9 items
+2026-01-13 00:56:30,947 - INFO - ✅ Cloned media group 14119116088611042 with 9 items
+2026-01-13 00:56:33,295 - INFO - ✅ Cloned media group 14119229136457922 with 9 items
+2026-01-13 00:56:35,272 - INFO - ✅ Cloned media group 14119346105029266 with 9 items
+2026-01-13 00:56:35,390 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:56:44,885 - INFO - ✅ Cloned media group 14119460896973610 with 9 items
+2026-01-13 00:56:47,274 - INFO - ✅ Cloned media group 14119576609307522 with 9 items
+2026-01-13 00:56:49,937 - INFO - ✅ Cloned media group 14119692704210290 with 9 items
+2026-01-13 00:56:51,967 - INFO - ✅ Cloned media group 14119805432918458 with 9 items
+2026-01-13 00:56:54,462 - INFO - ✅ Cloned media group 14119920656743506 with 9 items
+2026-01-13 00:57:00,286 - INFO - ✅ Cloned media group 14120036275950018 with 9 items
+2026-01-13 00:57:02,721 - INFO - ✅ Cloned media group 14120151929421490 with 9 items
+2026-01-13 00:57:05,363 - INFO - ✅ Cloned media group 14120268512224066 with 9 items
+2026-01-13 00:57:08,043 - INFO - ✅ Cloned media group 14120382329620058 with 9 items
+2026-01-13 00:57:10,762 - INFO - ✅ Cloned media group 14120497153082362 with 9 items
+2026-01-13 00:57:19,440 - INFO - ✅ Cloned media group 14120612856751162 with 9 items
+2026-01-13 00:57:21,661 - INFO - ✅ Cloned media group 14120727880830418 with 9 items
+2026-01-13 00:57:23,929 - INFO - ✅ Cloned media group 14120843393243906 with 9 items
+2026-01-13 00:57:23,966 - WARNING - ⏳ Flood wait: 2944s
+2026-01-13 01:46:32,682 - INFO - ✅ Cloned media group 14120958961274690 with 9 items
+2026-01-13 01:46:34,694 - INFO - ✅ Cloned media group 14121072922287122 with 9 items
+2026-01-13 01:46:42,089 - INFO - ✅ Cloned media group 14121189425026034 with 9 items
+2026-01-13 01:46:44,726 - INFO - ✅ Cloned media group 14121304344487458 with 9 items
+2026-01-13 01:46:47,556 - INFO - ✅ Cloned media group 14121419177246450 with 9 items
+2026-01-13 01:46:49,990 - INFO - ✅ Cloned media group 14121535089309122 with 9 items
+2026-01-13 01:46:54,724 - INFO - ✅ Cloned media group 14121649705215282 with 9 items
+2026-01-13 01:47:02,830 - INFO - ✅ Cloned media group 14121764633481826 with 9 items
+2026-01-13 01:47:05,032 - INFO - ✅ Cloned media group 14121879480852882 with 9 items
+2026-01-13 01:47:07,082 - INFO - ✅ Cloned media group 14121996016649794 with 9 items
+2026-01-13 01:47:09,871 - INFO - ✅ Cloned media group 14122109969418746 with 9 items
+2026-01-13 01:47:11,878 - INFO - ✅ Cloned media group 14122226808500602 with 9 items
+2026-01-13 01:47:21,422 - INFO - ✅ Cloned media group 14122340521294202 with 9 items
+2026-01-13 01:47:24,228 - INFO - ✅ Cloned media group 14122455505560474 with 9 items
+2026-01-13 01:47:24,433 - INFO - ✅ Cloned media group 14122541656789170 with 9 items
+2026-01-13 01:47:24,639 - INFO - ✅ Cloned media group 14122627402260394 with 9 items
+2026-01-13 01:47:27,268 - INFO - ✅ Cloned media group 14122744408489946 with 9 items
+2026-01-13 01:47:29,378 - INFO - ✅ Cloned media group 14122858436541626 with 9 items
+2026-01-13 01:47:40,729 - INFO - ✅ Cloned media group 14122974297630386 with 9 items
+2026-01-13 01:47:42,844 - INFO - ✅ Cloned media group 14123089897395290 with 9 items
+2026-01-13 01:47:45,381 - INFO - ✅ Cloned media group 14123203993210930 with 9 items
+2026-01-13 01:47:48,069 - INFO - ✅ Cloned media group 14123320312575330 with 9 items
+2026-01-13 01:47:56,888 - INFO - ✅ Cloned media group 14123436306829690 with 9 items
+2026-01-13 01:47:59,498 - INFO - ✅ Cloned media group 14123551704608626 with 9 items
+2026-01-13 01:48:01,829 - INFO - ✅ Cloned media group 14123666017383962 with 9 items
+2026-01-13 01:48:04,394 - INFO - ✅ Cloned media group 14123782016408770 with 9 items
+2026-01-13 01:48:04,653 - INFO - ✅ Cloned media group 14123868808295842 with 9 items
+2026-01-13 01:48:04,688 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 01:48:09,930 - INFO - ✅ Cloned media group 14124009776896362 with 9 items
+2026-01-13 01:48:16,427 - INFO - ✅ Cloned media group 14124126297073202 with 9 items
+2026-01-13 01:48:18,798 - INFO - ✅ Cloned media group 14124242632678978 with 9 items
+2026-01-13 01:48:21,247 - INFO - ✅ Cloned media group 14124358144424026 with 9 items
+2026-01-13 01:48:23,951 - INFO - ✅ Cloned media group 14124473449208546 with 9 items
+2026-01-13 01:48:25,960 - INFO - ✅ Cloned media group 14124586753003234 with 9 items
+2026-01-13 01:48:33,557 - INFO - ✅ Cloned media group 14124703096542402 with 9 items
+2026-01-13 01:48:36,457 - INFO - ✅ Cloned media group 14124817928706866 with 9 items
+2026-01-13 01:48:38,749 - INFO - ✅ Cloned media group 14124932273065898 with 9 items
+2026-01-13 01:48:41,521 - INFO - ✅ Cloned media group 14125049824241202 with 9 items
+2026-01-13 01:48:52,377 - INFO - ✅ Cloned media group 14125165008413898 with 9 items
+2026-01-13 01:48:54,768 - INFO - ✅ Cloned media group 14125278697118218 with 9 items
+2026-01-13 01:48:56,835 - INFO - ✅ Cloned media group 14125393456562690 with 9 items
+2026-01-13 01:48:59,450 - INFO - ✅ Cloned media group 14125509352708274 with 9 items
+2026-01-13 01:49:02,273 - INFO - ✅ Cloned media group 14125623529340554 with 9 items
+2026-01-13 01:49:08,994 - INFO - ✅ Cloned media group 14125740768358578 with 9 items
+2026-01-13 01:49:11,443 - INFO - ✅ Cloned media group 14125854761395194 with 9 items
+2026-01-13 01:49:14,283 - INFO - ✅ Cloned media group 14125970608516594 with 9 items
+2026-01-13 01:49:17,019 - INFO - ✅ Cloned media group 14126085688385922 with 9 items
+2026-01-13 01:49:20,100 - INFO - ✅ Cloned media group 14126200232733722 with 9 items
+2026-01-13 01:49:27,336 - INFO - ✅ Cloned media group 14126315897835090 with 9 items
+2026-01-13 01:49:27,571 - INFO - ✅ Cloned media group 14126401138220050 with 9 items
+2026-01-13 01:49:27,825 - INFO - ✅ Cloned media group 14126488073500586 with 9 items
+2026-01-13 01:49:28,066 - INFO - ✅ Cloned media group 14126574249471266 with 9 items
+2026-01-13 01:49:28,266 - INFO - ✅ Cloned media group 14126661288976146 with 9 items
+2026-01-13 01:49:28,470 - INFO - ✅ Cloned media group 14126718328734434 with 9 items
+2026-01-13 01:49:28,506 - WARNING - [my_account.session] Waiting for 6 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 01:49:37,001 - INFO - ✅ Cloned media group 14126833976521282 with 9 items
+2026-01-13 01:49:39,199 - INFO - ✅ Cloned media group 14126948488705506 with 9 items
+2026-01-13 01:49:47,052 - INFO - ✅ Cloned media group 14127064121117666 with 9 items
+2026-01-13 01:49:52,143 - INFO - ✅ Cloned media group 14127180552543146 with 9 items
+2026-01-13 01:49:55,121 - INFO - ✅ Cloned media group 14127295025427946 with 9 items
+2026-01-13 01:49:57,360 - INFO - ✅ Cloned media group 14127408816669426 with 9 items
+2026-01-13 01:50:05,476 - INFO - ✅ Cloned media group 14127523648471386 with 9 items
+2026-01-13 01:50:08,241 - INFO - ✅ Cloned media group 14127640712745178 with 9 items
+2026-01-13 01:50:10,772 - INFO - ✅ Cloned media group 14127755161304826 with 9 items
+2026-01-13 01:50:10,879 - INFO - ✅ Forwarded message 125151
+2026-01-13 01:50:15,700 - INFO - ✅ Forwarded message 125154
+2026-01-13 01:50:17,696 - INFO - ✅ Forwarded message 125155
+2026-01-13 01:50:19,774 - INFO - ✅ Forwarded message 125156
+2026-01-13 01:50:27,671 - INFO - ✅ Forwarded message 125157
+2026-01-13 01:50:30,640 - INFO - ✅ Forwarded message 125158
+2026-01-13 01:50:33,170 - INFO - ✅ Forwarded message 125159
+2026-01-13 01:50:36,365 - INFO - ✅ Cloned media group 14127871824423282 with 9 items
+2026-01-13 01:50:36,464 - INFO - ✅ Forwarded message 125169
+2026-01-13 01:50:38,172 - INFO - ✅ Forwarded message 125170
+2026-01-13 01:50:41,061 - INFO - ✅ Cloned media group 14127912566421986 with 6 items
+2026-01-13 01:50:42,900 - INFO - ✅ Forwarded message 125178
+2026-01-13 01:50:45,212 - INFO - ✅ Cloned media group 14127957832882170 with 4 items
+2026-01-13 01:50:51,358 - INFO - ✅ Cloned media group 14127973173272082 with 4 items
+2026-01-13 01:50:51,603 - INFO - ✅ Cloned media group 14127986329087266 with 9 items
+2026-01-13 01:50:51,778 - INFO - ✅ Cloned media group 14127991353177210 with 5 items
+2026-01-13 01:50:51,957 - INFO - ✅ Cloned media group 14127997982354250 with 5 items
+2026-01-13 01:50:52,068 - INFO - ✅ Cloned media group 14128014950903098 with 4 items
+2026-01-13 01:50:52,240 - INFO - ✅ Cloned media group 14128024290370850 with 5 items
+2026-01-13 01:50:52,333 - INFO - ✅ Forwarded message 125215
+2026-01-13 01:50:57,089 - INFO - ✅ Cloned media group 14128101280716218 with 9 items
+2026-01-13 01:51:05,481 - INFO - ✅ Cloned media group 14128214641252162 with 9 items
+2026-01-13 01:51:07,838 - INFO - ✅ Cloned media group 14128331752907122 with 9 items
+2026-01-13 01:51:10,381 - INFO - ✅ Cloned media group 14128392041570178 with 4 items
+2026-01-13 01:51:10,535 - INFO - ✅ Cloned media group 14128402524821290 with 4 items
+2026-01-13 01:51:10,734 - INFO - ✅ Cloned media group 14128412010703170 with 5 items
+2026-01-13 01:51:11,013 - INFO - ✅ Cloned media group 14128447160714226 with 9 items
+2026-01-13 01:51:13,563 - INFO - ✅ Cloned media group 14128562616760922 with 9 items
+2026-01-13 01:51:23,193 - INFO - ✅ Forwarded message 125281
+2026-01-13 01:51:25,754 - INFO - ✅ Cloned media group 14128676768926026 with 9 items
+2026-01-13 01:51:27,812 - INFO - ✅ Cloned media group 14128791528529090 with 9 items
+2026-01-13 01:51:29,836 - INFO - ✅ Cloned media group 14128906216835234 with 9 items
+2026-01-13 01:51:32,681 - INFO - ✅ Cloned media group 14129022457012578 with 9 items
+2026-01-13 01:51:39,925 - INFO - ✅ Cloned media group 14129138704305330 with 9 items
+2026-01-13 01:51:41,973 - INFO - ✅ Cloned media group 14129224265395042 with 3 items
+2026-01-13 01:51:42,231 - INFO - ✅ Cloned media group 14129254312347050 with 9 items
+2026-01-13 01:51:44,613 - INFO - ✅ Cloned media group 14129368209374194 with 9 items
+2026-01-13 01:51:44,701 - INFO - ✅ Forwarded message 125354
+2026-01-13 01:51:46,958 - INFO - ✅ Cloned media group 14129454384738954 with 9 items
+2026-01-13 01:51:47,243 - INFO - ✅ Cloned media group 14129539776615970 with 9 items
+2026-01-13 01:51:56,197 - INFO - ✅ Cloned media group 14129655880761170 with 9 items
+2026-01-13 01:51:58,733 - INFO - ✅ Cloned media group 14129772664280946 with 9 items
+2026-01-13 01:52:02,764 - INFO - ✅ Cloned media group 14129886577105746 with 9 items
+2026-01-13 01:52:05,411 - INFO - ✅ Cloned media group 14130003192294930 with 9 items
+2026-01-13 01:52:05,613 - INFO - ✅ Cloned media group 14130087369541306 with 9 items
+2026-01-13 01:52:12,267 - INFO - ✅ Cloned media group 14130175465331066 with 9 items
+2026-01-13 01:52:14,536 - INFO - ✅ Cloned media group 14130289226023834 with 9 items
+2026-01-13 01:52:16,679 - INFO - ✅ Cloned media group 14130404473445850 with 9 items
+2026-01-13 01:52:19,612 - INFO - ✅ Cloned media group 14130519490143618 with 9 items
+2026-01-13 01:52:21,613 - INFO - ✅ Cloned media group 14130635809541866 with 9 items
+2026-01-13 01:52:28,788 - INFO - ✅ Cloned media group 14130752008342162 with 9 items
+2026-01-13 01:52:30,931 - INFO - ✅ Cloned media group 14130864272775962 with 9 items
+2026-01-13 01:52:32,957 - INFO - ✅ Cloned media group 14130981328571842 with 9 items
+2026-01-13 01:52:35,425 - INFO - ✅ Cloned media group 14131096056955378 with 9 items
+2026-01-13 01:52:37,371 - INFO - ✅ Cloned media group 14131211217421114 with 9 items
+2026-01-13 01:52:46,707 - INFO - ✅ Cloned media group 14131326633219242 with 9 items
+2026-01-13 01:52:48,911 - INFO - ✅ Cloned media group 14131442840247794 with 9 items
+2026-01-13 01:52:50,885 - INFO - ✅ Cloned media group 14131586457042938 with 9 items
+2026-01-13 01:52:53,699 - INFO - ✅ Cloned media group 14131759640895650 with 9 items
+2026-01-13 01:52:53,991 - INFO - ✅ Cloned media group 14131844265072026 with 9 items
+2026-01-13 01:52:54,253 - INFO - ✅ Cloned media group 14131930681379914 with 9 items
+2026-01-13 01:53:00,044 - INFO - ✅ Cloned media group 14132017521141890 with 9 items
+2026-01-13 01:53:00,271 - INFO - ✅ Cloned media group 14132104337532962 with 9 items
+2026-01-13 01:53:00,309 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 01:53:03,590 - INFO - ✅ Cloned media group 14132190248994994 with 9 items
+2026-01-13 01:53:06,223 - INFO - ✅ Cloned media group 14132363416821954 with 9 items
+2026-01-13 01:53:09,087 - INFO - ✅ Cloned media group 14132535873344338 with 9 items
+2026-01-13 01:53:11,091 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 01:53:14,145 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 01:53:17,357 - INFO - ✅ Cloned media group 14132709873258042 with 9 items
+2026-01-13 01:53:25,489 - INFO - ✅ Cloned media group 14132882840083050 with 9 items
+2026-01-13 01:53:27,367 - INFO - ✅ Cloned media group 14133055075211106 with 9 items
+2026-01-13 01:53:29,489 - INFO - ✅ Cloned media group 14133228080464818 with 9 items
+2026-01-13 01:53:34,321 - INFO - ✅ Cloned media group 14133400401174522 with 9 items
+2026-01-13 01:53:36,870 - INFO - ✅ Cloned media group 14133573688291362 with 9 items
+2026-01-13 01:53:44,579 - INFO - ✅ Cloned media group 14133688912361450 with 9 items
+2026-01-13 01:53:47,164 - INFO - ✅ Cloned media group 14133802133415490 with 9 items
+2026-01-13 01:53:49,873 - INFO - ✅ Cloned media group 14133918872774778 with 9 items
+2026-01-13 01:53:52,496 - INFO - ✅ Cloned media group 14134022078255290 with 3 items
+2026-01-13 01:53:52,576 - INFO - ✅ Forwarded message 125728
+2026-01-13 01:53:54,784 - INFO - ✅ Forwarded message 125729
+2026-01-13 01:54:01,350 - INFO - ✅ Forwarded message 125730
+2026-01-13 01:54:03,806 - INFO - ✅ Cloned media group 14134034233230458 with 9 items
+2026-01-13 01:54:03,902 - INFO - ✅ Forwarded message 125740
+2026-01-13 01:54:05,643 - INFO - ✅ Forwarded message 125741
+2026-01-13 01:54:07,798 - INFO - ✅ Forwarded message 125743
+2026-01-13 01:54:10,498 - INFO - ✅ Cloned media group 14134081645443738 with 3 items
+2026-01-13 01:54:10,621 - INFO - ✅ Cloned media group 14134098431732226 with 4 items
+2026-01-13 01:54:10,771 - INFO - ✅ Cloned media group 14134113968990546 with 5 items
+2026-01-13 01:54:11,002 - INFO - ✅ Cloned media group 14134119850207938 with 9 items
+2026-01-13 01:54:11,124 - INFO - ✅ Cloned media group 14134132423748874 with 4 items
+2026-01-13 01:54:17,357 - WARNING - 🔄 Bad request (file ref) for group 14134145491107962, retry 1/10
+2026-01-13 01:54:26,541 - INFO - ✅ Cloned media group 14134145491107962 with 3 items
+2026-01-13 01:54:26,578 - WARNING - 🔄 Bad request (file ref) for group 14134154968150730, retry 1/10
+2026-01-13 01:54:35,781 - INFO - ✅ Cloned media group 14134154968150730 with 4 items
+2026-01-13 01:54:35,875 - INFO - ✅ Forwarded message 125776
+2026-01-13 01:54:37,608 - INFO - ✅ Forwarded message 125777
+2026-01-13 01:54:40,028 - WARNING - 🔄 Bad request (file ref) for group 14134192369978354, retry 1/10
+2026-01-13 01:54:49,230 - INFO - ✅ Cloned media group 14134192369978354 with 4 items
+2026-01-13 01:54:49,268 - WARNING - 🔄 Bad request (file ref) for group 14134207192669538, retry 1/10
+2026-01-13 01:54:58,566 - INFO - ✅ Cloned media group 14134207192669538 with 9 items
+2026-01-13 01:54:58,610 - WARNING - 🔄 Bad request (file ref) for group 14134232205737962, retry 1/10
+2026-01-13 01:55:07,840 - INFO - ✅ Cloned media group 14134232205737962 with 5 items
+2026-01-13 01:55:07,917 - INFO - ✅ Forwarded message 125796
+2026-01-13 01:55:09,722 - WARNING - 🔄 Bad request (file ref) for group 14134292024898026, retry 1/10
+2026-01-13 01:55:19,000 - INFO - ✅ Cloned media group 14134292024898026 with 9 items
+2026-01-13 01:55:19,040 - WARNING - 🔄 Bad request (file ref) for group 14134379048899978, retry 1/10
+2026-01-13 01:55:28,387 - INFO - ✅ Cloned media group 14134379048899978 with 9 items
+2026-01-13 01:55:33,037 - INFO - 🔄 File ref expired for 125815, retry 1/10
+2026-01-13 01:55:44,209 - WARNING - 🔄 Bad request (file ref) for group 14134495576237562, retry 1/10
+2026-01-13 01:55:53,531 - INFO - ✅ Cloned media group 14134495576237562 with 9 items
+2026-01-13 01:55:53,576 - INFO - 🔄 File ref expired for 125826, retry 1/10
+2026-01-13 01:56:05,254 - WARNING - 🔄 Bad request (file ref) for group 14134611256620066, retry 1/10
+2026-01-13 01:56:14,601 - INFO - ✅ Cloned media group 14134611256620066 with 9 items
+2026-01-13 01:56:14,641 - INFO - 🔄 File ref expired for 125840, retry 1/10
+2026-01-13 01:56:26,103 - WARNING - 🔄 Bad request (file ref) for group 14134725529136754, retry 1/10
+2026-01-13 01:56:35,383 - INFO - ✅ Cloned media group 14134725529136754 with 9 items
+2026-01-13 01:56:35,421 - INFO - 🔄 File ref expired for 125851, retry 1/10
+2026-01-13 01:56:47,450 - WARNING - 🔄 Bad request (file ref) for group 14134841096663810, retry 1/10
+2026-01-13 01:56:56,749 - INFO - ✅ Cloned media group 14134841096663810 with 9 items
+2026-01-13 01:56:56,810 - WARNING - 🔄 Bad request (file ref) for group 14134926360956602, retry 1/10
+2026-01-13 01:57:06,150 - INFO - ✅ Cloned media group 14134926360956602 with 9 items
+2026-01-13 01:57:06,188 - WARNING - 🔄 Bad request (file ref) for group 14135012568704850, retry 1/10
+2026-01-13 01:57:15,456 - INFO - ✅ Cloned media group 14135012568704850 with 9 items
+2026-01-13 01:57:21,065 - INFO - 🔄 File ref expired for 125879, retry 1/10
+2026-01-13 01:57:31,936 - WARNING - 🔄 Bad request (file ref) for group 14135128256507586, retry 1/10
+2026-01-13 01:57:41,292 - INFO - ✅ Cloned media group 14135128256507586 with 9 items
+2026-01-13 01:57:41,348 - INFO - 🔄 File ref expired for 125889, retry 1/10
+2026-01-13 01:57:52,779 - WARNING - 🔄 Bad request (file ref) for group 14135244480213946, retry 1/10
+2026-01-13 01:58:02,173 - INFO - ✅ Cloned media group 14135244480213946 with 9 items
+2026-01-13 01:58:02,212 - INFO - 🔄 File ref expired for 125899, retry 1/10
+2026-01-13 01:58:13,593 - WARNING - 🔄 Bad request (file ref) for group 14135358337122130, retry 1/10
+2026-01-13 01:58:22,901 - INFO - ✅ Cloned media group 14135358337122130 with 9 items
+2026-01-13 01:58:22,983 - INFO - ✅ Forwarded message 125909
+2026-01-13 01:58:24,969 - INFO - 🔄 File ref expired for 125910, retry 1/10
+2026-01-13 01:58:36,004 - INFO - 🔄 File ref expired for 125911, retry 1/10
+2026-01-13 01:58:47,942 - WARNING - 🔄 Bad request (file ref) for group 14135473273359490, retry 1/10
+2026-01-13 01:58:57,263 - INFO - ✅ Cloned media group 14135473273359490 with 9 items
+2026-01-13 01:59:01,919 - INFO - ✅ Forwarded message 125921
+2026-01-13 01:59:03,804 - INFO - 🔄 File ref expired for 125923, retry 1/10
+2026-01-13 01:59:15,024 - WARNING - 🔄 Bad request (file ref) for group 14135588905138722, retry 1/10
+2026-01-13 01:59:24,290 - INFO - ✅ Cloned media group 14135588905138722 with 9 items
+2026-01-13 01:59:24,329 - INFO - 🔄 File ref expired for 125933, retry 1/10
+2026-01-13 01:59:35,786 - WARNING - 🔄 Bad request (file ref) for group 14135702596720690, retry 1/10
+2026-01-13 01:59:45,185 - INFO - ✅ Cloned media group 14135702596720690 with 9 items
+2026-01-13 01:59:45,223 - INFO - 🔄 File ref expired for 125943, retry 1/10
+2026-01-13 01:59:56,200 - WARNING - 🔄 Bad request (file ref) for group 14135818464906002, retry 1/10
+2026-01-13 02:00:05,547 - INFO - ✅ Cloned media group 14135818464906002 with 9 items
+2026-01-13 02:00:05,590 - INFO - 🔄 File ref expired for 125953, retry 1/10
+2026-01-13 02:00:16,530 - WARNING - 🔄 Bad request (file ref) for group 14135934193816378, retry 1/10
+2026-01-13 02:00:25,842 - INFO - ✅ Cloned media group 14135934193816378 with 9 items
+2026-01-13 02:00:25,887 - INFO - 🔄 File ref expired for 125964, retry 1/10
+2026-01-13 02:00:43,381 - WARNING - 🔄 Bad request (file ref) for group 14136050816180914, retry 1/10
+2026-01-13 02:00:52,685 - INFO - ✅ Cloned media group 14136050816180914 with 9 items
+2026-01-13 02:00:52,722 - WARNING - 🔄 Bad request (file ref) for group 14136068192753786, retry 1/10
+2026-01-13 02:01:01,928 - INFO - ✅ Cloned media group 14136068192753786 with 2 items
+2026-01-13 02:01:01,993 - INFO - 🔄 File ref expired for 125977, retry 1/10
+2026-01-13 02:01:12,977 - WARNING - 🔄 Bad request (file ref) for group 14136165121136154, retry 1/10
+2026-01-13 02:01:22,335 - INFO - ✅ Cloned media group 14136165121136154 with 9 items
+2026-01-13 02:01:22,371 - INFO - 🔄 File ref expired for 125987, retry 1/10
+2026-01-13 02:01:34,160 - WARNING - 🔄 Bad request (file ref) for group 14136281072450066, retry 1/10
+2026-01-13 02:01:43,459 - INFO - ✅ Cloned media group 14136281072450066 with 9 items
+2026-01-13 02:01:43,519 - INFO - 🔄 File ref expired for 125997, retry 1/10
+2026-01-13 02:01:54,943 - WARNING - 🔄 Bad request (file ref) for group 14136395424669858, retry 1/10
+2026-01-13 02:02:04,242 - INFO - ✅ Cloned media group 14136395424669858 with 9 items
+2026-01-13 02:02:04,283 - INFO - 🔄 File ref expired for 126007, retry 1/10
+2026-01-13 02:02:15,582 - WARNING - 🔄 Bad request (file ref) for group 14136510880422466, retry 1/10
+2026-01-13 02:02:24,912 - INFO - ✅ Cloned media group 14136510880422466 with 9 items
+2026-01-13 02:02:31,207 - INFO - 🔄 File ref expired for 126017, retry 1/10
+2026-01-13 02:02:42,930 - WARNING - 🔄 Bad request (file ref) for group 14136626417685754, retry 1/10
+2026-01-13 02:02:52,221 - INFO - ✅ Cloned media group 14136626417685754 with 9 items
+2026-01-13 02:02:52,258 - INFO - 🔄 File ref expired for 126027, retry 1/10
+2026-01-13 02:03:03,895 - WARNING - 🔄 Bad request (file ref) for group 14136741065212122, retry 1/10
+2026-01-13 02:03:13,226 - INFO - ✅ Cloned media group 14136741065212122 with 9 items
+2026-01-13 02:03:13,265 - INFO - 🔄 File ref expired for 126037, retry 1/10
+2026-01-13 02:03:24,332 - WARNING - 🔄 Bad request (file ref) for group 14136857672319602, retry 1/10
+2026-01-13 02:03:33,621 - INFO - ✅ Cloned media group 14136857672319602 with 9 items
+2026-01-13 02:03:33,660 - INFO - 🔄 File ref expired for 126047, retry 1/10
+2026-01-13 02:03:45,394 - WARNING - 🔄 Bad request (file ref) for group 14136970676026426, retry 1/10
+2026-01-13 02:03:54,752 - INFO - ✅ Cloned media group 14136970676026426 with 9 items
+2026-01-13 02:03:54,791 - INFO - 🔄 File ref expired for 126057, retry 1/10
+2026-01-13 02:04:05,896 - INFO - 🔄 File ref expired for 126058, retry 1/10
+2026-01-13 02:04:22,470 - INFO - 🔄 File ref expired for 126059, retry 1/10
+2026-01-13 02:04:33,543 - WARNING - 🔄 Bad request (file ref) for group 14137085329047146, retry 1/10
+2026-01-13 02:04:42,809 - INFO - ✅ Cloned media group 14137085329047146 with 9 items
+2026-01-13 02:04:42,872 - INFO - 🔄 File ref expired for 126069, retry 1/10
+2026-01-13 02:04:54,611 - WARNING - 🔄 Bad request (file ref) for group 14137201448651266, retry 1/10
+2026-01-13 02:05:03,886 - INFO - ✅ Cloned media group 14137201448651266 with 9 items
+2026-01-13 02:05:03,924 - INFO - 🔄 File ref expired for 126079, retry 1/10
+2026-01-13 02:05:15,222 - WARNING - 🔄 Bad request (file ref) for group 14137317161025898, retry 1/10
+2026-01-13 02:05:24,539 - INFO - ✅ Cloned media group 14137317161025898 with 9 items
+2026-01-13 02:05:24,582 - INFO - 🔄 File ref expired for 126089, retry 1/10
+2026-01-13 02:05:36,054 - WARNING - 🔄 Bad request (file ref) for group 14137431508329394, retry 1/10
+2026-01-13 02:05:45,358 - INFO - ✅ Cloned media group 14137431508329394 with 9 items
+2026-01-13 02:05:47,230 - INFO - 🔄 File ref expired for 126100, retry 1/10
+2026-01-13 02:06:04,142 - WARNING - 🔄 Bad request (file ref) for group 14137548152984106, retry 1/10
+2026-01-13 02:06:13,515 - INFO - ✅ Cloned media group 14137548152984106 with 9 items
+2026-01-13 02:06:13,566 - WARNING - 🔄 Bad request (file ref) for group 14137634297493618, retry 1/10
+2026-01-13 02:06:22,882 - INFO - ✅ Cloned media group 14137634297493618 with 9 items
+2026-01-13 02:06:22,934 - INFO - 🔄 File ref expired for 126120, retry 1/10
+2026-01-13 02:06:34,008 - WARNING - 🔄 Bad request (file ref) for group 14137804736438474, retry 1/10
+2026-01-13 02:06:43,316 - INFO - ✅ Cloned media group 14137804736438474 with 9 items
+2026-01-13 02:06:43,355 - INFO - 🔄 File ref expired for 126130, retry 1/10
+2026-01-13 02:06:54,874 - WARNING - 🔄 Bad request (file ref) for group 14137919936519386, retry 1/10
+2026-01-13 02:07:04,162 - INFO - ✅ Cloned media group 14137919936519386 with 9 items
+2026-01-13 02:07:04,204 - INFO - 🔄 File ref expired for 126140, retry 1/10
+2026-01-13 02:07:15,260 - WARNING - 🔄 Bad request (file ref) for group 14138035136393426, retry 1/10
+2026-01-13 02:07:24,797 - INFO - ✅ Cloned media group 14138035136393426 with 9 items
+2026-01-13 02:07:24,837 - INFO - 🔄 File ref expired for 126150, retry 1/10
+2026-01-13 02:07:35,769 - WARNING - 🔄 Bad request (file ref) for group 14138150336533946, retry 1/10
+2026-01-13 02:07:45,069 - INFO - ✅ Cloned media group 14138150336533946 with 9 items
+2026-01-13 02:07:50,340 - INFO - 🔄 File ref expired for 126160, retry 1/10
+2026-01-13 02:08:01,968 - WARNING - 🔄 Bad request (file ref) for group 14138265537215962, retry 1/10
+2026-01-13 02:08:11,298 - INFO - ✅ Cloned media group 14138265537215962 with 9 items
+2026-01-13 02:08:11,339 - INFO - 🔄 File ref expired for 126170, retry 1/10
+2026-01-13 02:08:22,858 - WARNING - 🔄 Bad request (file ref) for group 14138362541597578, retry 1/10
+2026-01-13 02:08:32,572 - INFO - ✅ Cloned media group 14138362541597578 with 9 items
+2026-01-13 02:08:32,609 - WARNING - 🔄 Bad request (file ref) for group 14138399775833306, retry 1/10
+2026-01-13 02:08:41,786 - INFO - ✅ Cloned media group 14138399775833306 with 2 items
+2026-01-13 02:08:41,859 - WARNING - 🔄 Bad request (file ref) for group 14138410396609730, retry 1/10
+2026-01-13 02:08:51,568 - INFO - ✅ Cloned media group 14138410396609730 with 9 items
+2026-01-13 02:08:51,610 - INFO - 🔄 File ref expired for 126191, retry 1/10
+2026-01-13 02:09:03,150 - WARNING - 🔄 Bad request (file ref) for group 14138524736468650, retry 1/10
+2026-01-13 02:09:12,460 - INFO - ✅ Cloned media group 14138524736468650 with 9 items
+2026-01-13 02:09:12,503 - INFO - 🔄 File ref expired for 126201, retry 1/10
+2026-01-13 02:09:23,602 - WARNING - 🔄 Bad request (file ref) for group 14138641100760514, retry 1/10
+2026-01-13 02:09:32,903 - INFO - ✅ Cloned media group 14138641100760514 with 9 items
+2026-01-13 02:09:39,621 - INFO - 🔄 File ref expired for 126211, retry 1/10
+2026-01-13 02:09:50,717 - WARNING - 🔄 Bad request (file ref) for group 14138757784308906, retry 1/10
+2026-01-13 02:10:00,079 - INFO - ✅ Cloned media group 14138757784308906 with 9 items
+2026-01-13 02:10:00,116 - WARNING - 🔄 Bad request (file ref) for group 14138804177512906, retry 1/10
+2026-01-13 02:10:09,294 - INFO - ✅ Cloned media group 14138804177512906 with 2 items
+2026-01-13 02:10:09,337 - INFO - 🔄 File ref expired for 126223, retry 1/10
+2026-01-13 02:10:21,107 - WARNING - 🔄 Bad request (file ref) for group 14138872360895634, retry 1/10
+2026-01-13 02:10:30,429 - INFO - ✅ Cloned media group 14138872360895634 with 9 items
+2026-01-13 02:10:30,505 - INFO - 🔄 File ref expired for 126233, retry 1/10
+2026-01-13 02:10:41,941 - WARNING - 🔄 Bad request (file ref) for group 14138986470843346, retry 1/10
+2026-01-13 02:10:51,281 - INFO - ✅ Cloned media group 14138986470843346 with 9 items
+2026-01-13 02:10:51,322 - INFO - 🔄 File ref expired for 126243, retry 1/10
+2026-01-13 02:11:02,575 - WARNING - 🔄 Bad request (file ref) for group 14139101457511418, retry 1/10
+2026-01-13 02:11:11,916 - INFO - ✅ Cloned media group 14139101457511418 with 9 items
+2026-01-13 02:11:11,956 - INFO - 🔄 File ref expired for 126253, retry 1/10
+2026-01-13 02:11:29,057 - WARNING - 🔄 Bad request (file ref) for group 14139218200626978, retry 1/10
+2026-01-13 02:11:38,350 - INFO - ✅ Cloned media group 14139218200626978 with 9 items
+2026-01-13 02:11:38,389 - INFO - 🔄 File ref expired for 126263, retry 1/10
+2026-01-13 02:11:49,715 - WARNING - 🔄 Bad request (file ref) for group 14139333232751858, retry 1/10
+2026-01-13 02:11:59,014 - INFO - ✅ Cloned media group 14139333232751858 with 9 items
+2026-01-13 02:11:59,055 - INFO - 🔄 File ref expired for 126273, retry 1/10
+2026-01-13 02:12:10,712 - WARNING - 🔄 Bad request (file ref) for group 14139447400942282, retry 1/10
+2026-01-13 02:12:20,114 - INFO - ✅ Cloned media group 14139447400942282 with 9 items
+2026-01-13 02:12:20,153 - INFO - 🔄 File ref expired for 126283, retry 1/10
+2026-01-13 02:12:31,833 - WARNING - 🔄 Bad request (file ref) for group 14139564200638306, retry 1/10
+2026-01-13 02:12:41,115 - INFO - ✅ Cloned media group 14139564200638306 with 9 items
+2026-01-13 02:12:41,178 - INFO - 🔄 File ref expired for 126293, retry 1/10
+2026-01-13 02:12:52,586 - INFO - ✅ Forwarded message 126294
+2026-01-13 02:12:54,690 - WARNING - 🔄 Bad request (file ref) for group 14139678992964970, retry 1/10
+2026-01-13 02:13:03,994 - INFO - ✅ Cloned media group 14139678992964970 with 9 items
+2026-01-13 02:13:09,920 - INFO - 🔄 File ref expired for 126304, retry 1/10
+2026-01-13 02:13:21,089 - WARNING - 🔄 Bad request (file ref) for group 14139794248467666, retry 1/10
+2026-01-13 02:13:30,421 - INFO - ✅ Cloned media group 14139794248467666 with 9 items
+2026-01-13 02:13:30,487 - INFO - 🔄 File ref expired for 126314, retry 1/10
+2026-01-13 02:13:41,328 - WARNING - 🔄 Bad request (file ref) for group 14139909288554970, retry 1/10
+2026-01-13 02:13:50,684 - INFO - ✅ Cloned media group 14139909288554970 with 9 items
+2026-01-13 02:13:50,766 - INFO - ✅ Forwarded message 126324
+2026-01-13 02:13:52,673 - INFO - 🔄 File ref expired for 126325, retry 1/10
+2026-01-13 02:14:04,039 - WARNING - 🔄 Bad request (file ref) for group 14140023104831890, retry 1/10
+2026-01-13 02:14:13,336 - INFO - ✅ Cloned media group 14140023104831890 with 9 items
+2026-01-13 02:14:13,472 - INFO - 🔄 File ref expired for 126335, retry 1/10
+2026-01-13 02:14:25,086 - WARNING - 🔄 Bad request (file ref) for group 14140140640281242, retry 1/10
+2026-01-13 02:14:34,440 - INFO - ✅ Cloned media group 14140140640281242 with 9 items
+2026-01-13 02:14:34,480 - INFO - 🔄 File ref expired for 126345, retry 1/10
+2026-01-13 02:14:52,016 - WARNING - 🔄 Bad request (file ref) for group 14140254929023882, retry 1/10
+2026-01-13 02:15:01,135 - WARNING - ⏳ Flood wait for media group: 1887s
+2026-01-13 02:46:28,451 - INFO - ✅ Cloned media group 14140254929023882 with 9 items
+2026-01-13 02:46:28,504 - INFO - 🔄 File ref expired for 126355, retry 1/10
+2026-01-13 02:46:39,350 - WARNING - 🔄 Bad request (file ref) for group 14140371065036746, retry 1/10
+2026-01-13 02:46:48,641 - INFO - ✅ Cloned media group 14140371065036746 with 9 items
+2026-01-13 02:46:48,684 - INFO - 🔄 File ref expired for 126365, retry 1/10
+2026-01-13 02:46:59,736 - WARNING - 🔄 Bad request (file ref) for group 14140484601297098, retry 1/10
+2026-01-13 02:47:09,012 - INFO - ✅ Cloned media group 14140484601297098 with 9 items
+2026-01-13 02:47:09,049 - WARNING - 🔄 Bad request (file ref) for group 14140571992373114, retry 1/10
+2026-01-13 02:47:18,410 - INFO - ✅ Cloned media group 14140571992373114 with 9 items
+2026-01-13 02:47:18,457 - WARNING - 🔄 Bad request (file ref) for group 14140658120287714, retry 1/10
+2026-01-13 02:47:27,768 - INFO - ✅ Cloned media group 14140658120287714 with 9 items
+2026-01-13 02:47:27,809 - WARNING - 🔄 Bad request (file ref) for group 14140744824957986, retry 1/10
+2026-01-13 02:47:37,115 - INFO - ✅ Cloned media group 14140744824957986 with 9 items
+2026-01-13 02:47:37,152 - WARNING - 🔄 Bad request (file ref) for group 14140829700791154, retry 1/10
+2026-01-13 02:47:46,542 - INFO - ✅ Cloned media group 14140829700791154 with 9 items
+2026-01-13 02:47:46,587 - INFO - 🔄 File ref expired for 126411, retry 1/10
+2026-01-13 02:48:02,806 - INFO - 🔄 File ref expired for 126412, retry 1/10
+2026-01-13 02:48:14,686 - WARNING - 🔄 Bad request (file ref) for group 14140945067719178, retry 1/10
+2026-01-13 02:48:23,964 - INFO - ✅ Cloned media group 14140945067719178 with 9 items
+2026-01-13 02:48:24,056 - INFO - ✅ Forwarded message 126422
+2026-01-13 02:48:26,137 - INFO - 🔄 File ref expired for 126423, retry 1/10
+2026-01-13 02:48:37,861 - WARNING - 🔄 Bad request (file ref) for group 14141060457616754, retry 1/10
+2026-01-13 02:48:47,170 - INFO - ✅ Cloned media group 14141060457616754 with 9 items
+2026-01-13 02:48:47,209 - INFO - 🔄 File ref expired for 126434, retry 1/10
+2026-01-13 02:48:58,659 - WARNING - 🔄 Bad request (file ref) for group 14141177016299730, retry 1/10
+2026-01-13 02:49:07,935 - INFO - ✅ Cloned media group 14141177016299730 with 9 items
+2026-01-13 02:49:07,977 - INFO - 🔄 File ref expired for 126444, retry 1/10
+2026-01-13 02:49:18,917 - WARNING - 🔄 Bad request (file ref) for group 14141292056476386, retry 1/10
+2026-01-13 02:49:28,171 - INFO - ✅ Cloned media group 14141292056476386 with 9 items
+2026-01-13 02:49:28,214 - INFO - 🔄 File ref expired for 126454, retry 1/10
+2026-01-13 02:49:45,687 - WARNING - 🔄 Bad request (file ref) for group 14141406289018586, retry 1/10
+2026-01-13 02:49:55,045 - INFO - ✅ Cloned media group 14141406289018586 with 9 items
+2026-01-13 02:49:55,081 - INFO - 🔄 File ref expired for 126464, retry 1/10
+2026-01-13 02:50:06,010 - WARNING - 🔄 Bad request (file ref) for group 14141522225020394, retry 1/10
+2026-01-13 02:50:15,270 - INFO - ✅ Cloned media group 14141522225020394 with 9 items
+2026-01-13 02:50:15,309 - INFO - 🔄 File ref expired for 126474, retry 1/10
+2026-01-13 02:50:26,897 - WARNING - 🔄 Bad request (file ref) for group 14141637377030538, retry 1/10
+2026-01-13 02:50:36,218 - INFO - ✅ Cloned media group 14141637377030538 with 9 items
+2026-01-13 02:50:36,257 - INFO - 🔄 File ref expired for 126484, retry 1/10
+2026-01-13 02:50:47,250 - WARNING - 🔄 Bad request (file ref) for group 14141752065330298, retry 1/10
+2026-01-13 02:50:56,538 - INFO - ✅ Cloned media group 14141752065330298 with 9 items
+2026-01-13 02:50:56,642 - INFO - ✅ Forwarded message 126494
+2026-01-13 02:50:59,020 - INFO - 🔄 File ref expired for 126495, retry 1/10
+2026-01-13 02:51:10,210 - INFO - ✅ Forwarded message 126496
+2026-01-13 02:51:18,251 - WARNING - 🔄 Bad request (file ref) for group 14141868352421218, retry 1/10
+2026-01-13 02:51:27,515 - INFO - ✅ Cloned media group 14141868352421218 with 9 items
+2026-01-13 02:51:27,559 - INFO - 🔄 File ref expired for 126506, retry 1/10
+2026-01-13 02:51:38,705 - WARNING - 🔄 Bad request (file ref) for group 14141983280424034, retry 1/10
+2026-01-13 02:51:48,001 - INFO - ✅ Cloned media group 14141983280424034 with 9 items
+2026-01-13 02:51:48,043 - INFO - 🔄 File ref expired for 126516, retry 1/10
+2026-01-13 02:51:59,805 - WARNING - 🔄 Bad request (file ref) for group 14142097408724002, retry 1/10
+2026-01-13 02:52:09,098 - INFO - ✅ Cloned media group 14142097408724002 with 9 items
+2026-01-13 02:52:09,170 - INFO - 🔄 File ref expired for 126526, retry 1/10
+2026-01-13 02:52:19,986 - WARNING - 🔄 Bad request (file ref) for group 14142212248904682, retry 1/10
+2026-01-13 02:52:29,254 - INFO - ✅ Cloned media group 14142212248904682 with 9 items
+2026-01-13 02:52:29,296 - INFO - 🔄 File ref expired for 126536, retry 1/10
+2026-01-13 02:52:40,131 - WARNING - 🔄 Bad request (file ref) for group 14142327969841378, retry 1/10
+2026-01-13 02:52:49,442 - INFO - ✅ Cloned media group 14142327969841378 with 9 items
+2026-01-13 02:52:49,484 - INFO - 🔄 File ref expired for 126546, retry 1/10
+2026-01-13 02:53:05,900 - WARNING - 🔄 Bad request (file ref) for group 14142443051749266, retry 1/10
+2026-01-13 02:53:15,213 - INFO - ✅ Cloned media group 14142443051749266 with 9 items
+2026-01-13 02:53:15,258 - INFO - 🔄 File ref expired for 126556, retry 1/10
+2026-01-13 02:53:26,934 - WARNING - 🔄 Bad request (file ref) for group 14142559680295362, retry 1/10
+2026-01-13 02:53:36,236 - INFO - ✅ Cloned media group 14142559680295362 with 9 items
+2026-01-13 02:53:36,281 - INFO - 🔄 File ref expired for 126566, retry 1/10
+2026-01-13 02:53:47,152 - WARNING - 🔄 Bad request (file ref) for group 14142672584560410, retry 1/10
+2026-01-13 02:53:56,455 - INFO - ✅ Cloned media group 14142672584560410 with 9 items
+2026-01-13 02:53:56,496 - INFO - 🔄 File ref expired for 126576, retry 1/10
+2026-01-13 02:54:08,032 - WARNING - 🔄 Bad request (file ref) for group 14142788928692786, retry 1/10
+2026-01-13 02:54:17,308 - INFO - ✅ Cloned media group 14142788928692786 with 9 items
+2026-01-13 02:54:17,378 - INFO - 🔄 File ref expired for 126586, retry 1/10
+2026-01-13 02:54:28,633 - WARNING - 🔄 Bad request (file ref) for group 14142905240295874, retry 1/10
+2026-01-13 02:54:37,957 - INFO - ✅ Cloned media group 14142905240295874 with 9 items
+2026-01-13 02:54:37,996 - INFO - 🔄 File ref expired for 126596, retry 1/10
+2026-01-13 02:54:55,487 - WARNING - 🔄 Bad request (file ref) for group 14143020297001842, retry 1/10
+2026-01-13 02:55:04,874 - INFO - ✅ Cloned media group 14143020297001842 with 9 items
+2026-01-13 02:55:04,915 - INFO - 🔄 File ref expired for 126606, retry 1/10
+2026-01-13 02:55:16,143 - WARNING - 🔄 Bad request (file ref) for group 14143135960385162, retry 1/10
+2026-01-13 02:55:25,420 - INFO - ✅ Cloned media group 14143135960385162 with 9 items
+2026-01-13 02:55:25,459 - INFO - 🔄 File ref expired for 126616, retry 1/10
+2026-01-13 02:55:37,215 - WARNING - 🔄 Bad request (file ref) for group 14143249176786730, retry 1/10
+2026-01-13 02:55:46,528 - INFO - ✅ Cloned media group 14143249176786730 with 9 items
+2026-01-13 02:55:46,569 - WARNING - 🔄 Bad request (file ref) for group 14143282353909706, retry 1/10
+2026-01-13 02:55:55,925 - INFO - ✅ Cloned media group 14143282353909706 with 10 items
+2026-01-13 02:55:55,968 - INFO - 🔄 File ref expired for 126636, retry 1/10
+2026-01-13 02:56:07,519 - WARNING - 🔄 Bad request (file ref) for group 14143364992651562, retry 1/10
+2026-01-13 02:56:16,828 - INFO - ✅ Cloned media group 14143364992651562 with 9 items
+2026-01-13 02:56:16,899 - INFO - 🔄 File ref expired for 126646, retry 1/10
+2026-01-13 02:56:28,164 - WARNING - 🔄 Bad request (file ref) for group 14143479544951018, retry 1/10
+2026-01-13 02:56:37,457 - INFO - ✅ Cloned media group 14143479544951018 with 9 items
+2026-01-13 02:56:43,463 - INFO - 🔄 File ref expired for 126656, retry 1/10
+2026-01-13 02:56:54,693 - WARNING - 🔄 Bad request (file ref) for group 14143595441322426, retry 1/10
+2026-01-13 02:57:03,985 - INFO - ✅ Cloned media group 14143595441322426 with 9 items
+2026-01-13 02:57:04,026 - INFO - 🔄 File ref expired for 126666, retry 1/10
+2026-01-13 02:57:15,737 - WARNING - 🔄 Bad request (file ref) for group 14143710433114530, retry 1/10
+2026-01-13 02:57:25,016 - INFO - ✅ Cloned media group 14143710433114530 with 9 items
+2026-01-13 02:57:25,096 - INFO - 🔄 File ref expired for 126676, retry 1/10
+2026-01-13 02:57:35,958 - WARNING - 🔄 Bad request (file ref) for group 14143825273701730, retry 1/10
+2026-01-13 02:57:45,247 - INFO - ✅ Cloned media group 14143825273701730 with 9 items
+2026-01-13 02:57:45,296 - INFO - 🔄 File ref expired for 126686, retry 1/10
+2026-01-13 02:57:56,314 - WARNING - 🔄 Bad request (file ref) for group 14143939858154034, retry 1/10
+2026-01-13 02:58:05,661 - INFO - ✅ Cloned media group 14143939858154034 with 9 items
+2026-01-13 02:58:05,736 - INFO - 🔄 File ref expired for 126696, retry 1/10
+2026-01-13 02:58:17,273 - WARNING - 🔄 Bad request (file ref) for group 14144055472446554, retry 1/10
+2026-01-13 02:58:26,618 - INFO - ✅ Cloned media group 14144055472446554 with 9 items
+2026-01-13 02:58:30,544 - INFO - 🔄 File ref expired for 126706, retry 1/10
+2026-01-13 02:58:41,864 - WARNING - 🔄 Bad request (file ref) for group 14144170592935410, retry 1/10
+2026-01-13 02:58:51,177 - INFO - ✅ Cloned media group 14144170592935410 with 9 items
+2026-01-13 02:58:51,219 - INFO - 🔄 File ref expired for 126716, retry 1/10
+2026-01-13 02:59:02,516 - WARNING - 🔄 Bad request (file ref) for group 14144286433199594, retry 1/10
+2026-01-13 02:59:11,847 - INFO - ✅ Cloned media group 14144286433199594 with 9 items
+2026-01-13 02:59:11,896 - INFO - 🔄 File ref expired for 126726, retry 1/10
+2026-01-13 02:59:22,897 - WARNING - 🔄 Bad request (file ref) for group 14144402576515802, retry 1/10
+2026-01-13 02:59:32,170 - INFO - ✅ Cloned media group 14144402576515802 with 9 items
+2026-01-13 02:59:32,209 - INFO - 🔄 File ref expired for 126736, retry 1/10
+2026-01-13 02:59:43,098 - WARNING - 🔄 Bad request (file ref) for group 14144516641023098, retry 1/10
+2026-01-13 02:59:52,433 - INFO - ✅ Cloned media group 14144516641023098 with 9 items
+2026-01-13 02:59:52,472 - INFO - 🔄 File ref expired for 126746, retry 1/10
+2026-01-13 03:00:03,991 - INFO - 🔄 File ref expired for 126747, retry 1/10
+2026-01-13 03:00:20,056 - WARNING - 🔄 Bad request (file ref) for group 14144585765540666, retry 1/10
+2026-01-13 03:00:29,252 - INFO - ✅ Cloned media group 14144585765540666 with 3 items
+2026-01-13 03:00:29,335 - INFO - ✅ Forwarded message 126751
+2026-01-13 03:00:31,199 - WARNING - 🔄 Bad request (file ref) for group 14144631504742842, retry 1/10
+2026-01-13 03:00:40,519 - INFO - ✅ Cloned media group 14144631504742842 with 9 items
+2026-01-13 03:00:40,629 - INFO - 🔄 File ref expired for 126761, retry 1/10
+2026-01-13 03:00:52,223 - WARNING - 🔄 Bad request (file ref) for group 14144747248583002, retry 1/10
+2026-01-13 03:01:01,543 - INFO - ✅ Cloned media group 14144747248583002 with 9 items
+2026-01-13 03:01:01,710 - INFO - 🔄 File ref expired for 126771, retry 1/10
+2026-01-13 03:01:12,814 - WARNING - 🔄 Bad request (file ref) for group 14144862624817098, retry 1/10
+2026-01-13 03:01:22,155 - INFO - ✅ Cloned media group 14144862624817098 with 9 items
+2026-01-13 03:01:22,198 - INFO - 🔄 File ref expired for 126781, retry 1/10
+2026-01-13 03:01:33,094 - WARNING - 🔄 Bad request (file ref) for group 14144977929767466, retry 1/10
+2026-01-13 03:01:42,403 - INFO - ✅ Cloned media group 14144977929767466 with 9 items
+2026-01-13 03:01:42,445 - INFO - 🔄 File ref expired for 126791, retry 1/10
+2026-01-13 03:01:57,560 - WARNING - 🔄 Bad request (file ref) for group 14145092328918402, retry 1/10
+2026-01-13 03:02:06,997 - INFO - ✅ Cloned media group 14145092328918402 with 9 items
+2026-01-13 03:02:07,043 - INFO - 🔄 File ref expired for 126801, retry 1/10
+2026-01-13 03:02:17,901 - WARNING - 🔄 Bad request (file ref) for group 14145207832951314, retry 1/10
+2026-01-13 03:02:27,207 - INFO - ✅ Cloned media group 14145207832951314 with 9 items
+2026-01-13 03:02:27,244 - INFO - 🔄 File ref expired for 126811, retry 1/10
+2026-01-13 03:02:38,136 - WARNING - 🔄 Bad request (file ref) for group 14145323745183330, retry 1/10
+2026-01-13 03:02:47,457 - INFO - ✅ Cloned media group 14145323745183330 with 9 items
+2026-01-13 03:02:47,510 - INFO - 🔄 File ref expired for 126821, retry 1/10
+2026-01-13 03:02:58,591 - WARNING - 🔄 Bad request (file ref) for group 14145437034891746, retry 1/10
+2026-01-13 03:03:07,915 - INFO - ✅ Cloned media group 14145437034891746 with 9 items
+2026-01-13 03:03:07,958 - INFO - 🔄 File ref expired for 126831, retry 1/10
+2026-01-13 03:03:19,499 - WARNING - 🔄 Bad request (file ref) for group 14145553960480474, retry 1/10
+2026-01-13 03:03:28,897 - INFO - ✅ Cloned media group 14145553960480474 with 9 items
+2026-01-13 03:03:28,942 - INFO - 🔄 File ref expired for 126841, retry 1/10
+2026-01-13 03:03:46,007 - WARNING - 🔄 Bad request (file ref) for group 14145669424924242, retry 1/10
+2026-01-13 03:03:55,314 - INFO - ✅ Cloned media group 14145669424924242 with 9 items
+2026-01-13 03:03:55,391 - INFO - ✅ Forwarded message 126851
+2026-01-13 03:03:57,516 - INFO - 🔄 File ref expired for 126852, retry 1/10
+2026-01-13 03:04:09,206 - WARNING - 🔄 Bad request (file ref) for group 14145784049276826, retry 1/10
+2026-01-13 03:04:18,519 - INFO - ✅ Cloned media group 14145784049276826 with 9 items
+2026-01-13 03:04:18,556 - INFO - 🔄 File ref expired for 126862, retry 1/10
+2026-01-13 03:04:29,605 - INFO - 🔄 File ref expired for 126863, retry 1/10

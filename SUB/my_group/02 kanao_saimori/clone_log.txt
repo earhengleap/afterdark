@@ -49870,3 +49870,110 @@
 2025-11-12 00:15:48,794 - INFO - ✅ Forwarded message 36740
 2025-11-12 00:16:00,721 - INFO - ✅ Cloned media group 14100231376945746 with 4 items
 2025-11-12 00:18:32,632 - INFO - ✅ Forwarded message 36781
+2026-01-12 23:15:05,733 - WARNING - [my_account.session] Waiting for 18 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:15:36,917 - WARNING - [my_account.session] Waiting for 18 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:16:08,125 - WARNING - [my_account.session] Waiting for 17 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:16:36,422 - WARNING - [my_account.session] Waiting for 20 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:17:10,945 - WARNING - [my_account.session] Waiting for 17 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:17:38,487 - WARNING - [my_account.session] Waiting for 20 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:18:08,187 - WARNING - [my_account.session] Waiting for 21 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:18:37,908 - WARNING - [my_account.session] Waiting for 23 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:19:07,434 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:19:37,421 - WARNING - [my_account.session] Waiting for 25 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:20:09,499 - WARNING - [my_account.session] Waiting for 24 seconds before continuing (required by "messages.GetHistory")
+2026-01-12 23:20:37,403 - WARNING - Unsupported type: unknown (ID: 29023)
+2026-01-12 23:20:37,404 - WARNING - Unsupported type: unknown (ID: 29314)
+2026-01-12 23:20:37,404 - WARNING - Unsupported type: unknown (ID: 32077)
+2026-01-12 23:20:37,404 - WARNING - Unsupported type: unknown (ID: 35394)
+2026-01-12 23:20:49,833 - INFO - ✅ Cloned media group 14103499826419706 with 2 items
+2026-01-12 23:21:26,846 - INFO - ✅ Forwarded message 36802
+2026-01-12 23:23:15,208 - INFO - ✅ Forwarded message 36825
+2026-01-12 23:28:06,954 - INFO - ✅ Cloned media group 14109785486588298 with 3 items
+2026-01-12 23:28:23,200 - INFO - ✅ Cloned media group 14110394477303130 with 3 items
+2026-01-12 23:28:35,903 - INFO - ✅ Forwarded message 36878
+2026-01-12 23:28:43,263 - INFO - ✅ Cloned media group 14110682102524266 with 3 items
+2026-01-12 23:28:59,270 - INFO - ✅ Cloned media group 14111202728491466 with 3 items
+2026-01-12 23:29:01,259 - INFO - ✅ Cloned media group 14111319849627674 with 2 items
+2026-01-12 23:29:17,594 - INFO - ✅ Cloned media group 14111835368861898 with 2 items
+2026-01-12 23:29:34,624 - INFO - ✅ Forwarded message 36909
+2026-01-12 23:31:26,851 - INFO - ✅ Cloned media group 14114516687089282 with 2 items
+2026-01-12 23:31:36,521 - INFO - ✅ Forwarded message 36938
+2026-01-12 23:31:59,282 - INFO - ✅ Cloned media group 14115258814331330 with 3 items
+2026-01-12 23:32:12,079 - INFO - ✅ Forwarded message 36953
+2026-01-12 23:32:29,548 - INFO - ✅ Forwarded message 36957
+2026-01-12 23:32:39,935 - INFO - ✅ Forwarded message 36961
+2026-01-12 23:32:46,180 - INFO - ✅ Forwarded message 36963
+2026-01-12 23:32:58,927 - INFO - ✅ Forwarded message 36965
+2026-01-12 23:35:31,882 - INFO - ✅ Cloned media group 14118182659394970 with 3 items
+2026-01-12 23:36:34,460 - INFO - ✅ Cloned media group 14119526531023234 with 6 items
+2026-01-12 23:36:57,906 - INFO - ✅ Cloned media group 14120159056777834 with 4 items
+2026-01-12 23:37:00,506 - INFO - ✅ Forwarded message 37032
+2026-01-12 23:38:47,680 - WARNING - [my_account.session] Waiting for 8 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:42:03,787 - INFO - ✅ Cloned media group 14124306256631898 with 3 items
+2026-01-12 23:42:06,302 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:42:09,348 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:42:19,578 - INFO - ✅ Cloned media group 14124528268801186 with 9 items
+2026-01-12 23:42:58,084 - INFO - ✅ Cloned media group 14125701428952922 with 4 items
+2026-01-12 23:43:03,672 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:43:10,807 - INFO - ✅ Forwarded message 37120
+2026-01-12 23:43:18,843 - INFO - ✅ Forwarded message 37124
+2026-01-12 23:43:24,948 - INFO - ✅ Forwarded message 37126
+2026-01-12 23:43:30,794 - INFO - ✅ Forwarded message 37128
+2026-01-12 23:45:58,054 - WARNING - ⏳ Flood wait: 30s
+2026-01-12 23:52:31,546 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:54:04,387 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-12 23:58:07,963 - INFO - ✅ Cloned media group 14133514577133970 with 2 items
+2026-01-12 23:58:28,777 - INFO - ✅ Forwarded message 37227
+2026-01-12 23:58:42,739 - WARNING - ⏳ Flood wait: 2865s
+2026-01-13 00:46:55,511 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:47:04,586 - INFO - ✅ Cloned media group 14134732934090850 with 10 items
+2026-01-13 00:47:04,641 - WARNING - [my_account.session] Waiting for 4 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:47:23,270 - INFO - ✅ Forwarded message 37250
+2026-01-13 00:47:58,575 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:26,003 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:29,065 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:47,774 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:48:55,337 - WARNING - [my_account.session] Waiting for 4 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:49:28,797 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMultiMedia")
+2026-01-13 00:49:32,090 - INFO - ✅ Cloned media group 14136955770607218 with 10 items
+2026-01-13 00:49:34,790 - INFO - ✅ Cloned media group 14137058458655770 with 9 items
+2026-01-13 00:50:12,059 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:50:18,636 - INFO - ✅ Cloned media group 14138058657216258 with 7 items
+2026-01-13 00:50:27,996 - WARNING - [my_account.session] Waiting for 4 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:50:32,038 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:55:25,932 - WARNING - [my_account.session] Waiting for 3 seconds before continuing (required by "messages.SendMedia")
+2026-01-13 00:56:39,715 - INFO - ✅ Cloned media group 14142940336763538 with 9 items
+2026-01-13 00:56:51,590 - INFO - ✅ Forwarded message 37390
+2026-01-13 00:57:26,792 - WARNING - ⏳ Flood wait: 2941s
+2026-01-13 01:46:27,848 - INFO - 🔄 File ref expired for 37400, retry 1/10
+2026-01-13 01:46:42,112 - INFO - 🔄 File ref expired for 37401, retry 1/10
+2026-01-13 01:46:56,491 - INFO - 🔄 File ref expired for 37402, retry 1/10
+2026-01-13 01:47:10,861 - INFO - 🔄 File ref expired for 37403, retry 1/10
+2026-01-13 01:47:25,853 - INFO - 🔄 File ref expired for 37404, retry 1/10
+2026-01-13 01:47:40,581 - INFO - ✅ Forwarded message 37405
+2026-01-13 01:47:46,650 - INFO - 🔄 File ref expired for 37406, retry 1/10
+2026-01-13 01:48:01,383 - WARNING - 🔄 Bad request (file ref) for group 14144351056803026, retry 1/10
+2026-01-13 01:48:10,567 - INFO - ✅ Cloned media group 14144351056803026 with 2 items
+2026-01-13 01:48:10,605 - INFO - 🔄 File ref expired for 37409, retry 1/10
+2026-01-13 01:48:21,757 - INFO - ✅ Forwarded message 37410
+2026-01-13 01:48:28,581 - INFO - 🔄 File ref expired for 37411, retry 1/10
+2026-01-13 01:48:40,105 - INFO - 🔄 File ref expired for 37412, retry 1/10
+2026-01-13 01:48:52,197 - INFO - 🔄 File ref expired for 37413, retry 1/10
+2026-01-13 01:49:03,490 - INFO - 🔄 File ref expired for 37414, retry 1/10
+2026-01-13 01:49:15,186 - INFO - 🔄 File ref expired for 37415, retry 1/10
+2026-01-13 01:49:26,980 - INFO - 🔄 File ref expired for 37416, retry 1/10
+2026-01-13 01:49:39,329 - INFO - 🔄 File ref expired for 37417, retry 1/10
+2026-01-13 01:49:51,590 - INFO - 🔄 File ref expired for 37418, retry 1/10
+2026-01-13 01:50:04,073 - INFO - 🔄 File ref expired for 37419, retry 1/10
+2026-01-13 01:50:16,553 - INFO - 🔄 File ref expired for 37420, retry 1/10
+2026-01-13 01:50:34,069 - INFO - 🔄 File ref expired for 37421, retry 1/10
+2026-01-13 01:50:46,525 - INFO - 🔄 File ref expired for 37422, retry 1/10
+2026-01-13 01:50:59,591 - INFO - 🔄 File ref expired for 37423, retry 1/10
+2026-01-13 01:51:12,093 - INFO - 🔄 File ref expired for 37424, retry 1/10
+2026-01-13 01:51:25,368 - INFO - 🔄 File ref expired for 37425, retry 1/10
+2026-01-13 01:51:38,560 - INFO - 🔄 File ref expired for 37426, retry 1/10
+2026-01-13 01:51:51,738 - INFO - 🔄 File ref expired for 37427, retry 1/10
+2026-01-13 01:52:04,574 - INFO - 🔄 File ref expired for 37428, retry 1/10
+2026-01-13 01:52:17,960 - INFO - ✅ Forwarded message 37429
+2026-01-13 01:52:21,672 - INFO - 🔄 File ref expired for 37430, retry 1/10
+2026-01-13 01:52:38,284 - INFO - ✅ Forwarded message 37431

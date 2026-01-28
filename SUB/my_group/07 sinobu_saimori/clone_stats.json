@@ -1,50 +1,55 @@
 {
-  "total_messages": 1525,
-  "total_items": 7522,
-  "successful": 7522,
+  "total_messages": 822,
+  "total_items": 3994,
+  "successful": 3994,
   "failed": 0,
   "skipped": 0,
-  "duplicates": 10,
-  "media_groups": 797,
-  "media_group_items": 6794,
+  "duplicates": 4,
+  "media_groups": 420,
+  "media_group_items": 3592,
   "by_type": {
     "photo": {
-      "success": 6828,
+      "success": 3606,
       "failed": 0,
       "skipped": 0
     },
     "video": {
-      "success": 522,
-      "failed": 0,
-      "skipped": 0
-    },
-    "photo_forwarded": {
-      "success": 71,
+      "success": 298,
       "failed": 0,
       "skipped": 0
     },
     "animation": {
-      "success": 67,
+      "success": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    "photo_forwarded": {
+      "success": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    "animation_forwarded": {
+      "success": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_forwarded": {
+      "success": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "document_forwarded": {
+      "success": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "video_note_forwarded": {
+      "success": 1,
       "failed": 0,
       "skipped": 0
     },
     "text": {
       "success": 1,
-      "failed": 0,
-      "skipped": 0
-    },
-    "video_forwarded": {
-      "success": 22,
-      "failed": 0,
-      "skipped": 0
-    },
-    "text_forwarded": {
-      "success": 5,
-      "failed": 0,
-      "skipped": 0
-    },
-    "animation_forwarded": {
-      "success": 6,
       "failed": 0,
       "skipped": 0
     }
