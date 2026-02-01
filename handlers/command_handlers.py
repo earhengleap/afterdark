@@ -310,7 +310,7 @@ def setup_command_handlers(app: Client):
                         f"⏳ Searching for images...",
                         disable_web_page_preview=False
                     )
-                    image_paths, image_info = ImageDownloader.download(url, message)
+                    image_paths, image_info = await ImageDownloader.download(url, message)
                     
                     if image_paths and len(image_paths) > 0:
                         # Image download successful
@@ -408,7 +408,7 @@ def setup_command_handlers(app: Client):
                     f"⏳ Checking for image content...",
                     disable_web_page_preview=False
                 )
-                image_paths, image_info = ImageDownloader.download(url, message)
+                image_paths, image_info = await ImageDownloader.download(url, message)
                 
                 if image_paths and len(image_paths) > 0:
                     try:
