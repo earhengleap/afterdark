@@ -204,7 +204,7 @@ def setup_command_handlers(app: Client):
                 f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
                 f"⏳ Starting bulk download process..."
             )
-            VideoDownloader.download_multiple(urls, message, user_id, detection_msg)
+            await VideoDownloader.download_multiple(urls, message, user_id, detection_msg)
             return
         
         # Single URL download - NOW HANDLES MULTIPLE VIDEOS FROM ONE URL
