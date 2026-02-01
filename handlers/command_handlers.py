@@ -359,23 +359,25 @@ def setup_command_handlers(app: Client):
                                     reply_markup=Keyboards.image_actions_with_upload(user_id),
                                     disable_web_page_preview=False
                                 )
+                                log_user_action(user_id, username, url, "success", "image")
+                                print(f"✅ Image download successful for {url} - Sent {len(image_paths)} images")
                             except Exception as e:
                                 print(f"❌ Error sending confirmation message: {e}")
                             
-                            log_user_action(user_id, username, url, "success", "image")
-                            print(f"✅ Image download successful for {url} - Sent {len(image_paths)} images")
-                            
                         except Exception as e:
                             print(f"❌ Error sending images: {e}")
-                            await status_msg.edit_text(
-                                f"❌ **Image Send Failed**\n\n"
-                                f"👤 **X User:** {clickable_username}\n"
-                                f"🔗 **URL:** {formatted_url}\n"
-                                f"🖼️ **Images Downloaded:** {len(image_paths)}\n"
-                                f"⚠️ **Error:** {str(e)[:100]}\n\n"
-                                f"Images downloaded but couldn't be sent.",
-                                disable_web_page_preview=False
-                            )
+                            try:
+                                await status_msg.edit_text(
+                                    f"❌ **Image Send Failed**\n\n"
+                                    f"👤 **X User:** {clickable_username}\n"
+                                    f"🔗 **URL:** {formatted_url}\n"
+                                    f"🖼️ **Images Downloaded:** {len(image_paths)}\n"
+                                    f"⚠️ **Error:** {str(e)[:100]}\n\n"
+                                    f"Images downloaded but couldn't be sent.",
+                                    disable_web_page_preview=False
+                                )
+                            except:
+                                pass
                             log_user_action(user_id, username, url, "failed", "image")
                     else:
                         # Both video and image failed
@@ -463,17 +465,19 @@ def setup_command_handlers(app: Client):
                                 reply_markup=Keyboards.image_actions_with_upload(user_id),
                                 disable_web_page_preview=False
                             )
+                            log_user_action(user_id, username, url, "success", "image")
                         except Exception as e:
                             print(f"❌ Error sending confirmation message: {e}")
                         
-                        log_user_action(user_id, username, url, "success", "image")
-                        
                     except Exception as e:
-                        await status_msg.edit_text(
-                            f"❌ **Image Send Failed**\n\n"
-                            f"⚠️ **Error:** {str(e)[:100]}",
-                            disable_web_page_preview=False
-                        )
+                        try:
+                            await status_msg.edit_text(
+                                f"❌ **Image Send Failed**\n\n"
+                                f"⚠️ **Error:** {str(e)[:100]}",
+                                disable_web_page_preview=False
+                            )
+                        except:
+                            pass
                         log_user_action(user_id, username, url, "failed", "image")
                 else:
                     # Try video as fallback
