@@ -3,6 +3,7 @@ Progress tracking for uploads
 """
 
 import time
+import asyncio
 from typing import Dict, Optional
 
 from pyrogram.types import Message
@@ -14,7 +15,7 @@ class ProgressTracker:
     """Track and display upload progress"""
     
     @staticmethod
-    def callback(current: int, total: int, progress_key: str, status_msg: Message, 
+    async def callback(current: int, total: int, progress_key: str, status_msg: Message, 
                  video_name: str, start_time: float) -> None:
         """Progress callback for upload with ETA"""
         try:
@@ -58,7 +59,7 @@ class ProgressTracker:
                 )
                 
                 try:
-                    status_msg.edit_text(status_text)
+                    await status_msg.edit_text(status_text)
                 except Exception:
                     pass
         except Exception as e:

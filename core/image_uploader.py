@@ -4,6 +4,7 @@ Image upload functionality for Telegram
 
 import os
 import time
+import asyncio
 from typing import List, Tuple, Optional
 
 from pyrogram import Client
@@ -18,7 +19,7 @@ class ImageUploader:
     """Handle image uploads to Telegram"""
     
     @staticmethod
-    def upload_images_to_group(image_paths: List[str], user_id: int,
+    async def upload_images_to_group(image_paths: List[str], user_id: int,
                              status_msg: Optional[Message] = None,
                              client: Optional[Client] = None) -> Tuple[bool, str]:
         """Upload images to Telegram group with retry logic - NO CAPTIONS, NO GROUPING"""
@@ -45,7 +46,7 @@ class ImageUploader:
                         continue
                     
                     # Send single photo WITHOUT caption
-                    upload_client.send_photo(
+                    await upload_client.send_photo(
                         chat_id=CHAT_ID,
                         photo=img_path
                         # No caption parameter
@@ -54,7 +55,7 @@ class ImageUploader:
                     
                     # Update progress every 5 images
                     if status_msg and (idx + 1) % 5 == 0:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"📤 **Uploading Images to Group**\n\n"
                             f"🖼️ Progress: {idx + 1}/{len(image_paths)}\n"
                             f"✅ Uploaded: {total_uploaded} images\n\n"
@@ -62,7 +63,7 @@ class ImageUploader:
                         )
                     
                     # Small delay between images to avoid rate limits
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                 
                 return True, f"Successfully uploaded {total_uploaded} images"
 
@@ -74,7 +75,7 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"⏸️ **Rate Limit Hit**\n\n"
                             f"Telegram requires a {wait_time}s cooldown.\n\n"
                             f"⏳ Waiting {wait_time} seconds...\n"
@@ -84,11 +85,11 @@ class ImageUploader:
                     except Exception:
                         pass
                 
-                time.sleep(wait_time + 1)
+                await asyncio.sleep(wait_time + 1)
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"📤 **Resuming Image Upload**\n\n"
                             f"🖼️ Remaining: {len(image_paths) - total_uploaded} images\n\n"
                             f"⏳ Retrying upload..."
@@ -105,7 +106,7 @@ class ImageUploader:
         return False, f"Failed after {max_retries} attempts due to rate limiting"
     
     @staticmethod
-    def upload_single_image(image_path: str, user_id: int, status_msg: Optional[Message] = None,
+    async def upload_single_image_to_group(image_path: str, user_id: int, status_msg: Optional[Message] = None,
                            client: Optional[Client] = None) -> Tuple[bool, str]:
         """Upload single image to Telegram group - NO CAPTION"""
         if not os.path.exists(image_path):
@@ -123,7 +124,7 @@ class ImageUploader:
                     upload_client = client
                 
                 # Send single photo WITHOUT caption
-                upload_client.send_photo(
+                await upload_client.send_photo(
                     chat_id=CHAT_ID,
                     photo=image_path
                     # No caption parameter
@@ -139,7 +140,7 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"⏸️ **Rate Limit Hit**\n\n"
                             f"Telegram requires a {wait_time}s cooldown.\n\n"
                             f"⏳ Waiting {wait_time} seconds...\n"
@@ -148,11 +149,11 @@ class ImageUploader:
                     except Exception:
                         pass
                 
-                time.sleep(wait_time + 1)
+                await asyncio.sleep(wait_time + 1)
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text("📤 **Resuming Upload...**")
+                        await status_msg.edit_text("📤 **Resuming Upload...**")
                     except Exception:
                         pass
                 
@@ -165,13 +166,13 @@ class ImageUploader:
         return False, f"Failed after {max_retries} attempts due to rate limiting"
     
     @staticmethod
-    def upload_multiple_images(image_paths: List[str], message: Message, user_id: int) -> None:
+    async def upload_multiple_images(image_paths: List[str], message: Message, user_id: int) -> None:
         """Upload multiple images with progress tracking - NO CAPTIONS, NO GROUPING"""
         total = len(image_paths)
         success_count = 0
         failed_count = 0
         
-        status_msg = message.reply_text(
+        status_msg = await message.reply_text(
             f"📤 **Starting Bulk Image Upload**\n\n"
             f"Total images: {total}\n"
             f"Preparing upload..."
@@ -180,7 +181,7 @@ class ImageUploader:
         overall_start = time.time()
         
         # Upload images individually
-        success, msg = ImageUploader.upload_images_to_group(
+        success, msg = await ImageUploader.upload_images_to_group(
             image_paths, user_id, status_msg, client=message._client
         )
         
@@ -194,7 +195,7 @@ class ImageUploader:
         total_time = time.time() - overall_start
         
         from ui.keyboards import Keyboards
-        status_msg.edit_text(
+        await status_msg.edit_text(
             f"✅ **Bulk Image Upload Complete!**\n\n"
             f"📊 **Summary:**\n"
             f"• Total: {total} images\n"

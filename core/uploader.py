@@ -4,6 +4,7 @@ Video upload functionality
 
 import os
 import time
+import asyncio
 from typing import List, Tuple, Optional
 
 from pyrogram import Client
@@ -21,7 +22,7 @@ class VideoUploader:
     """Handle video uploads to Telegram"""
     
     @staticmethod
-    def upload_to_group(video_path: str, user_id: int, 
+    async def upload_to_group(video_path: str, user_id: int, 
                        status_msg: Optional[Message] = None,
                        client: Optional[Client] = None) -> Tuple[bool, str]:
         """Upload video to Telegram group with retry logic"""
@@ -49,14 +50,14 @@ class VideoUploader:
 
                 if width is None or height is None:
                     upload_type = "document"
-                    upload_client.send_document(
+                    await upload_client.send_document(
                         chat_id=CHAT_ID,
                         document=video_path,
                         progress=ProgressTracker.callback,
                         progress_args=(progress_key, status_msg, video_name, start_time)
                     )
                 else:
-                    upload_client.send_video(
+                    await upload_client.send_video(
                         chat_id=CHAT_ID,
                         video=video_path,
                         width=width,
@@ -81,7 +82,7 @@ class VideoUploader:
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"⏸️ **Rate Limit Hit**\n\n"
                             f"Telegram requires a {wait_time}s cooldown.\n\n"
                             f"⏳ Waiting {wait_time} seconds...\n"
@@ -91,11 +92,11 @@ class VideoUploader:
                     except Exception:
                         pass
                 
-                time.sleep(wait_time + 1)
+                await asyncio.sleep(wait_time + 1)
                 
                 if status_msg:
                     try:
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"📤 **Resuming Upload**\n\n"
                             f"📁 File: `{video_name[:35]}...`\n"
                             f"💾 Size: {Formatter.size(file_size)}\n\n"
@@ -113,13 +114,13 @@ class VideoUploader:
         return False, f"Failed after {max_retries} attempts due to rate limiting"
     
     @staticmethod
-    def upload_multiple(video_paths: List[str], message: Message, user_id: int) -> None:
+    async def upload_multiple(video_paths: List[str], message: Message, user_id: int) -> None:
         """Upload multiple videos with progress tracking"""
         total = len(video_paths)
         success_count = 0
         failed_count = 0
         
-        status_msg = message.reply_text(
+        status_msg = await message.reply_text(
             f"📤 **Starting Bulk Upload**\n\n"
             f"Total videos: {total}\n"
             f"Preparing upload..."
@@ -132,7 +133,7 @@ class VideoUploader:
                 video_name = os.path.basename(video_path)
                 file_size = os.path.getsize(video_path)
                 
-                status_msg.edit_text(
+                await status_msg.edit_text(
                     f"📤 **Bulk Upload Progress**\n\n"
                     f"**Video {idx}/{total}**\n"
                     f"✅ Completed: {success_count}\n"
@@ -143,7 +144,7 @@ class VideoUploader:
                 )
                 
                 # Pass the client from the message context
-                success, msg = VideoUploader.upload_to_group(
+                success, msg = await VideoUploader.upload_to_group(
                     video_path, user_id, status_msg, client=message._client
                 )
                 
@@ -155,7 +156,7 @@ class VideoUploader:
                     print(f"❌ Failed {idx}/{total}: {video_name} - {msg}")
                 
                 if idx < total:
-                    time.sleep(3)
+                    await asyncio.sleep(3)
                     
             except Exception as e:
                 print(f"Error uploading {video_path}: {e}")
@@ -164,7 +165,7 @@ class VideoUploader:
         total_time = time.time() - overall_start
         
         from ui.keyboards import Keyboards
-        status_msg.edit_text(
+        await status_msg.edit_text(
             f"✅ **Bulk Upload Complete!**\n\n"
             f"📊 **Summary:**\n"
             f"• Total: {total} videos\n"
