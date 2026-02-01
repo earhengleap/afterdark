@@ -334,18 +334,14 @@ def setup_command_handlers(app: Client):
                             
                             await status_msg.delete()
                             
-                            # Send images in batches of 10
-                            for i in range(0, len(image_paths), 10):
-                                batch = image_paths[i:i + 10]
-                                media_group = [InputMediaPhoto(media=img_path) for img_path in batch]
-                                if media_group:
-                                    try:
-                                        await app.send_media_group(chat_id=message.chat.id, media=media_group)
-                                    except Exception as e:
-                                        print(f"❌ Error sending media group: {e}")
-                                        # Fallback: send individually
-                                        for img_path in batch:
-                                            await app.send_photo(chat_id=message.chat.id, photo=img_path)
+                            # Send images individually to avoid Pyrogram media group bug
+                            for img_path in image_paths:
+                                try:
+                                    if os.path.exists(img_path):
+                                        await app.send_photo(chat_id=message.chat.id, photo=img_path)
+                                        await asyncio.sleep(0.5) # Avoid flood wait
+                                except Exception as e:
+                                    print(f"❌ Error sending image: {e}")
                             
                             try:
                                 await message.reply_text(
@@ -442,16 +438,14 @@ def setup_command_handlers(app: Client):
                         
                         await status_msg.delete()
                         
-                        for i in range(0, len(image_paths), 10):
-                            batch = image_paths[i:i + 10]
-                            media_group = [InputMediaPhoto(media=img_path) for img_path in batch]
-                            if media_group:
-                                try:
-                                    await app.send_media_group(chat_id=message.chat.id, media=media_group)
-                                except Exception as e:
-                                    print(f"❌ Error sending media group: {e}")
-                                    for img_path in batch:
-                                        await app.send_photo(chat_id=message.chat.id, photo=img_path)
+                        # Send images individually to avoid Pyrogram media group bug
+                        for img_path in image_paths:
+                            try:
+                                if os.path.exists(img_path):
+                                    await app.send_photo(chat_id=message.chat.id, photo=img_path)
+                                    await asyncio.sleep(0.5)
+                            except Exception as e:
+                                print(f"❌ Error sending image: {e}")
                         
                         try:
                             await message.reply_text(
