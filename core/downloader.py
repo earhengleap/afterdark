@@ -305,10 +305,16 @@ class VideoDownloader:
             except Exception as e:
                 print(f"❌ Error sending video {video_path}: {e}")
         
-        # Send images individually
+        # Send images individually to avoid Pyrogram media group bug
         if image_paths:
             print(f"🔄 Sending {len(image_paths)} images to user individually...")
-            await ImageDownloader.send_images_to_user(image_paths, message, user_id)
+            for img_path in image_paths:
+                try:
+                    if os.path.exists(img_path):
+                        await message.reply_photo(photo=img_path)
+                        await asyncio.sleep(0.5) # Avoid flood wait
+                except Exception as e:
+                    print(f"❌ Error sending image {img_path}: {e}")
     
     @staticmethod
     async def _send_summary(url_results: List[DownloadResult], video_success_count: int, 
