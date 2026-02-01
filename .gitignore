@@ -1,12 +1,9 @@
-# Create/update .gitignore with these contents
-cat > .gitignore << 'EOF'
 # Media files - DO NOT UPLOAD
 videos/
 images/
 uploadthing_videos/
 x_downloader_web/data/videos/
 x_downloader_web/data/images/
-#uploadthing/
 audio/
 *.mp4
 *.mp3
@@ -23,14 +20,9 @@ audio/
 *.webp
 
 # Telegram session files and user data
-#*.session
-#*.session-journal
-#*.session.*
-#users/
-#my_group/
-#backup/
-#saved_message_to_group/
-#O36F4/
+*.session
+*.session-journal
+*.session.*
 
 # Python cache and build files
 __pycache__/
@@ -44,11 +36,10 @@ venv/
 *.egg-info/
 dist/
 build/
+.pythonlibs/
 
 # Log files and data
-#*.log
-#data/
-#get_url_log/
+*.log
 
 # Temporary files
 *.tmp
@@ -57,11 +48,11 @@ build/
 
 # IDE and OS files
 .vscode/
+.idea/
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Configuration with sensitive data
-#config/twitter_cookies.txt
-#twitter_cookies.txt
-EOF
+# Replit
+.replit
+replit.nix
