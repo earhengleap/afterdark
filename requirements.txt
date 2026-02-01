@@ -23,3 +23,4 @@ tgcrypto
 uvicorn[standard]
 websockets
 yt-dlp
+gallery-dl

@@ -4,6 +4,7 @@ Video download functionality - SUPPORTS MULTIPLE VIDEOS PER URL
 
 import os
 import time
+import asyncio
 from typing import List, Tuple, Optional, Dict
 
 import yt_dlp
@@ -127,7 +128,7 @@ class VideoDownloader:
         return None, None
     
     @staticmethod
-    def download_multiple(urls: List[str], message: Message, user_id: int,
+    async def download_multiple(urls: List[str], message: Message, user_id: int,
                         detection_msg: Optional[Message] = None) -> None:
         """Download multiple videos with progress tracking - NOW HANDLES BOTH VIDEOS AND IMAGES"""
         total = len(urls)
@@ -142,13 +143,13 @@ class VideoDownloader:
         
         if detection_msg:
             status_msg = detection_msg
-            status_msg.edit_text(
+            await status_msg.edit_text(
                 f"📥 **Starting Bulk Download**\n\n"
                 f"Total URLs: {total}\n"
                 f"Processing videos and images..."
             )
         else:
-            status_msg = message.reply_text(
+            status_msg = await message.reply_text(
                 f"📥 **Starting Bulk Download**\n\n"
                 f"Total URLs: {total}\n"
                 f"Processing videos and images..."
@@ -159,7 +160,7 @@ class VideoDownloader:
         # Download phase - try both video and image for each URL
         for idx, url in enumerate(urls, 1):
             try:
-                status_msg.edit_text(
+                await status_msg.edit_text(
                     f"📥 **Bulk Download Progress**\n\n"
                     f"**URL {idx}/{total}**\n"
                     f"🎬 Videos: {video_success_count}\n"
@@ -187,7 +188,7 @@ class VideoDownloader:
                     
                     print(f"✅ Downloaded {len(video_paths)} video(s) from {idx}/{total}: {url}")
                     
-                    status_msg.edit_text(
+                    await status_msg.edit_text(
                         f"📥 **Bulk Download Progress**\n\n"
                         f"**URL {idx}/{total}**\n"
                         f"🎬 Videos: {video_success_count}\n"
@@ -196,11 +197,11 @@ class VideoDownloader:
                         f"✅ **Video Success:** {len(video_paths)} video(s) from URL\n\n"
                         f"⏳ Continuing..."
                     )
-                    time.sleep(0.5)
+                    await asyncio.sleep(0.5)
                 else:
                     # Video download failed, try image download
                     print(f"🖼️ No video found, trying image download for {url}")
-                    image_paths, image_info = ImageDownloader.download(url, message)
+                    image_paths, image_info = await ImageDownloader.download(url, message)
                     
                     if image_paths and len(image_paths) > 0:
                         image_success_count += 1
@@ -217,7 +218,7 @@ class VideoDownloader:
                         
                         print(f"✅ Downloaded {len(image_paths)} images from {idx}/{total}: {url}")
                         
-                        status_msg.edit_text(
+                        await status_msg.edit_text(
                             f"📥 **Bulk Download Progress**\n\n"
                             f"**URL {idx}/{total}**\n"
                             f"🎬 Videos: {video_success_count}\n"
@@ -226,7 +227,7 @@ class VideoDownloader:
                             f"✅ **Image Success:** {len(image_paths)} images from URL\n\n"
                             f"⏳ Continuing..."
                         )
-                        time.sleep(0.5)
+                        await asyncio.sleep(0.5)
                     else:
                         # Both video and image download failed
                         failed_count += 1
@@ -262,22 +263,22 @@ class VideoDownloader:
         print(f"📁 Total downloaded images: {len(downloaded_image_paths)}")
         
         try:
-            status_msg.delete()
+            await status_msg.delete()
         except Exception:
             pass
         
         # Send downloaded content to user
         if downloaded_video_paths or downloaded_image_paths:
             print(f"🔄 Sending {len(downloaded_video_paths)} videos and {len(downloaded_image_paths)} images to user...")
-            VideoDownloader._send_downloaded_content(downloaded_video_paths, downloaded_image_paths, message, user_id)
+            await VideoDownloader._send_downloaded_content(downloaded_video_paths, downloaded_image_paths, message, user_id)
         
         # Send summary
-        VideoDownloader._send_summary(url_results, video_success_count, image_success_count, 
+        await VideoDownloader._send_summary(url_results, video_success_count, image_success_count, 
                                     failed_count, total, total_time, message, user_id, 
                                     downloaded_video_paths, downloaded_image_paths)
     
     @staticmethod
-    def _send_downloaded_content(video_paths: List[str], image_paths: List[str], 
+    async def _send_downloaded_content(video_paths: List[str], image_paths: List[str], 
                                message: Message, user_id: int) -> None:
         """Send downloaded videos and images to user"""
         # Send videos
@@ -291,7 +292,7 @@ class VideoDownloader:
                 video_key = f"{user_id}_v_{idx}"
                 user_downloads[video_key] = video_path
                 
-                message.reply_video(
+                await message.reply_video(
                     video=video_path,
                     width=width if width else 720,
                     height=height if height else 1280,
@@ -307,10 +308,10 @@ class VideoDownloader:
         # Send images individually
         if image_paths:
             print(f"🔄 Sending {len(image_paths)} images to user individually...")
-            ImageDownloader.send_images_to_user(image_paths, message, user_id)
+            await ImageDownloader.send_images_to_user(image_paths, message, user_id)
     
     @staticmethod
-    def _send_summary(url_results: List[DownloadResult], video_success_count: int, 
+    async def _send_summary(url_results: List[DownloadResult], video_success_count: int, 
                      image_success_count: int, failed_count: int, total: int, 
                      total_time: float, message: Message, user_id: int, 
                      video_paths: List[str], image_paths: List[str]) -> None:
@@ -397,7 +398,7 @@ class VideoDownloader:
             summary_text += "💡 **Tip:** Check if the URLs contain videos/images and are publicly accessible."
             keyboard = Keyboards.back_to_main()
         
-        message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
+        await message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
     
     @staticmethod
     def _parse_error(error_msg: str) -> str:
