@@ -6,8 +6,7 @@ Version: 1.0.0
 """
 
 import os
-from threading import Thread
-from flask import Flask
+import time
 from datetime import datetime
 
 from pyrogram import Client
@@ -18,7 +17,7 @@ from config.paths import setup_directories
 
 # Core functionality imports
 from core.downloader import VideoDownloader
-from core.image_downloader import ImageDownloader
+from core.image_downloader import ImageDownloader # ADD THIS IMPORT
 from core.uploader import VideoUploader
 from core.image_uploader import ImageUploader
 from core.file_manager import FileManager
@@ -56,29 +55,17 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# ==================== FLASK SERVER (for UptimeRobot) ====================
-
-flask_app = Flask('')
-
-@flask_app.route('/')
-def home():
-    return "🤖 Bot is running!"
-
-def run_flask():
-    # Replit free-tier requires port 8080
-    flask_app.run(host='0.0.0.0', port=8080)
-
 # ==================== SETUP HANDLERS ====================
 
+# Setup command handlers
 setup_command_handlers(app)
+
+# Setup callback handlers  
 setup_callback_handlers(app)
 
 # ==================== MAIN ====================
 
 if __name__ == "__main__":
-    # Start Flask server in background thread
-    Thread(target=run_flask).start()
-
     print("="*50)
     print(f"🤖 {BOT_NAME}")
     print(f"📦 Version: {BOT_VERSION}")
@@ -86,7 +73,7 @@ if __name__ == "__main__":
     print("="*50)
     print("✅ Bot is starting...")
     print("⏳ Connecting to Telegram...")
-
+    
     try:
         app.run()
     except KeyboardInterrupt:
