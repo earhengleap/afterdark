@@ -1,0 +1,37 @@
+❌ Error sending images: Messages.__init__() missing 1 required keyword-only argument: 'topics'
+Unhandled exception: Telegram says: [400 MESSAGE_ID_INVALID] (caused by "messages.EditMessage") Pyrogram 2.3.69 thinks: The message id is invalid
+Traceback (most recent call last):
+  File "/home/runner/workspace/handlers/command_handlers.py", line 342, in text_handler
+    await app.send_media_group(chat_id=message.chat.id, media=media_group)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/methods/messages/send_media_group.py", line 549, in send_media_group
+    raw.types.messages.Messages(
+TypeError: Messages.__init__() missing 1 required keyword-only argument: 'topics'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/dispatcher.py", line 383, in _dispatch_to_handlers
+    await self._execute_handler(handler, *args)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/dispatcher.py", line 410, in _execute_handler
+    await handler.callback(self.client, *args)
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/handlers/message_handler.py", line 154, in resolve_future_or_callback
+    await self.original_callback(client, message, *args)
+  File "/home/runner/workspace/handlers/command_handlers.py", line 361, in text_handler
+    await status_msg.edit_text(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/types/messages_and_media/message.py", line 4504, in edit_text
+    return await self._client.edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/methods/messages/edit_message_text.py", line 109, in edit_message_text
+    r = await self.invoke(rpc)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/methods/advanced/invoke.py", line 80, in invoke
+    r = await self.session.invoke(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/session/session.py", line 420, in invoke
+    return await self.send(query, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/session/session.py", line 377, in send
+    RPCError.raise_it(result, type(data))
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/pyrogram/errors/rpc_error.py", line 93, in raise_it
+    raise getattr(
+pyrogram.errors.exceptions.bad_request_400.MessageIdInvalid: Telegram says: [400 MESSAGE_ID_INVALID] (caused by "messages.EditMessage") Pyrogram 2.3.69 thinks: The message id is invalid

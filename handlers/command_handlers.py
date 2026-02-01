@@ -339,19 +339,28 @@ def setup_command_handlers(app: Client):
                                 batch = image_paths[i:i + 10]
                                 media_group = [InputMediaPhoto(media=img_path) for img_path in batch]
                                 if media_group:
-                                    await app.send_media_group(chat_id=message.chat.id, media=media_group)
+                                    try:
+                                        await app.send_media_group(chat_id=message.chat.id, media=media_group)
+                                    except Exception as e:
+                                        print(f"❌ Error sending media group: {e}")
+                                        # Fallback: send individually
+                                        for img_path in batch:
+                                            await app.send_photo(chat_id=message.chat.id, photo=img_path)
                             
-                            await message.reply_text(
-                                f"✅ **Images Download Successful**\n\n"
-                                f"👤 **X User:** {clickable_username}\n"
-                                f"🔗 **Source:** {formatted_url}\n"
-                                f"🖼️ **Images Found:** {len(image_paths)}\n"
-                                f"💾 **Total Size:** {total_size:.2f} MB\n"
-                                f"📥 **Downloaded by:** {username}\n\n"
-                                f"What would you like to do next?",
-                                reply_markup=Keyboards.image_actions_with_upload(user_id),
-                                disable_web_page_preview=False
-                            )
+                            try:
+                                await message.reply_text(
+                                    f"✅ **Images Download Successful**\n\n"
+                                    f"👤 **X User:** {clickable_username}\n"
+                                    f"🔗 **Source:** {formatted_url}\n"
+                                    f"🖼️ **Images Found:** {len(image_paths)}\n"
+                                    f"💾 **Total Size:** {total_size:.2f} MB\n"
+                                    f"📥 **Downloaded by:** {username}\n\n"
+                                    f"What would you like to do next?",
+                                    reply_markup=Keyboards.image_actions_with_upload(user_id),
+                                    disable_web_page_preview=False
+                                )
+                            except Exception as e:
+                                print(f"❌ Error sending confirmation message: {e}")
                             
                             log_user_action(user_id, username, url, "success", "image")
                             print(f"✅ Image download successful for {url} - Sent {len(image_paths)} images")
@@ -435,19 +444,27 @@ def setup_command_handlers(app: Client):
                             batch = image_paths[i:i + 10]
                             media_group = [InputMediaPhoto(media=img_path) for img_path in batch]
                             if media_group:
-                                await app.send_media_group(chat_id=message.chat.id, media=media_group)
+                                try:
+                                    await app.send_media_group(chat_id=message.chat.id, media=media_group)
+                                except Exception as e:
+                                    print(f"❌ Error sending media group: {e}")
+                                    for img_path in batch:
+                                        await app.send_photo(chat_id=message.chat.id, photo=img_path)
                         
-                        await message.reply_text(
-                            f"✅ **Images Download Successful**\n\n"
-                            f"👤 **X User:** {clickable_username}\n"
-                            f"🔗 **Source:** {formatted_url}\n"
-                            f"🖼️ **Images Found:** {len(image_paths)}\n"
-                            f"💾 **Total Size:** {total_size:.2f} MB\n"
-                            f"📥 **Downloaded by:** {username}\n\n"
-                            f"What would you like to do next?",
-                            reply_markup=Keyboards.image_actions_with_upload(user_id),
-                            disable_web_page_preview=False
-                        )
+                        try:
+                            await message.reply_text(
+                                f"✅ **Images Download Successful**\n\n"
+                                f"👤 **X User:** {clickable_username}\n"
+                                f"🔗 **Source:** {formatted_url}\n"
+                                f"🖼️ **Images Found:** {len(image_paths)}\n"
+                                f"💾 **Total Size:** {total_size:.2f} MB\n"
+                                f"📥 **Downloaded by:** {username}\n\n"
+                                f"What would you like to do next?",
+                                reply_markup=Keyboards.image_actions_with_upload(user_id),
+                                disable_web_page_preview=False
+                            )
+                        except Exception as e:
+                            print(f"❌ Error sending confirmation message: {e}")
                         
                         log_user_action(user_id, username, url, "success", "image")
                         
