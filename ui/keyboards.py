@@ -14,23 +14,20 @@ class Keyboards:
         """Main menu keyboard with primary actions"""
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📥 Download Video", callback_data="download"),
-                InlineKeyboardButton("🖼️ Download Images", callback_data="download_images")
+                InlineKeyboardButton("🎬 Download Video", callback_data="download"),
+                InlineKeyboardButton("📸 Download Images", callback_data="download_images")
             ],
             [
-                InlineKeyboardButton("📤 Bulk Upload Videos", callback_data="bulk_upload"),
-                InlineKeyboardButton("🖼️ Bulk Upload Images", callback_data="bulk_upload_images")
+                InlineKeyboardButton("📂 Bulk Videos", callback_data="bulk_upload"),
+                InlineKeyboardButton("📂 Bulk Images", callback_data="bulk_upload_images")
             ],
             [
-                InlineKeyboardButton("📊 Statistics", callback_data="stats"),
-                InlineKeyboardButton("❓ Help", callback_data="help")
+                InlineKeyboardButton("📊 My Stats", callback_data="stats"),
+                InlineKeyboardButton("💡 Help & FAQ", callback_data="help")
             ],
             [
-                InlineKeyboardButton("ℹ️ About", callback_data="about"),
-                InlineKeyboardButton("⚙️ Settings", callback_data="settings")
-            ],
-            [
-                InlineKeyboardButton("📦 Version Info", callback_data="version")
+                InlineKeyboardButton("✨ Settings", callback_data="settings"),
+                InlineKeyboardButton("🔗 Support", callback_data="about")
             ]
         ])
     
@@ -38,7 +35,7 @@ class Keyboards:
     def back_to_main():
         """Simple back button to return to main menu"""
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            [InlineKeyboardButton("🔙 Back to Home", callback_data="main_menu")]
         ])
     
     @staticmethod
@@ -93,11 +90,11 @@ class Keyboards:
         """Actions available after video download with upload option"""
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_to_group_{user_id}")
+                InlineKeyboardButton("🚀 Send to Telegram Group", callback_data=f"upload_to_group_{user_id}")
             ],
             [
-                InlineKeyboardButton("📥 Download Another", callback_data="download"),
-                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+                InlineKeyboardButton("🔄 New Download", callback_data="download"),
+                InlineKeyboardButton("🏠 Home", callback_data="main_menu")
             ]
         ])
     
@@ -106,11 +103,11 @@ class Keyboards:
         """Actions available after image download with upload option"""
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📤 Upload to Group", callback_data=f"upload_images_to_group_{user_id}")
+                InlineKeyboardButton("🚀 Send to Telegram Group", callback_data=f"upload_images_to_group_{user_id}")
             ],
             [
-                InlineKeyboardButton("🖼️ Download More Images", callback_data="download_images"),
-                InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+                InlineKeyboardButton("🔄 New Download", callback_data="download_images"),
+                InlineKeyboardButton("🏠 Home", callback_data="main_menu")
             ]
         ])
     
