@@ -1,0 +1,3388 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X Downloader Pro - Download X/Twitter Videos & Images</title>
+    
+    <!-- Bootstrap 5 with Dark Theme -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            --danger-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --dark-bg: #0f172a;
+            --darker-bg: #0a0f1e;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(148, 163, 184, 0.1);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+            z-index: -1;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            border: 2px solid rgba(30, 41, 59, 0.5);
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        
+        /* Navigation */
+        .navbar {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+        
+        .navbar-brand {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .navbar-brand i {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 1.8rem;
+        }
+        
+        .nav-link {
+            color: var(--text-secondary) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem !important;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            margin: 0 0.2rem;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: var(--text-primary) !important;
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .nav-link i {
+            margin-right: 8px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-top: 80px;
+            padding: 2rem 0;
+        }
+        
+        /* Hero Section */
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0;
+            margin-bottom: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+            z-index: -1;
+        }
+        
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            line-height: 1.6;
+        }
+        
+        /* Feature Cards */
+        .feature-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .feature-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+        }
+        
+        .feature-card:nth-child(1) .feature-icon {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .feature-card:nth-child(2) .feature-icon {
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .feature-card:nth-child(3) .feature-icon {
+            background: var(--success-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .feature-card h4 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        /* Download Card */
+        .download-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border-bottom: 1px solid var(--card-border);
+            padding: 1.5rem 2rem;
+        }
+        
+        .card-header h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-header i {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .card-body {
+            padding: 2rem;
+        }
+        
+        /* Form Elements */
+        .form-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-control, .form-select {
+            background: rgba(15, 23, 42, 0.5);
+            border: 2px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: var(--accent-color);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: 0.5s;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-success {
+            background: var(--success-gradient);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(67, 233, 123, 0.3);
+        }
+        
+        .btn-danger {
+            background: var(--danger-gradient);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(250, 112, 154, 0.3);
+        }
+        
+        .btn-telegram {
+            background: linear-gradient(135deg, #0088cc 0%, #00aced 100%);
+            color: white;
+        }
+        
+        .btn-telegram:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 136, 204, 0.3);
+        }
+        
+        /* Progress Bars */
+        .progress-container {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .progress {
+            height: 12px;
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-bar {
+            background: var(--primary-gradient);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        /* Files Table */
+        .files-container {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 3rem;
+        }
+        
+        .table {
+            margin: 0;
+            color: var(--text-primary);
+        }
+        
+        .table thead th {
+            background: rgba(59, 130, 246, 0.1);
+            border: none;
+            color: var(--accent-color);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            padding: 1rem 1.5rem;
+        }
+        
+        .table tbody tr {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .table td {
+            padding: 1rem 1.5rem;
+            vertical-align: middle;
+        }
+        
+        .badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-video {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .badge-image {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+        
+        /* File Actions */
+        .file-actions {
+            display: flex;
+            gap: 5px;
+            min-width: 180px;
+        }
+        
+        .file-actions .btn {
+            padding: 0.5rem;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-color);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+        
+        .stat-card:nth-child(1) .stat-icon {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-card:nth-child(2) .stat-icon {
+            background: var(--danger-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-card:nth-child(3) .stat-icon {
+            background: var(--success-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-card:nth-child(4) .stat-icon {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0.5rem 0;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Tasks Section */
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .task-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 15px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .task-card.completed {
+            border-left: 4px solid #43e97b;
+        }
+        
+        .task-card.failed {
+            border-left: 4px solid #fa709a;
+        }
+        
+        .task-card.processing {
+            border-left: 4px solid #f6d365;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(246, 211, 101, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(246, 211, 101, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(246, 211, 101, 0); }
+        }
+        
+        /* Selection Info */
+        .selection-info {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* File Checkboxes */
+        .file-checkbox {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .file-checkbox:checked {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        
+        /* Modals */
+        .modal-content {
+            background: var(--dark-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--card-border);
+            padding: 1.5rem 2rem;
+        }
+        
+        .modal-body {
+            padding: 2rem;
+        }
+        
+        .modal-footer {
+            border-top: 1px solid var(--card-border);
+            padding: 1.5rem 2rem;
+        }
+        
+        /* Footer */
+        footer {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--card-border);
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+        
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.6s ease forwards;
+        }
+        
+        /* Connection Status */
+        .connection-status {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .connection-dot.connected {
+            background: #43e97b;
+            box-shadow: 0 0 10px #43e97b;
+        }
+        
+        .connection-dot.disconnected {
+            background: #fa709a;
+            box-shadow: 0 0 10px #fa709a;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .feature-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .table-responsive {
+                font-size: 0.9rem;
+            }
+            
+            .file-actions {
+                flex-wrap: wrap;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .tasks-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .hero-title {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card-body {
+                padding: 1.5rem;
+            }
+            
+            .btn {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+        }
+        
+        /* Custom file upload queue */
+        .upload-queue {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-queue-item {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-queue-item:hover {
+            transform: translateX(5px);
+            border-color: var(--accent-color);
+        }
+        
+        /* Glass morphism effect */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 20px;
+        }
+        
+        /* Loading animation */
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        .toast {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* File type indicators */
+        .file-type-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+        }
+        
+        .file-type-video {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+            color: #f093fb;
+        }
+        
+        .file-type-image {
+            background: linear-gradient(135deg, rgba(67, 233, 123, 0.2) 0%, rgba(56, 249, 215, 0.2) 100%);
+            color: #43e97b;
+        }
+        
+        /* Custom tabs */
+        .custom-tabs {
+            display: flex;
+            gap: 5px;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 5px;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .custom-tab {
+            flex: 1;
+            text-align: center;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .custom-tab.active {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .custom-tab:hover:not(.active) {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-primary);
+        }
+        
+        /* Search box */
+        .search-box {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+        
+        .search-box input {
+            padding-left: 2.5rem;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            width: 100%;
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-bolt"></i>
+                <span>X Downloader Pro</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="fas fa-bars text-white"></i>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#download">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            Download
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#files">
+                            <i class="fas fa-folder"></i>
+                            Files
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#stats">
+                            <i class="fas fa-chart-bar"></i>
+                            Stats
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog"></i>
+                            Settings
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#telegramConfigModal">
+                                    <i class="fab fa-telegram"></i> Telegram Settings
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="/api/docs" target="_blank">
+                                    <i class="fas fa-code"></i> API Documentation
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <i class="fas fa-palette"></i> Theme Settings
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Connection Status -->
+    <div class="connection-status slide-in">
+        <span class="connection-dot connected"></span>
+        <span class="connection-text">Connected</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container main-content">
+        <!-- Hero Section -->
+        <div class="hero-section slide-in">
+            <h1 class="hero-title">X Downloader Pro</h1>
+            <p class="hero-subtitle">
+                Download high-quality videos and images from X/Twitter directly to your device 
+                or upload them to Telegram with a single click.
+            </p>
+            <div class="mt-4">
+                <span class="badge bg-primary me-2"><i class="fas fa-bolt me-1"></i> Fast Downloads</span>
+                <span class="badge bg-success me-2"><i class="fas fa-cloud-upload-alt me-1"></i> Telegram Upload</span>
+                <span class="badge bg-info"><i class="fas fa-mobile-alt me-1"></i> Mobile Friendly</span>
+            </div>
+        </div>
+
+        <!-- Feature Cards -->
+        <div class="feature-cards slide-in" style="animation-delay: 0.2s">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-download"></i>
+                </div>
+                <h4>Batch Download</h4>
+                <p>Download multiple videos and images simultaneously with our high-speed downloader.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fab fa-telegram"></i>
+                </div>
+                <h4>Telegram Upload</h4>
+                <p>Upload downloaded files directly to your Telegram groups or channels instantly.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-tachometer-alt"></i>
+                </div>
+                <h4>Real-time Progress</h4>
+                <p>Monitor download and upload progress in real-time with detailed statistics.</p>
+            </div>
+        </div>
+
+        <!-- Download Section -->
+        <div id="download" class="download-card slide-in" style="animation-delay: 0.4s">
+            <div class="card-header">
+                <h3><i class="fas fa-cloud-download-alt"></i> Download Content</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="fas fa-link"></i> Enter X/Twitter URLs (one per line)
+                    </label>
+                    <textarea 
+                        id="urlInput" 
+                        class="form-control" 
+                        rows="5" 
+                        placeholder="Paste your X/Twitter URLs here...
+Example:
+https://x.com/user/status/1234567890
+https://twitter.com/user/status/9876543210"
+                        style="font-family: 'Consolas', monospace; resize: vertical;"></textarea>
+                    <div class="form-text mt-2">
+                        <i class="fas fa-info-circle"></i> You can paste multiple URLs separated by new lines, spaces, or commas
+                    </div>
+                </div>
+
+                <!-- Content Type Selection -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-filter"></i> Content Type
+                        </label>
+                        <div class="custom-tabs">
+                            <div class="custom-tab active" data-type="auto">
+                                <i class="fas fa-magic me-1"></i> Auto
+                            </div>
+                            <div class="custom-tab" data-type="video">
+                                <i class="fas fa-video me-1"></i> Video
+                            </div>
+                            <div class="custom-tab" data-type="image">
+                                <i class="fas fa-image me-1"></i> Image
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-chart-line"></i> Quality Preference
+                        </label>
+                        <div class="custom-tabs">
+                            <div class="custom-tab active" data-quality="best">
+                                <i class="fas fa-trophy me-1"></i> Best
+                            </div>
+                            <div class="custom-tab" data-quality="high">
+                                <i class="fas fa-chart-line me-1"></i> High
+                            </div>
+                            <div class="custom-tab" data-quality="medium">
+                                <i class="fas fa-balance-scale me-1"></i> Medium
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-grid gap-2 d-md-flex justify-content-center">
+                    <button id="downloadBtn" class="btn btn-primary btn-lg px-5">
+                        <i class="fas fa-play-circle me-2"></i>
+                        Start Download
+                    </button>
+                    <button id="clearBtn" class="btn btn-outline-secondary btn-lg">
+                        <i class="fas fa-eraser me-2"></i>
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Progress Section -->
+                <div id="progressSection" class="mt-4" style="display: none;">
+                    <div class="progress-container glass-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            Download Progress
+                        </h5>
+                        <div class="progress mb-3">
+                            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Status:</span>
+                                    <span id="statusText" class="fw-bold">Initializing...</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Progress:</span>
+                                    <span id="progressText" class="fw-bold">0/0 URLs</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="taskDetails" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Files Section -->
+        <div id="files" class="files-container slide-in" style="animation-delay: 0.6s">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">
+                    <i class="fas fa-folder-open"></i>
+                    Downloaded Files
+                    <span id="filesCount" class="badge bg-primary ms-2">0</span>
+                </h3>
+                <div class="d-flex gap-2">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="fileSearch" class="form-control form-control-sm" placeholder="Search files...">
+                    </div>
+                    <button id="uploadSelectedBtn" class="btn btn-telegram" onclick="showUploadOptions()" disabled>
+                        <i class="fab fa-telegram-plane me-2"></i>
+                        Upload Selected
+                        <span id="selectedCountBadge" class="badge bg-light text-dark ms-1" style="display: none;">0</span>
+                    </button>
+                    <button id="refreshFiles" class="btn btn-outline-primary">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <!-- File Controls -->
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary active" data-filter="all">
+                                <i class="fas fa-layer-group"></i> All
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" data-filter="video">
+                                <i class="fas fa-video"></i> Videos
+                            </button>
+                            <button type="button" class="btn btn-outline-success" data-filter="image">
+                                <i class="fas fa-image"></i> Images
+                            </button>
+                        </div>
+                        <div class="btn-group ms-2" role="group">
+                            <button type="button" class="btn btn-outline-secondary" data-sort="newest">
+                                <i class="fas fa-sort-amount-down"></i> Newest
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-sort="largest">
+                                <i class="fas fa-sort-amount-down-alt"></i> Largest
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-sort="name">
+                                <i class="fas fa-sort-alpha-down"></i> Name
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button id="selectAllBtn" class="btn btn-sm btn-outline-primary me-2" onclick="selectAllFiles()">
+                            <i class="fas fa-check-double"></i> Select All
+                        </button>
+                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#clearAllModal">
+                            <i class="fas fa-trash"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selection Info -->
+                <div id="selectionInfo" class="selection-info" style="display: none;">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <i class="fas fa-check-circle me-2"></i>
+                            <span id="selectedCount">0</span> files selected
+                            <small class="text-muted ms-2">
+                                (<span id="selectedVideos">0</span> videos, <span id="selectedImages">0</span> images)
+                            </small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-2" onclick="deselectAllFiles()">
+                                <i class="fas fa-times"></i> Deselect All
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="clearSelection()">
+                                <i class="fas fa-times-circle"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Files Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th width="50" class="text-center">
+                                    <input type="checkbox" id="selectAllCheckbox" class="form-check-input file-checkbox" onchange="toggleSelectAll(this.checked)">
+                                </th>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Date</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTable">
+                            <!-- Files will be loaded here -->
+                            <tr id="filesLoading">
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="loading-spinner mx-auto"></div>
+                                    <p class="mt-3 text-muted">Loading files...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="noFiles" style="display: none;">
+                    <div class="text-center py-5">
+                        <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
+                        <h4>No Files Downloaded</h4>
+                        <p class="text-muted mb-4">Start downloading content to see files here.</p>
+                        <button class="btn btn-primary" onclick="document.querySelector('#download').scrollIntoView({ behavior: 'smooth' })">
+                            <i class="fas fa-download me-2"></i>Start Downloading
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div id="stats" class="stats-grid slide-in" style="animation-delay: 0.8s">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="stat-value" id="totalDownloads">0</div>
+                <div class="stat-label">Total Downloads</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-video"></i>
+                </div>
+                <div class="stat-value" id="totalVideos">0</div>
+                <div class="stat-label">Videos</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-image"></i>
+                </div>
+                <div class="stat-value" id="totalImages">0</div>
+                <div class="stat-label">Images</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="stat-value" id="totalSize">0 MB</div>
+                <div class="stat-label">Total Size</div>
+            </div>
+        </div>
+
+        <!-- Recent Tasks -->
+        <div class="tasks-grid slide-in" style="animation-delay: 1s">
+            <div class="col-12">
+                <div class="files-container">
+                    <div class="card-header">
+                        <h3 class="mb-0">
+                            <i class="fas fa-history"></i>
+                            Recent Tasks
+                            <span id="tasksCount" class="badge bg-primary ms-2">0</span>
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="tasksList" class="row">
+                            <!-- Tasks will be loaded here -->
+                            <div class="col-12 text-center py-4">
+                                <div class="loading-spinner mx-auto"></div>
+                                <p class="mt-3 text-muted">Loading tasks...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="slide-in" style="animation-delay: 1.2s">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="mb-3">
+                        <i class="fas fa-bolt me-2"></i>
+                        X Downloader Pro
+                    </h5>
+                    <p class="text-muted mb-0">
+                        Open-source tool for downloading X/Twitter content and uploading to Telegram.
+                        Made with <i class="fas fa-heart text-danger"></i> for content creators.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                    <div class="d-flex flex-column flex-md-row justify-content-md-end gap-3">
+                        <div class="d-flex align-items-center">
+                            <span id="connectionStatusBadge" class="badge bg-success">
+                                <i class="fas fa-wifi"></i> Connected
+                            </span>
+                            <span class="text-muted ms-3">v2.0.0</span>
+                        </div>
+                        <div class="text-muted">
+                            <small>
+                                <i class="far fa-copyright me-1"></i> 
+                                2024 X Downloader Pro. All rights reserved.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <!-- Upload Options Modal -->
+    <div class="modal fade" id="uploadOptionsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram-plane me-2"></i>
+                        Upload to Telegram
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-list me-2"></i>
+                            Files to Upload
+                            <span class="badge bg-primary ms-2" id="uploadQueueCount">0</span>
+                        </h6>
+                        <div class="upload-queue">
+                            <div id="uploadQueueItems"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-cogs me-2"></i>
+                            Upload Settings
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Upload Mode</label>
+                                <select class="form-select" id="uploadMode">
+                                    <option value="mixed">Mixed Content</option>
+                                    <option value="videos_only">Videos Only</option>
+                                    <option value="images_only">Images Only</option>
+                                    <option value="separate">Separate Uploads</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Delay (seconds)</label>
+                                <input type="range" class="form-range" id="uploadDelay" min="1" max="10" value="2">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">Fast (1s)</small>
+                                    <small class="text-muted" id="delayValue">2s</small>
+                                    <small class="text-muted">Slow (10s)</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="addCaption" checked>
+                            <label class="form-check-label" for="addCaption">
+                                <i class="fas fa-comment me-1"></i> Add caption with filename
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="alert glass-card">
+                        <div class="d-flex">
+                            <i class="fas fa-info-circle fa-lg me-3 mt-1"></i>
+                            <div>
+                                <strong>Note:</strong> Files will be uploaded to your configured Telegram chat.
+                                <br>
+                                <small class="text-muted">Make sure to configure Telegram settings first.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="testTelegramConnection()">
+                        <i class="fas fa-wifi me-2"></i>Test Connection
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="startUpload()">
+                        <i class="fab fa-telegram-plane me-2"></i>Start Upload
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Progress Modal -->
+    <div class="modal fade" id="uploadProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="uploading-animation mb-3">
+                            <i class="fas fa-cloud-upload-alt fa-4x" style="background: linear-gradient(135deg, #0088cc 0%, #00aced 100%); -webkit-background-clip: text; background-clip: text; color: transparent;"></i>
+                        </div>
+                        <h5>Uploading to Telegram</h5>
+                        <p class="text-muted">Processing <span id="uploadingFileCount">0</span> files</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <small>Overall Progress</small>
+                            <small id="uploadStatus">Starting...</small>
+                        </div>
+                        <div class="progress">
+                            <div id="uploadOverallProgress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <small>Current File</small>
+                            <small id="currentFileName" class="text-truncate">Preparing...</small>
+                        </div>
+                        <div class="progress">
+                            <div id="uploadCurrentProgress" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="row text-center mb-3">
+                        <div class="col-4">
+                            <div class="stat-card">
+                                <div class="stat-value" id="uploadedCount">0</div>
+                                <small class="stat-label">Uploaded</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-card">
+                                <div class="stat-value" id="failedCount">0</div>
+                                <small class="stat-label">Failed</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-card">
+                                <div class="stat-value" id="remainingCount">0</div>
+                                <small class="stat-label">Remaining</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="uploadDetails" class="text-center text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Upload in progress...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Complete Modal -->
+    <div class="modal fade" id="uploadCompleteModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Upload Complete
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="uploadSummaryContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Close
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-sync me-2"></i>Refresh Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Single File Upload Modal -->
+    <div class="modal fade" id="singleUploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram-plane me-2"></i>
+                        Upload Single File
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-file-upload fa-3x mb-3" style="color: #3b82f6;"></i>
+                        <h5 id="singleFileName">File Name</h5>
+                        <p class="text-muted" id="singleFileSize">Size: 0 MB</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Caption (optional)</label>
+                        <textarea class="form-control" id="singleFileCaption" rows="3" placeholder="Add a caption for this file..."></textarea>
+                    </div>
+                    
+                    <div class="alert glass-card">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This file will be uploaded to your configured Telegram chat.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="uploadSingleFile()">
+                        <i class="fab fa-telegram-plane me-2"></i>Upload Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Telegram Config Modal -->
+    <div class="modal fade" id="telegramConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram me-2"></i>
+                        Telegram Settings
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <label class="form-label">Telegram Bot Token</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="botToken" placeholder="Enter bot token">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('botToken')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Get this from @BotFather on Telegram</small>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Chat ID</label>
+                        <input type="text" class="form-control" id="chatId" placeholder="e.g., -1001234567890">
+                        <small class="text-muted">Your Telegram group/channel ID (must start with -100)</small>
+                    </div>
+                    <div class="alert glass-card">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        These settings are required for uploading files to Telegram.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="testTelegramConnection()">
+                        <i class="fas fa-wifi me-2"></i>Test Connection
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveTelegramConfig()">
+                        <i class="fas fa-save me-2"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear All Modal -->
+    <div class="modal fade" id="clearAllModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Clear All Files
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete all downloaded files? This action cannot be undone.</p>
+                    <div class="alert glass-card bg-danger bg-opacity-10">
+                        <i class="fas fa-warning me-2"></i>
+                        This will permanently delete all videos and images from the server.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmClearAll">
+                        <i class="fas fa-trash me-2"></i>Delete All Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div class="modal fade" id="taskDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Task Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="taskDetailsContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Main JavaScript -->
+    <script>
+        // ==================== GLOBAL VARIABLES ====================
+        let currentTaskId = null;
+        let websocket = null;
+        let files = [];
+        let tasks = [];
+        let autoRefresh = true;
+        let selectedFiles = new Set();
+        let allFiles = [];
+        let uploadTaskId = null;
+        let uploadWebSocket = null;
+
+        // ==================== DOM READY ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            loadInitialData();
+            startAutoRefresh();
+            
+            // Animate elements on scroll
+            animateOnScroll();
+        });
+
+        // ==================== APP INITIALIZATION ====================
+        function initializeApp() {
+            console.log('🚀 X Downloader Pro v2.0.0 initialized');
+            
+            // Check connection
+            checkConnection();
+            
+            // Initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            // Load telegram config from localStorage
+            const botToken = localStorage.getItem('telegram_bot_token');
+            const chatId = localStorage.getItem('telegram_chat_id');
+            
+            if (botToken) document.getElementById('botToken').value = botToken;
+            if (chatId) document.getElementById('chatId').value = chatId;
+            
+            // Update upload button state
+            updateUploadButtonState();
+            
+            // Initialize custom tabs
+            initializeCustomTabs();
+        }
+
+        // ==================== CUSTOM TABS ====================
+        function initializeCustomTabs() {
+            // Content type tabs
+            document.querySelectorAll('.custom-tabs .custom-tab[data-type]').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.custom-tabs .custom-tab[data-type]').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Quality tabs
+            document.querySelectorAll('.custom-tabs .custom-tab[data-quality]').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.custom-tabs .custom-tab[data-quality]').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Update delay value display
+            const delaySlider = document.getElementById('uploadDelay');
+            const delayValue = document.getElementById('delayValue');
+            if (delaySlider && delayValue) {
+                delaySlider.addEventListener('input', function() {
+                    delayValue.textContent = this.value + 's';
+                });
+            }
+        }
+
+        // ==================== ANIMATIONS ====================
+        function animateOnScroll() {
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('animate__animated', 'animate__fadeInUp');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+            
+            // Observe elements
+            document.querySelectorAll('.feature-card, .download-card, .files-container, .stat-card').forEach(el => {
+                observer.observe(el);
+            });
+        }
+
+        // ==================== EVENT LISTENERS ====================
+        function setupEventListeners() {
+            // Download button
+            document.getElementById('downloadBtn').addEventListener('click', startDownload);
+            
+            // Clear button
+            document.getElementById('clearBtn').addEventListener('click', clearInput);
+            
+            // Refresh files button
+            document.getElementById('refreshFiles').addEventListener('click', function() {
+                loadFiles();
+                showToast('Refreshing files...', 'info');
+            });
+            
+            // Clear all files button
+            document.getElementById('confirmClearAll').addEventListener('click', clearAllFiles);
+            
+            // File filter buttons
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Update active state
+                    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Filter files
+                    const filter = this.getAttribute('data-filter');
+                    filterFiles(filter);
+                });
+            });
+            
+            // Sort buttons
+            document.querySelectorAll('[data-sort]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sortBy = this.getAttribute('data-sort');
+                    sortFiles(sortBy);
+                });
+            });
+            
+            // URL input validation
+            document.getElementById('urlInput').addEventListener('input', validateURLs);
+            
+            // File search
+            const fileSearch = document.getElementById('fileSearch');
+            if (fileSearch) {
+                fileSearch.addEventListener('input', function() {
+                    searchFiles(this.value);
+                });
+            }
+        }
+
+        // ==================== CONNECTION MANAGEMENT ====================
+        async function checkConnection() {
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    updateConnectionStatus('connected');
+                } else {
+                    updateConnectionStatus('disconnected');
+                }
+            } catch (error) {
+                updateConnectionStatus('disconnected');
+                console.error('Connection error:', error);
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const statusBadge = document.getElementById('connectionStatusBadge');
+            const statusDot = document.querySelector('.connection-dot');
+            const statusText = document.querySelector('.connection-text');
+            
+            switch(status) {
+                case 'connected':
+                    statusBadge.className = 'badge bg-success';
+                    statusBadge.innerHTML = '<i class="fas fa-wifi"></i> Connected';
+                    statusDot.className = 'connection-dot connected';
+                    statusText.textContent = 'Connected';
+                    break;
+                case 'disconnected':
+                    statusBadge.className = 'badge bg-danger';
+                    statusBadge.innerHTML = '<i class="fas fa-wifi-slash"></i> Disconnected';
+                    statusDot.className = 'connection-dot disconnected';
+                    statusText.textContent = 'Disconnected';
+                    break;
+                default:
+                    statusBadge.className = 'badge bg-warning';
+                    statusBadge.innerHTML = '<i class="fas fa-question-circle"></i> Unknown';
+                    statusDot.className = 'connection-dot disconnected';
+                    statusText.textContent = 'Unknown';
+            }
+        }
+
+        // ==================== DATA LOADING ====================
+        async function loadInitialData() {
+            await Promise.all([
+                loadFiles(),
+                loadTasks(),
+                loadStats()
+            ]);
+        }
+
+        // ==================== DOWNLOAD FUNCTIONALITY ====================
+        function validateURLs() {
+            const textarea = document.getElementById('urlInput');
+            const value = textarea.value.trim();
+            
+            if (!value) {
+                document.getElementById('downloadBtn').disabled = true;
+                return false;
+            }
+            
+            // Simple URL validation
+            const urlPattern = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+            const matches = value.match(urlPattern);
+            
+            const count = matches ? matches.length : 0;
+            
+            // Update UI based on validation
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (count > 0) {
+                downloadBtn.disabled = false;
+                if (count > 1) {
+                    showToast(`Found ${count} URLs`, 'info');
+                }
+            } else {
+                downloadBtn.disabled = true;
+            }
+            
+            return count > 0;
+        }
+
+        async function startDownload() {
+            const urls = document.getElementById('urlInput').value;
+            const contentType = document.querySelector('.custom-tab[data-type].active').getAttribute('data-type');
+            const quality = document.querySelector('.custom-tab[data-quality].active').getAttribute('data-quality');
+            
+            // Parse URLs
+            const urlList = parseURLs(urls);
+            
+            if (urlList.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No URLs Found',
+                    text: 'Please enter at least one valid URL.',
+                    confirmButtonColor: '#667eea',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+                return;
+            }
+            
+            // Show progress section
+            const progressSection = document.getElementById('progressSection');
+            progressSection.style.display = 'block';
+            
+            // Reset progress
+            updateProgress(0, 0, urlList.length, 'Starting download...');
+            
+            // Disable download button
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            
+            try {
+                // Start download task
+                const response = await fetch('/api/download/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        urls: urlList,
+                        content_type: contentType,
+                        quality: quality
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                currentTaskId = data.task_id;
+                
+                // Show success message
+                showToast(`Download started for ${urlList.length} URLs`, 'success');
+                
+                // Connect to WebSocket for real-time updates
+                connectWebSocket(currentTaskId);
+                
+                // Poll task status as fallback
+                pollTaskStatus(currentTaskId);
+                
+            } catch (error) {
+                console.error('Download error:', error);
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Download Failed',
+                    text: error.message || 'Failed to start download. Please try again.',
+                    confirmButtonColor: '#fa709a',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+                
+                // Reset UI
+                resetDownloadUI();
+            }
+        }
+
+        function parseURLs(text) {
+            if (!text) return [];
+            
+            // Split by new lines, spaces, commas, or pipes
+            const lines = text.split(/[\n\s,|]+/);
+            
+            // Filter and clean URLs
+            const urlPattern = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/;
+            
+            return lines
+                .map(url => url.trim())
+                .filter(url => {
+                    // Remove empty strings and validate URL pattern
+                    if (!url) return false;
+                    
+                    // Check if it's a Twitter/X URL
+                    if (!url.includes('x.com') && !url.includes('twitter.com')) {
+                        console.warn(`Skipping non-Twitter URL: ${url}`);
+                        return false;
+                    }
+                    
+                    return urlPattern.test(url);
+                });
+        }
+
+        // ==================== WEBSOCKET HANDLING ====================
+        function connectWebSocket(taskId) {
+            if (websocket) {
+                websocket.close();
+            }
+            
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/tasks/${taskId}`;
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                console.log('🔌 WebSocket connected');
+            };
+            
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'ping') {
+                    return; // Ignore ping messages
+                }
+                
+                // Update UI with task data
+                updateTaskUI(data);
+                
+                // If task is completed, load files and tasks
+                if (data.status === 'completed') {
+                    loadFiles();
+                    loadTasks();
+                    loadStats();
+                    
+                    // Show completion message
+                    showCompletionMessage(data);
+                }
+            };
+            
+            websocket.onclose = function() {
+                console.log('🔌 WebSocket disconnected');
+                websocket = null;
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // ==================== TASK MANAGEMENT ====================
+        async function pollTaskStatus(taskId) {
+            if (!taskId) return;
+            
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}`);
+                    const task = await response.json();
+                    
+                    updateTaskUI(task);
+                    
+                    // Stop polling if task is completed or failed
+                    if (task.status === 'completed' || task.status === 'failed') {
+                        clearInterval(pollInterval);
+                        
+                        if (task.status === 'completed') {
+                            loadFiles();
+                            loadTasks();
+                            loadStats();
+                            showCompletionMessage(task);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function updateTaskUI(task) {
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `${task.progress}%`;
+            progressBar.textContent = `${Math.round(task.progress)}%`;
+            
+            // Update status text
+            const statusText = document.getElementById('statusText');
+            const progressText = document.getElementById('progressText');
+            
+            statusText.textContent = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+            progressText.textContent = `${task.processed_urls}/${task.total_urls} URLs processed`;
+            
+            // Update task details
+            const taskDetails = document.getElementById('taskDetails');
+            taskDetails.innerHTML = `
+                <div class="glass-card p-3">
+                    <h6 class="mb-3">Task Details</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">Task ID:</small>
+                            <p class="mb-2"><code class="bg-dark p-1 rounded">${task.task_id}</code></p>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">Files Downloaded:</small>
+                            <p class="mb-2"><span class="badge bg-primary">${task.downloaded_files?.length || 0}</span></p>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">Total Size:</small>
+                            <p class="mb-2">${task.total_size_mb || 0} MB</p>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">Errors:</small>
+                            <p class="mb-2"><span class="badge bg-danger">${task.errors?.length || 0}</span></p>
+                        </div>
+                    </div>
+                    ${task.errors?.length > 0 ? `
+                    <div class="mt-2">
+                        <small class="text-muted">Recent Errors:</small>
+                        <div class="small text-danger mt-1">
+                            ${task.errors.slice(0, 3).map(e => `
+                                <div class="mb-1">
+                                    <i class="fas fa-exclamation-circle me-1"></i>
+                                    ${e.url?.substring(0, 50)}... - ${e.error}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function showCompletionMessage(task) {
+            const filesCount = task.downloaded_files?.length || 0;
+            const progressSection = document.getElementById('progressSection');
+            
+            if (filesCount > 0) {
+                showToast(`✅ Download completed! ${filesCount} files downloaded.`, 'success');
+                
+                // Show confetti effect
+                showConfetti();
+                
+                // Reset UI after a delay
+                setTimeout(() => {
+                    resetDownloadUI();
+                    progressSection.style.display = 'none';
+                }, 3000);
+            } else {
+                showToast('⚠️ Download completed but no files were downloaded.', 'warning');
+                resetDownloadUI();
+            }
+        }
+
+        function resetDownloadUI() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Start Download';
+            
+            // Clear progress
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '0%';
+            progressBar.textContent = '';
+            
+            // Clear task details
+            document.getElementById('taskDetails').innerHTML = '';
+        }
+
+        function clearInput() {
+            document.getElementById('urlInput').value = '';
+            document.getElementById('progressSection').style.display = 'none';
+            resetDownloadUI();
+            showToast('Input cleared', 'info');
+        }
+
+        // ==================== FILE MANAGEMENT ====================
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error('Failed to load files');
+                
+                files = await response.json();
+                renderFilesTable();
+                updateFilesCount();
+                updateStats();
+                
+            } catch (error) {
+                console.error('Error loading files:', error);
+                showToast('Failed to load files', 'error');
+            }
+        }
+
+        function renderFilesTable() {
+            allFiles = files; // Store files globally
+            
+            const tbody = document.getElementById('filesTable');
+            const noFiles = document.getElementById('noFiles');
+            const loading = document.getElementById('filesLoading');
+            
+            // Hide loading
+            if (loading) loading.style.display = 'none';
+            
+            if (files.length === 0) {
+                tbody.innerHTML = '';
+                noFiles.style.display = 'block';
+                updateUploadButtonState();
+                return;
+            }
+            
+            noFiles.style.display = 'none';
+            
+            // Render files with checkboxes
+            tbody.innerHTML = files.map(file => {
+                const isVideo = file.type === 'video';
+                const isSelected = selectedFiles.has(file.name);
+                
+                return `
+                <tr class="file-item ${isSelected ? 'selected-row' : ''}" data-type="${file.type}" data-file="${file.name}">
+                    <td class="text-center" onclick="event.stopPropagation()">
+                        <input type="checkbox" 
+                               class="form-check-input file-checkbox" 
+                               value="${file.name}" 
+                               ${isSelected ? 'checked' : ''}
+                               onchange="toggleFileSelection(this, '${file.name}')">
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <div class="d-flex align-items-center">
+                            <div class="file-type-indicator ${isVideo ? 'file-type-video' : 'file-type-image'}">
+                                <i class="fas ${isVideo ? 'fa-video' : 'fa-image'}"></i>
+                            </div>
+                            <div>
+                                <strong class="d-block">${escapeHtml(file.name)}</strong>
+                                ${file.resolution ? `<small class="text-muted">${file.resolution}</small>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <span class="badge ${isVideo ? 'badge-video' : 'badge-image'}">
+                            <i class="fas ${isVideo ? 'fa-video' : 'fa-image'} me-1"></i>
+                            ${isVideo ? 'Video' : 'Image'}
+                        </span>
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <span class="fw-bold">${file.size_mb.toFixed(2)}</span> MB
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <small>${formatDate(file.modified)}</small>
+                    </td>
+                    <td>
+                        <div class="file-actions">
+                            <a href="/download/${encodeURIComponent(file.name)}" 
+                               class="btn btn-success btn-sm" 
+                               download="${file.name}"
+                               data-bs-toggle="tooltip"
+                               title="Download">
+                                <i class="fas fa-download"></i>
+                            </a>
+                            <button onclick="previewFile('${file.name}', '${file.type}')" 
+                                    class="btn btn-info btn-sm"
+                                    data-bs-toggle="tooltip"
+                                    title="Preview">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="uploadSingle('${file.name}')" 
+                                    class="btn btn-telegram btn-sm"
+                                    data-bs-toggle="tooltip"
+                                    title="Upload to Telegram">
+                                <i class="fab fa-telegram-plane"></i>
+                            </button>
+                            <button onclick="deleteFile('${file.name}')" 
+                                    class="btn btn-danger btn-sm"
+                                    data-bs-toggle="tooltip"
+                                    title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+            
+            // Re-initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+            updateSelectAllCheckbox();
+        }
+
+        function updateFilesCount() {
+            const countElement = document.getElementById('filesCount');
+            if (countElement) {
+                countElement.textContent = files.length;
+            }
+        }
+
+        function filterFiles(filter) {
+            const rows = document.querySelectorAll('.file-item');
+            
+            rows.forEach(row => {
+                if (filter === 'all' || row.getAttribute('data-type') === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function searchFiles(query) {
+            const rows = document.querySelectorAll('.file-item');
+            const lowerQuery = query.toLowerCase();
+            
+            rows.forEach(row => {
+                const filename = row.getAttribute('data-file').toLowerCase();
+                if (filename.includes(lowerQuery)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function sortFiles(sortBy) {
+            switch(sortBy) {
+                case 'newest':
+                    files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+                    break;
+                case 'largest':
+                    files.sort((a, b) => b.size_mb - a.size_mb);
+                    break;
+                case 'name':
+                    files.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                default:
+                    files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+            }
+            
+            renderFilesTable();
+        }
+
+        // ==================== FILE ACTIONS ====================
+        function previewFile(filename, type) {
+            if (type === 'video') {
+                Swal.fire({
+                    title: 'Video Preview',
+                    html: `
+                        <div class="text-center">
+                            <video controls width="100%" style="max-width: 500px; border-radius: 10px;">
+                                <source src="/download/${encodeURIComponent(filename)}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                            <p class="mt-2"><strong>${filename}</strong></p>
+                        </div>
+                    `,
+                    showCloseButton: true,
+                    showConfirmButton: false,
+                    width: '600px',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+            } else if (type === 'image') {
+                Swal.fire({
+                    title: 'Image Preview',
+                    html: `
+                        <div class="text-center">
+                            <img src="/download/${encodeURIComponent(filename)}" 
+                                 alt="${filename}" 
+                                 style="max-width: 100%; max-height: 500px; border-radius: 10px;">
+                            <p class="mt-2"><strong>${filename}</strong></p>
+                        </div>
+                    `,
+                    showCloseButton: true,
+                    showConfirmButton: false,
+                    width: '600px',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+            }
+        }
+
+        async function deleteFile(filename) {
+            const result = await Swal.fire({
+                title: 'Delete File?',
+                text: `Are you sure you want to delete "${filename}"?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#fa709a',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel',
+                background: 'var(--dark-bg)',
+                color: 'var(--text-primary)'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        showToast('File deleted successfully', 'success');
+                        loadFiles(); // Refresh list
+                        // Remove from selection if selected
+                        selectedFiles.delete(filename);
+                        updateUploadButtonState();
+                    } else {
+                        throw new Error('Failed to delete file');
+                    }
+                } catch (error) {
+                    console.error('Error deleting file:', error);
+                    showToast('Failed to delete file', 'error');
+                }
+            }
+        }
+
+        async function clearAllFiles() {
+            const result = await Swal.fire({
+                title: 'Clear All Files?',
+                text: 'This will permanently delete all downloaded files. This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#fa709a',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete all!',
+                cancelButtonText: 'Cancel',
+                background: 'var(--dark-bg)',
+                color: 'var(--text-primary)'
+            });
+            
+            if (result.isConfirmed) {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('clearAllModal'));
+                if (modal) modal.hide();
+                
+                try {
+                    // Delete each file one by one to avoid overwhelming the server
+                    for (const file of files) {
+                        await fetch(`/api/files/${encodeURIComponent(file.name)}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                    
+                    showToast('All files deleted successfully', 'success');
+                    loadFiles(); // Refresh list
+                    // Clear selection
+                    selectedFiles.clear();
+                    updateUploadButtonState();
+                } catch (error) {
+                    console.error('Error clearing files:', error);
+                    showToast('Failed to clear all files', 'error');
+                }
+            }
+        }
+
+        // ==================== UPLOAD FUNCTIONALITY ====================
+        // File selection functions
+        function toggleFileSelection(checkbox, filename) {
+            const row = checkbox.closest('tr');
+            
+            if (checkbox.checked) {
+                selectedFiles.add(filename);
+                if (row) row.classList.add('selected-row');
+            } else {
+                selectedFiles.delete(filename);
+                if (row) row.classList.remove('selected-row');
+            }
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+            updateSelectAllCheckbox();
+        }
+
+        function toggleSelectAll(checked) {
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            const rows = document.querySelectorAll('.file-item');
+            
+            if (checked) {
+                // Select all
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                    const filename = checkbox.value;
+                    selectedFiles.add(filename);
+                });
+                rows.forEach(row => row.classList.add('selected-row'));
+            } else {
+                // Deselect all
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                    const filename = checkbox.value;
+                    selectedFiles.delete(filename);
+                });
+                rows.forEach(row => row.classList.remove('selected-row'));
+            }
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+        }
+
+        function selectAllFiles() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            selectAllCheckbox.checked = true;
+            toggleSelectAll(true);
+        }
+
+        function deselectAllFiles() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            selectAllCheckbox.checked = false;
+            toggleSelectAll(false);
+        }
+
+        function clearSelection() {
+            deselectAllFiles();
+        }
+
+        function updateUploadButtonState() {
+            const uploadBtn = document.getElementById('uploadSelectedBtn');
+            const selectedCountBadge = document.getElementById('selectedCountBadge');
+            
+            if (selectedFiles.size > 0) {
+                uploadBtn.disabled = false;
+                selectedCountBadge.textContent = selectedFiles.size;
+                selectedCountBadge.style.display = 'inline';
+                uploadBtn.classList.add('uploading');
+            } else {
+                uploadBtn.disabled = false; // Changed from true to false - always enabled
+                selectedCountBadge.style.display = 'none';
+                uploadBtn.classList.remove('uploading');
+            }
+        }
+
+        function updateSelectionInfo() {
+            const info = document.getElementById('selectionInfo');
+            const selectedCount = document.getElementById('selectedCount');
+            const selectedVideos = document.getElementById('selectedVideos');
+            const selectedImages = document.getElementById('selectedImages');
+            
+            if (selectedFiles.size > 0) {
+                info.style.display = 'block';
+                selectedCount.textContent = selectedFiles.size;
+                
+                // Count videos and images
+                let videoCount = 0;
+                let imageCount = 0;
+                
+                selectedFiles.forEach(filename => {
+                    const file = allFiles.find(f => f.name === filename);
+                    if (file) {
+                        if (file.type === 'video') videoCount++;
+                        else if (file.type === 'image') imageCount++;
+                    }
+                });
+                
+                selectedVideos.textContent = videoCount;
+                selectedImages.textContent = imageCount;
+            } else {
+                info.style.display = 'none';
+            }
+        }
+
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            
+            if (checkboxes.length === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+                return;
+            }
+            
+            const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+            
+            if (checkedCount === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+            } else if (checkedCount === checkboxes.length) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.indeterminate = true;
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        // Helper function for row click selection
+        function selectFileRow(cell) {
+            const row = cell.closest('tr');
+            const checkbox = row.querySelector('.file-checkbox');
+            const filename = checkbox.value;
+            
+            checkbox.checked = !checkbox.checked;
+            toggleFileSelection(checkbox, filename);
+        }
+
+        // Show upload options
+        function showUploadOptions() {
+            if (selectedFiles.size === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Files Selected',
+                    text: 'Please select files to upload.',
+                    confirmButtonColor: '#667eea',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+                return;
+            }
+
+            // Update queue items
+            updateUploadQueue();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('uploadOptionsModal'));
+            modal.show();
+        }
+
+        function updateUploadQueue() {
+            const queueItems = document.getElementById('uploadQueueItems');
+            const count = document.getElementById('uploadQueueCount');
+            
+            if (selectedFiles.size === 0) {
+                queueItems.innerHTML = `
+                    <div class="text-center py-3">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No files selected</p>
+                    </div>
+                `;
+                count.textContent = '0';
+                return;
+            }
+
+            let itemsHTML = '';
+            let videoCount = 0;
+            let imageCount = 0;
+            let totalSize = 0;
+            
+            Array.from(selectedFiles).forEach(filename => {
+                // Find file info from allFiles array
+                const fileInfo = allFiles.find(f => f.name === filename);
+                const isVideo = filename.toLowerCase().endsWith('.mp4') || 
+                               filename.toLowerCase().endsWith('.mkv') ||
+                               filename.toLowerCase().endsWith('.avi');
+                
+                if (fileInfo) {
+                    if (isVideo) videoCount++;
+                    else imageCount++;
+                    totalSize += fileInfo.size_mb;
+                }
+                
+                itemsHTML += `
+                    <div class="upload-queue-item">
+                        <div class="d-flex align-items-center">
+                            <i class="fas ${isVideo ? 'fa-video text-danger' : 'fa-image text-success'} me-2"></i>
+                            <div class="flex-grow-1">
+                                <span class="small d-block text-truncate">${filename}</span>
+                                ${fileInfo ? `<small class="text-muted">${fileInfo.size_mb.toFixed(2)} MB</small>` : ''}
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeFromQueue('${filename}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            // Add summary at the top
+            itemsHTML = `
+                <div class="alert glass-card mb-2 p-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small><strong>${selectedFiles.size}</strong> files selected</small>
+                        </div>
+                        <div>
+                            <small class="me-3">
+                                <i class="fas fa-video text-danger me-1"></i>${videoCount}
+                            </small>
+                            <small>
+                                <i class="fas fa-image text-success me-1"></i>${imageCount}
+                            </small>
+                        </div>
+                        <div>
+                            <small><strong>${totalSize.toFixed(2)} MB</strong></small>
+                        </div>
+                    </div>
+                </div>
+                ${itemsHTML}
+            `;
+
+            queueItems.innerHTML = itemsHTML;
+            count.textContent = selectedFiles.size;
+        }
+
+        function removeFromQueue(filename) {
+            // Uncheck the checkbox
+            const checkbox = document.querySelector(`.file-checkbox[value="${filename}"]`);
+            if (checkbox) {
+                checkbox.checked = false;
+                toggleFileSelection(checkbox, filename);
+            }
+            
+            updateUploadQueue();
+        }
+
+        // Start upload
+        async function startUpload() {
+            if (selectedFiles.size === 0) {
+                showToast('No files selected for upload', 'warning');
+                return;
+            }
+
+            const uploadMode = document.getElementById('uploadMode').value;
+            const uploadDelay = document.getElementById('uploadDelay').value;
+            const addCaption = document.getElementById('addCaption').checked;
+
+            // Close options modal
+            const optionsModal = bootstrap.Modal.getInstance(document.getElementById('uploadOptionsModal'));
+            if (optionsModal) optionsModal.hide();
+
+            // Show progress modal
+            const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+            progressModal.show();
+
+            // Update progress UI
+            document.getElementById('uploadingFileCount').textContent = selectedFiles.size;
+            document.getElementById('uploadedCount').textContent = '0';
+            document.getElementById('failedCount').textContent = '0';
+            document.getElementById('remainingCount').textContent = selectedFiles.size;
+
+            try {
+                const response = await fetch('/api/upload/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filenames: Array.from(selectedFiles),
+                        upload_mode: uploadMode,
+                        delay: parseInt(uploadDelay),
+                        add_caption: addCaption
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                uploadTaskId = data.task_id;
+
+                // Connect to WebSocket for real-time updates
+                connectUploadWebSocket(uploadTaskId);
+
+                // Show success message
+                showToast(`Upload started for ${selectedFiles.size} files`, 'success');
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                progressModal.hide();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Upload Failed',
+                    text: error.message || 'Failed to start upload.',
+                    confirmButtonColor: '#fa709a',
+                    background: 'var(--dark-bg)',
+                    color: 'var(--text-primary)'
+                });
+            }
+        }
+
+        // Connect to upload WebSocket
+        function connectUploadWebSocket(taskId) {
+            if (uploadWebSocket) {
+                uploadWebSocket.close();
+            }
+
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/tasks/${taskId}`;
+            uploadWebSocket = new WebSocket(wsUrl);
+
+            uploadWebSocket.onopen = function() {
+                console.log('🔌 Upload WebSocket connected');
+            };
+
+            uploadWebSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateUploadProgress(data);
+
+                if (data.status === 'completed' || data.status === 'failed') {
+                    setTimeout(() => {
+                        showUploadSummary(data);
+                    }, 1000);
+                    uploadWebSocket.close();
+                }
+            };
+
+            uploadWebSocket.onclose = function() {
+                console.log('🔌 Upload WebSocket disconnected');
+                uploadWebSocket = null;
+            };
+
+            uploadWebSocket.onerror = function(error) {
+                console.error('Upload WebSocket error:', error);
+            };
+        }
+
+        function updateUploadProgress(task) {
+            // Update overall progress
+            const overallProgress = document.getElementById('uploadOverallProgress');
+            const uploadStatus = document.getElementById('uploadStatus');
+            
+            overallProgress.style.width = `${task.progress}%`;
+            overallProgress.textContent = `${Math.round(task.progress)}%`;
+            uploadStatus.textContent = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+
+            // Update current file progress
+            const currentProgress = document.getElementById('uploadCurrentProgress');
+            const currentFile = document.getElementById('currentFileName');
+            
+            if (task.current_file) {
+                currentFile.textContent = task.current_file.name;
+                currentProgress.style.width = `${task.current_file.progress || 0}%`;
+            }
+
+            // Update counts
+            const uploadedCount = document.getElementById('uploadedCount');
+            const failedCount = document.getElementById('failedCount');
+            const remainingCount = document.getElementById('remainingCount');
+            
+            const uploaded = task.downloaded_files?.length || 0;
+            const failed = task.errors?.length || 0;
+            const total = task.total_urls || selectedFiles.size;
+            const remaining = total - uploaded - failed;
+            
+            uploadedCount.textContent = uploaded;
+            failedCount.textContent = failed;
+            remainingCount.textContent = remaining > 0 ? remaining : 0;
+
+            // Update details
+            const details = document.getElementById('uploadDetails');
+            if (task.downloaded_files?.length > 0) {
+                const lastFile = task.downloaded_files[task.downloaded_files.length - 1];
+                details.innerHTML = `
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Last uploaded: <strong>${lastFile.name}</strong>
+                    <br>
+                    <small class="text-muted">Progress: ${uploaded}/${total} files</small>
+                `;
+            }
+        }
+
+        function showUploadSummary(task) {
+            const progressModal = bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal'));
+            if (progressModal) progressModal.hide();
+
+            const summaryContent = document.getElementById('uploadSummaryContent');
+            const successCount = task.downloaded_files?.length || 0;
+            const failedCount = task.errors?.length || 0;
+            const totalCount = successCount + failedCount;
+
+            let summaryHTML = `
+                <div class="text-center mb-4">
+                    <i class="fas ${task.status === 'completed' ? 'fa-check-circle text-success' : 'fa-exclamation-triangle text-warning'} fa-3x mb-3"></i>
+                    <h4>Upload ${task.status === 'completed' ? 'Complete' : 'Failed'}</h4>
+                    <p class="text-muted">${totalCount} files processed</p>
+                </div>
+            `;
+
+            if (successCount > 0) {
+                summaryHTML += `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>${successCount} files uploaded successfully</strong>
+                    </div>
+                    
+                    <h6 class="mt-3">Uploaded Files:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                task.downloaded_files.slice(0, 5).forEach(file => {
+                    summaryHTML += `
+                        <tr>
+                            <td><small>${file.name}</small></td>
+                            <td><span class="badge ${file.type === 'video' ? 'badge-video' : 'badge-image'}">${file.type}</span></td>
+                            <td><small>${file.size_mb ? file.size_mb.toFixed(2) : '0.00'} MB</small></td>
+                        </tr>
+                    `;
+                });
+
+                summaryHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            if (failedCount > 0) {
+                summaryHTML += `
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>${failedCount} files failed to upload</strong>
+                    </div>
+                    
+                    <h6 class="mt-3">Failed Files:</h6>
+                    <ul class="list-group">
+                `;
+
+                task.errors.slice(0, 3).forEach(error => {
+                    summaryHTML += `
+                        <li class="list-group-item">
+                            <small class="text-danger">${error.url || error.filename || 'Unknown file'}</small><br>
+                            <small>${error.error}</small>
+                        </li>
+                    `;
+                });
+
+                summaryHTML += `</ul>`;
+            }
+
+            summaryContent.innerHTML = summaryHTML;
+
+            // Clear selection after upload
+            deselectAllFiles();
+
+            // Show confetti for successful upload
+            if (successCount > 0) {
+                showConfetti();
+            }
+
+            const summaryModal = new bootstrap.Modal(document.getElementById('uploadCompleteModal'));
+            summaryModal.show();
+        }
+
+        // Single file upload
+        function uploadSingle(filename) {
+            // Find file info
+            const fileInfo = allFiles.find(f => f.name === filename);
+            
+            if (!fileInfo) {
+                showToast('File not found', 'error');
+                return;
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('singleUploadModal'));
+            document.getElementById('singleFileName').textContent = filename;
+            document.getElementById('singleFileSize').textContent = `Size: ${fileInfo.size_mb.toFixed(2)} MB`;
+            document.getElementById('singleFileCaption').value = filename;
+            modal.show();
+        }
+
+        async function uploadSingleFile() {
+            const filename = document.getElementById('singleFileName').textContent;
+            const caption = document.getElementById('singleFileCaption').value;
+
+            try {
+                const response = await fetch('/api/upload/single', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filename: filename,
+                        caption: caption
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('File uploaded successfully', 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('singleUploadModal'));
+                    if (modal) modal.hide();
+                    // Show confetti
+                    showConfetti();
+                } else {
+                    showToast(`Upload failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showToast('Upload failed', 'error');
+                console.error(error);
+            }
+        }
+
+        // Telegram connection test
+        async function testTelegramConnection() {
+            try {
+                showToast('Testing Telegram connection...', 'info');
+                const response = await fetch('/api/upload/test-connection');
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Telegram connection successful', 'success');
+                } else {
+                    showToast(`Connection failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showToast('Connection test failed', 'error');
+            }
+        }
+
+        // Save telegram config
+        function saveTelegramConfig() {
+            const botToken = document.getElementById('botToken').value;
+            const chatId = document.getElementById('chatId').value;
+
+            if (!botToken || !chatId) {
+                showToast('Please fill in all fields', 'warning');
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('telegram_bot_token', botToken);
+            localStorage.setItem('telegram_chat_id', chatId);
+
+            showToast('Settings saved successfully', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('telegramConfigModal'));
+            if (modal) modal.hide();
+        }
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.classList.remove('fa-eye');
+                button.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                button.classList.remove('fa-eye-slash');
+                button.classList.add('fa-eye');
+            }
+        }
+
+        // ==================== STATISTICS ====================
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (!response.ok) throw new Error('Failed to load stats');
+                
+                const stats = await response.json();
+                updateStats(stats);
+                
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function updateStats(stats = null) {
+            // Calculate stats from files
+            const videoFiles = files.filter(f => f.type === 'video');
+            const imageFiles = files.filter(f => f.type === 'image');
+            const totalSize = files.reduce((sum, file) => sum + file.size_mb, 0);
+            
+            // Update UI
+            document.getElementById('totalDownloads').textContent = files.length;
+            document.getElementById('totalVideos').textContent = videoFiles.length;
+            document.getElementById('totalImages').textContent = imageFiles.length;
+            document.getElementById('totalSize').textContent = totalSize.toFixed(0) + ' MB';
+            
+            // If server stats are available, update them
+            if (stats) {
+                // You can add server-specific stats here
+            }
+        }
+
+        // ==================== TASKS MANAGEMENT ====================
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks?limit=5');
+                if (!response.ok) throw new Error('Failed to load tasks');
+                
+                tasks = await response.json();
+                renderTasks();
+                updateTasksCount();
+                
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        function renderTasks() {
+            const tasksList = document.getElementById('tasksList');
+            
+            if (tasks.length === 0) {
+                tasksList.innerHTML = `
+                    <div class="col-12 text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <h5>No Recent Tasks</h5>
+                        <p class="text-muted">Start a download to see tasks here.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            tasksList.innerHTML = tasks.map(task => `
+                <div class="col-12 mb-3">
+                    <div class="task-card ${task.status}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-0">
+                                    <i class="fas fa-tasks me-2"></i>
+                                    ${formatTaskId(task.task_id)}
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="far fa-clock me-1"></i>
+                                    ${formatDate(task.start_time)}
+                                </small>
+                            </div>
+                            <span class="badge ${getStatusBadgeClass(task.status)}">
+                                ${task.status}
+                            </span>
+                        </div>
+                        
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar ${getProgressBarClass(task.status)}" 
+                                 style="width: ${task.progress}%"></div>
+                        </div>
+                        
+                        <div class="row small text-muted mb-2">
+                            <div class="col-6">
+                                <i class="fas fa-link me-1"></i> ${task.total_urls} URLs
+                            </div>
+                            <div class="col-6 text-end">
+                                <i class="fas fa-file me-1"></i> ${task.downloaded_files?.length || 0} files
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small class="text-muted">
+                                    <i class="fas fa-database me-1"></i> ${task.total_size_mb || 0} MB
+                                </small>
+                            </div>
+                            <button onclick="viewTaskDetails('${task.task_id}')" 
+                                    class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-info-circle"></i> Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewTaskDetails(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`);
+                const task = await response.json();
+                
+                const modalContent = document.getElementById('taskDetailsContent');
+                modalContent.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Task ID:</label>
+                            <div class="bg-dark p-2 rounded">
+                                <code class="text-primary">${task.task_id}</code>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Status:</label>
+                            <div>
+                                <span class="badge ${getStatusBadgeClass(task.status)} fs-6">
+                                    ${task.status}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Start Time:</label>
+                            <p>${formatDateTime(task.start_time)}</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">End Time:</label>
+                            <p>${task.end_time ? formatDateTime(task.end_time) : 'In progress'}</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Progress:</label>
+                            <p>${task.progress}% (${task.processed_urls}/${task.total_urls} URLs)</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Total Size:</label>
+                            <p>${task.total_size_mb || 0} MB</p>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-3 mb-2">
+                        <i class="fas fa-file me-2"></i>
+                        Downloaded Files (${task.downloaded_files?.length || 0})
+                    </h6>
+                    ${task.downloaded_files?.length > 0 ? `
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${task.downloaded_files.slice(0, 10).map(file => `
+                                <tr>
+                                    <td>${file.name}</td>
+                                    <td><span class="badge ${file.type === 'video' ? 'badge-video' : 'badge-image'}">${file.type}</span></td>
+                                    <td>${file.size_mb ? file.size_mb.toFixed(2) : '0.00'} MB</td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${task.downloaded_files.length > 10 ? `
+                        <p class="text-muted text-center">
+                            <i class="fas fa-ellipsis-h me-1"></i>
+                            ... and ${task.downloaded_files.length - 10} more files
+                        </p>
+                        ` : ''}
+                    </div>
+                    ` : '<p class="text-muted">No files downloaded</p>'}
+                    
+                    ${task.errors?.length > 0 ? `
+                    <h6 class="mt-3 mb-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Errors (${task.errors.length})
+                    </h6>
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            ${task.errors.slice(0, 5).map(error => `
+                            <li>
+                                <small class="text-danger">${error.url?.substring(0, 50)}...</small><br>
+                                <small>${error.error}</small>
+                            </li>
+                            `).join('')}
+                        </ul>
+                        ${task.errors.length > 5 ? `
+                        <p class="mt-2 mb-0">
+                            <i class="fas fa-ellipsis-h me-1"></i>
+                            ... and ${task.errors.length - 5} more errors
+                        </p>
+                        ` : ''}
+                    </div>
+                    ` : ''}
+                `;
+                
+                const modal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
+                modal.show();
+                
+            } catch (error) {
+                console.error('Error loading task details:', error);
+                showToast('Failed to load task details', 'error');
+            }
+        }
+
+        function updateTasksCount() {
+            const countElement = document.getElementById('tasksCount');
+            if (countElement) {
+                countElement.textContent = tasks.length;
+            }
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function updateProgress(current, total, totalUrls, message) {
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            const progressText = document.getElementById('progressText');
+            
+            const percentage = total > 0 ? (current / total) * 100 : 0;
+            
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${Math.round(percentage)}%`;
+            statusText.textContent = message;
+            progressText.textContent = `${current}/${totalUrls} URLs`;
+        }
+
+        function startAutoRefresh() {
+            if (autoRefresh) {
+                setInterval(() => {
+                    if (!document.hidden) {
+                        loadTasks();
+                        loadStats();
+                    }
+                }, 30000); // Refresh every 30 seconds
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-success';
+                case 'failed': return 'bg-danger';
+                case 'processing': return 'bg-warning';
+                case 'pending': return 'bg-info';
+                default: return 'bg-secondary';
+            }
+        }
+
+        function getProgressBarClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-success';
+                case 'failed': return 'bg-danger';
+                case 'processing': return 'progress-bar-animated bg-warning';
+                case 'pending': return 'bg-info';
+                default: return 'bg-secondary';
+            }
+        }
+
+        function formatTaskId(taskId) {
+            return taskId.length > 20 ? taskId.substring(0, 20) + '...' : taskId;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showToast(message, type = 'info') {
+            const toastId = 'toast-' + Date.now();
+            const iconMap = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-bg-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body d-flex align-items-center">
+                            <i class="fas ${iconMap[type] || 'fa-info-circle'} me-2 fa-lg"></i>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            // Create container if it doesn't exist
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+            
+            // Add toast to container
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            
+            // Show toast
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl, {
+                autohide: true,
+                delay: 3000
+            });
+            toast.show();
+            
+            // Remove toast after it's hidden
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+                // Remove container if empty
+                if (container.children.length === 0) {
+                    container.remove();
+                }
+            });
+        }
+
+        function showConfetti() {
+            // Simple confetti effect
+            const confettiCount = 100;
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#43e97b', '#38f9d7', '#fa709a', '#fee140'];
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.position = 'fixed';
+                confetti.style.width = '10px';
+                confetti.style.height = '10px';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.borderRadius = '50%';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = '-10px';
+                confetti.style.zIndex = '9999';
+                confetti.style.pointerEvents = 'none';
+                document.body.appendChild(confetti);
+                
+                // Animate
+                const animation = confetti.animate([
+                    { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+                    { transform: `translateY(${window.innerHeight + 10}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                ], {
+                    duration: 2000 + Math.random() * 2000,
+                    easing: 'cubic-bezier(0.215, 0.610, 0.355, 1)'
+                });
+                
+                // Remove after animation
+                animation.onfinish = () => confetti.remove();
+            }
+        }
+
+        // ==================== EXPORT FUNCTIONS TO GLOBAL SCOPE ====================
+        window.toggleFileSelection = toggleFileSelection;
+        window.selectAllFiles = selectAllFiles;
+        window.deselectAllFiles = deselectAllFiles;
+        window.clearSelection = clearSelection;
+        window.showUploadOptions = showUploadOptions;
+        window.removeFromQueue = removeFromQueue;
+        window.startUpload = startUpload;
+        window.uploadSingle = uploadSingle;
+        window.uploadSingleFile = uploadSingleFile;
+        window.testTelegramConnection = testTelegramConnection;
+        window.saveTelegramConfig = saveTelegramConfig;
+        window.togglePassword = togglePassword;
+        window.selectFileRow = selectFileRow;
+        window.previewFile = previewFile;
+        window.deleteFile = deleteFile;
+        window.viewTaskDetails = viewTaskDetails;
+    </script>
+</body>
+</html>

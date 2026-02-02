@@ -1,0 +1,2703 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X Downloader Web - Download X/Twitter Videos & Images</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📥</text></svg>">
+    
+    <style>
+        /* Additional styles for upload functionality */
+        .table-primary {
+            background-color: rgba(29, 161, 242, 0.15) !important;
+        }
+        
+        .upload-queue-item {
+            border-left: 4px solid var(--bs-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-queue-item:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.05);
+        }
+        
+        .progress-upload {
+            height: 8px;
+            border-radius: 4px;
+        }
+        
+        .btn-telegram {
+            background: linear-gradient(135deg, #0088cc, #34aadc);
+            border: none;
+            color: white;
+        }
+        
+        .btn-telegram:hover {
+            background: linear-gradient(135deg, #0077b5, #2a8fbb);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .file-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .file-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .file-checkbox:checked {
+            background-color: #1DA1F2;
+            border-color: #1DA1F2;
+        }
+        
+        /* Selection styling */
+        .selected-row {
+            background-color: rgba(29, 161, 242, 0.1) !important;
+        }
+        
+        .selection-indicator {
+            width: 4px;
+            background: #1DA1F2;
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            display: none;
+        }
+        
+        .selected-row .selection-indicator {
+            display: block;
+        }
+        
+        /* Video/Image badges */
+        .badge-video {
+            background: linear-gradient(45deg, #E0245E, #C51D5A);
+            color: white;
+        }
+        
+        .badge-image {
+            background: linear-gradient(45deg, #17BF63, #14A34A);
+            color: white;
+        }
+        
+        /* Action buttons */
+        .action-buttons {
+            min-width: 180px;
+        }
+        
+        /* Upload queue */
+        .upload-queue-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        /* Upload progress animation */
+        @keyframes pulse-upload {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .uploading {
+            animation: pulse-upload 1.5s infinite;
+        }
+        
+        /* File type icons */
+        .file-icon {
+            font-size: 1.2em;
+            width: 24px;
+            text-align: center;
+        }
+        
+        /* Custom caption styling */
+        .custom-caption-item {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .custom-caption-item:hover {
+            border-color: rgba(29, 161, 242, 0.3);
+            background-color: rgba(29, 161, 242, 0.05);
+        }
+        
+        .badge-sm {
+            font-size: 0.65em;
+            padding: 0.2em 0.4em;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .action-buttons {
+                min-width: auto;
+            }
+            
+            .btn-group-sm .btn {
+                padding: 0.25rem 0.5rem;
+            }
+            
+            .upload-queue-container {
+                max-height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-download me-2"></i>
+                <strong>X Downloader</strong>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#download-section">
+                            <i class="fas fa-cloud-download-alt"></i> Download
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#files-section">
+                            <i class="fas fa-file"></i> Files
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#tasks-section">
+                            <i class="fas fa-tasks"></i> Tasks
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#stats-section">
+                            <i class="fas fa-chart-bar"></i> Stats
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#telegramConfigModal">
+                                <i class="fab fa-telegram"></i> Telegram Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/api/docs" target="_blank">
+                                <i class="fas fa-code"></i> API Documentation
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-5 pt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 gradient-text">
+                    <i class="fas fa-download"></i> X Downloader Web
+                </h1>
+                <p class="lead text-muted">Download videos and images from X/Twitter and upload to Telegram</p>
+                <div class="alert alert-info d-flex align-items-center" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <div>Enter X/Twitter URLs below to start downloading. Supports both single and bulk downloads.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Section -->
+        <div class="row mb-5" id="download-section">
+            <div class="col-lg-8 mx-auto">
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-cloud-download-alt me-2"></i>Download Content</h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- URL Input -->
+                        <div class="mb-4">
+                            <label for="urlInput" class="form-label fw-bold">
+                                <i class="fas fa-link me-1"></i>Enter URLs (one per line or separated by spaces):
+                            </label>
+                            <textarea 
+                                id="urlInput" 
+                                class="form-control form-control-lg" 
+                                rows="6" 
+                                placeholder="Example:
+https://x.com/username/status/1234567890
+https://twitter.com/username/status/1234567890
+https://x.com/username/status/1234567890 https://x.com/username/status/9876543210"
+                                style="font-family: monospace;"></textarea>
+                            <div class="form-text">
+                                <i class="fas fa-lightbulb"></i> You can paste multiple URLs separated by spaces or new lines
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-film me-1"></i>Content Type:
+                                </label>
+                                <div class="btn-group-vertical w-100" role="group">
+                                    <input type="radio" class="btn-check" name="contentType" id="auto" value="auto" checked>
+                                    <label class="btn btn-outline-primary" for="auto">
+                                        <i class="fas fa-magic me-2"></i>Auto Detect
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="contentType" id="video" value="video">
+                                    <label class="btn btn-outline-danger" for="video">
+                                        <i class="fas fa-video me-2"></i>Videos Only
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="contentType" id="image" value="image">
+                                    <label class="btn btn-outline-success" for="image">
+                                        <i class="fas fa-image me-2"></i>Images Only
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-star me-1"></i>Quality Preference:
+                                </label>
+                                <div class="btn-group-vertical w-100" role="group">
+                                    <input type="radio" class="btn-check" name="quality" id="best" value="best" checked>
+                                    <label class="btn btn-outline-warning" for="best">
+                                        <i class="fas fa-trophy me-2"></i>Best Quality
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="quality" id="high" value="high">
+                                    <label class="btn btn-outline-info" for="high">
+                                        <i class="fas fa-chart-line me-2"></i>High Quality
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="quality" id="medium" value="medium">
+                                    <label class="btn btn-outline-secondary" for="medium">
+                                        <i class="fas fa-balance-scale me-2"></i>Balanced
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center mb-4">
+                            <button id="downloadBtn" class="btn btn-success btn-lg px-5 py-3">
+                                <i class="fas fa-play-circle me-2"></i>Start Download
+                            </button>
+                            <button id="clearBtn" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-eraser me-2"></i>Clear
+                            </button>
+                        </div>
+
+                        <!-- Progress Section -->
+                        <div id="progressSection" style="display: none;">
+                            <h5 class="mb-3">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Download Progress
+                            </h5>
+                            <div class="progress mb-3" style="height: 20px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%;"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6><i class="fas fa-info-circle me-2"></i>Status</h6>
+                                            <p id="statusText" class="mb-0">Initializing...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6><i class="fas fa-chart-bar me-2"></i>Progress</h6>
+                                            <p id="progressText" class="mb-0">0/0 URLs</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="taskDetails" class="mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Files Section -->
+        <div class="row mb-5" id="files-section">
+            <div class="col-12">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-folder me-2"></i>Downloaded Files
+                            <span id="filesCount" class="badge bg-primary ms-2">0</span>
+                        </h4>
+                        <div>
+                            <button id="uploadSelectedBtn" class="btn btn-telegram me-2" onclick="showUploadOptions()">
+                                <i class="fab fa-telegram-plane me-2"></i>Upload Selected
+                                <span id="selectedCountBadge" class="badge bg-light text-dark ms-1" style="display: none;">0</span>
+                            </button>
+                            <button id="selectAllBtn" class="btn btn-outline-primary btn-sm me-2" onclick="selectAllFiles()">
+                                <i class="fas fa-check-double"></i> All
+                            </button>
+                            <button id="deselectAllBtn" class="btn btn-outline-secondary btn-sm me-2" onclick="deselectAllFiles()">
+                                <i class="fas fa-times"></i> None
+                            </button>
+                            <button id="refreshFiles" class="btn btn-primary btn-sm">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Filters -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary active" data-filter="all">
+                                        <i class="fas fa-layer-group"></i> All
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" data-filter="video">
+                                        <i class="fas fa-video"></i> Videos
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success" data-filter="image">
+                                        <i class="fas fa-image"></i> Images
+                                    </button>
+                                </div>
+                                <div class="btn-group ms-2" role="group">
+                                    <button type="button" class="btn btn-outline-secondary" data-sort="newest">
+                                        <i class="fas fa-sort-amount-down"></i> Newest
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" data-sort="largest">
+                                        <i class="fas fa-sort-amount-down-alt"></i> Largest
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" data-sort="name">
+                                        <i class="fas fa-sort-alpha-down"></i> Name
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#clearAllModal">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Selection Info -->
+                        <div id="selectionInfo" class="alert alert-info mb-3" style="display: none;">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <span id="selectedCount">0</span> files selected
+                                    <small class="text-muted ms-2">
+                                        (<span id="selectedVideos">0</span> videos, <span id="selectedImages">0</span> images)
+                                    </small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-warning ms-2" onclick="clearAllCustomCaptions()" id="clearCaptionsBtn" style="display: none;">
+                                        <i class="fas fa-comment-slash me-1"></i>Clear All Captions
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+                                        <i class="fas fa-times"></i> Clear Selection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Files Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th width="50" class="text-center">
+                                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input" onchange="toggleSelectAll(this.checked)">
+                                        </th>
+                                        <th>File Name</th>
+                                        <th>Type</th>
+                                        <th>Size</th>
+                                        <th>Date</th>
+                                        <th class="action-buttons">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="filesTable">
+                                    <!-- Files will be loaded here -->
+                                    <tr id="filesLoading">
+                                        <td colspan="6" class="text-center py-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p class="mt-2">Loading files...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div id="noFiles" style="display: none;">
+                            <div class="text-center py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                                <h4>No Files Downloaded</h4>
+                                <p class="text-muted">Start downloading content to see files here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Section -->
+        <div class="row mb-5" id="tasks-section">
+            <div class="col-12">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-history me-2"></i>Recent Tasks
+                            <span id="tasksCount" class="badge bg-light text-dark ms-2">0</span>
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="tasksList" class="row">
+                            <!-- Tasks will be loaded here -->
+                            <div class="col-12 text-center py-5">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading tasks...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="row" id="stats-section">
+            <div class="col-12">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Statistics
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="statsCards">
+                            <!-- Stats will be loaded here -->
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <div class="spinner-border text-success" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-download me-2"></i>X Downloader Web</h5>
+                    <p class="text-muted">Open-source tool for downloading X/Twitter content and uploading to Telegram.</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="mb-0">
+                        <span id="connectionStatus" class="badge bg-success">Connected</span>
+                        <span class="ms-2 text-muted">v2.0.0</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <!-- Upload Options Modal -->
+    <div class="modal fade" id="uploadOptionsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram-plane me-2"></i>Upload to Telegram
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Upload Queue -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-list me-2"></i>Files to Upload
+                            <span class="badge bg-primary ms-2" id="uploadQueueCount">0</span>
+                        </h6>
+                        <div class="upload-queue-container border rounded p-2">
+                            <div id="uploadQueueItems" style="max-height: 250px; overflow-y: auto;">
+                                <!-- Upload queue items will be added here -->
+                                <div class="text-center py-3">
+                                    <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted">No files selected</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Options -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-cogs me-2"></i>Upload Options
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Upload Mode:</label>
+                                <select class="form-select" id="uploadMode">
+                                    <option value="mixed">Mixed Content</option>
+                                    <option value="videos_only">Videos Only</option>
+                                    <option value="images_only">Images Only</option>
+                                    <option value="separate">Separate Uploads</option>
+                                </select>
+                                <small class="text-muted">Choose how to organize the upload</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Delay Between Files (seconds):</label>
+                                <input type="number" class="form-control" id="uploadDelay" value="2" min="1" max="10">
+                                <small class="text-muted">Prevent rate limiting</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Caption Management -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-comment me-2"></i>Captions (Optional)
+                        </h6>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableCaptions" checked>
+                            <label class="form-check-label" for="enableCaptions">
+                                <i class="fas fa-comment-alt me-1"></i> Add captions to files
+                            </label>
+                        </div>
+                        
+                        <div id="captionsContainer">
+                            <div class="mb-3">
+                                <label class="form-label">Default Caption Template:</label>
+                                <input type="text" class="form-control" id="defaultCaption" 
+                                       placeholder="e.g., 📤 {filename}" value="📤 {filename}">
+                                <small class="text-muted">Use {filename} to insert filename, {size} for file size</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Custom Captions (Optional):</label>
+                                <div id="customCaptionsContainer" class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Custom captions will be added here -->
+                                    <div class="text-center py-3">
+                                        <i class="fas fa-comment-dots fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted">No custom captions added</p>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCustomCaption()">
+                                            <i class="fas fa-plus me-1"></i>Add Custom Caption
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Add custom captions for specific files (optional)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Telegram Group Info -->
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2 fa-lg"></i>
+                        <div>
+                            <strong>Note:</strong> Files will be uploaded to your configured Telegram group/chat.
+                            <br>
+                            <small class="text-muted">Make sure Telegram settings are configured before uploading.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="testTelegramConnection()">
+                        <i class="fas fa-wifi"></i> Test Connection
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="startUpload()">
+                        <i class="fab fa-telegram-plane me-2"></i>Start Upload
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Progress Modal -->
+    <div class="modal fade" id="uploadProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram-plane me-2"></i>Uploading to Telegram
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                        <h5>Uploading <span id="uploadingFileCount">0</span> files</h5>
+                    </div>
+                    
+                    <!-- Overall Progress -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Overall Progress</small>
+                            <small id="uploadStatus">Starting...</small>
+                        </div>
+                        <div class="progress progress-upload">
+                            <div id="uploadOverallProgress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Current File Progress -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Current File</small>
+                            <small id="currentFileName">Preparing...</small>
+                        </div>
+                        <div class="progress progress-upload">
+                            <div id="uploadCurrentProgress" class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="row text-center mb-3">
+                        <div class="col-4">
+                            <div class="card bg-dark">
+                                <div class="card-body p-2">
+                                    <h5 class="mb-0" id="uploadedCount">0</h5>
+                                    <small class="text-success">Uploaded</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card bg-dark">
+                                <div class="card-body p-2">
+                                    <h5 class="mb-0" id="failedCount">0</h5>
+                                    <small class="text-danger">Failed</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card bg-dark">
+                                <div class="card-body p-2">
+                                    <h5 class="mb-0" id="remainingCount">0</h5>
+                                    <small class="text-warning">Remaining</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Details -->
+                    <div id="uploadDetails" class="mt-3 small text-muted">
+                        <!-- Upload details will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Complete Modal -->
+    <div class="modal fade" id="uploadCompleteModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle me-2"></i>Upload Complete
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="uploadSummaryContent">
+                        <!-- Upload summary will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-sync me-2"></i>Refresh Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Single File Upload Modal -->
+    <div class="modal fade" id="singleUploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram-plane me-2"></i>Upload Single File
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-file fa-3x text-primary mb-3"></i>
+                        <h5 id="singleFileName">File Name</h5>
+                        <p class="text-muted" id="singleFileSize">Size: 0 MB</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Caption (optional):</label>
+                        <textarea class="form-control" id="singleFileCaption" rows="2" placeholder="Add a caption for this file..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This file will be uploaded to your Telegram group/chat. Leave caption empty if you don't want one.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="uploadSingleFile()">
+                        <i class="fab fa-telegram-plane me-2"></i>Upload Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Telegram Config Modal -->
+    <div class="modal fade" id="telegramConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fab fa-telegram me-2"></i>Telegram Settings
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Telegram Bot Token:</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="botToken" placeholder="Enter bot token">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('botToken')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Get this from @BotFather on Telegram</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Chat ID:</label>
+                        <input type="text" class="form-control" id="chatId" placeholder="e.g., -1001234567890">
+                        <small class="text-muted">Your Telegram group/channel ID (must start with -100)</small>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        These settings are required for uploading files to Telegram.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="testTelegramConnection()">
+                        <i class="fas fa-wifi me-2"></i>Test Connection
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="saveTelegramConfig()">
+                        <i class="fas fa-save me-2"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear All Modal -->
+    <div class="modal fade" id="clearAllModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Clear All Files</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete all downloaded files? This action cannot be undone.</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-warning me-2"></i>
+                        This will permanently delete all videos and images from the server.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmClearAll">Delete All Files</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div class="modal fade" id="taskDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="taskDetailsContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // ==================== GLOBAL VARIABLES ====================
+        let currentTaskId = null;
+        let websocket = null;
+        let files = [];
+        let tasks = [];
+        let autoRefresh = true;
+        let selectedFiles = new Set();
+        let allFiles = [];
+        let uploadTaskId = null;
+        let uploadWebSocket = null;
+        let customCaptions = {};
+
+        // ==================== DOM READY ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            loadInitialData();
+            startAutoRefresh();
+        });
+
+        // ==================== APP INITIALIZATION ====================
+        function initializeApp() {
+            console.log('X Downloader Web v2.0.0 initialized');
+            
+            // Check connection
+            checkConnection();
+            
+            // Initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            // Load telegram config from localStorage
+            const botToken = localStorage.getItem('telegram_bot_token');
+            const chatId = localStorage.getItem('telegram_chat_id');
+            
+            if (botToken) document.getElementById('botToken').value = botToken;
+            if (chatId) document.getElementById('chatId').value = chatId;
+            
+            // Initialize caption UI
+            document.getElementById('enableCaptions').addEventListener('change', updateCaptionUI);
+            updateCaptionUI();
+            
+            // Update upload button state
+            updateUploadButtonState();
+        }
+
+        // ==================== EVENT LISTENERS ====================
+        function setupEventListeners() {
+            // Download button
+            document.getElementById('downloadBtn').addEventListener('click', startDownload);
+            
+            // Clear button
+            document.getElementById('clearBtn').addEventListener('click', clearInput);
+            
+            // Refresh files button
+            document.getElementById('refreshFiles').addEventListener('click', function() {
+                loadFiles();
+                showToast('Refreshing files...', 'info');
+            });
+            
+            // Clear all files button
+            document.getElementById('confirmClearAll').addEventListener('click', clearAllFiles);
+            
+            // File filter buttons
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Update active state
+                    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Filter files
+                    const filter = this.getAttribute('data-filter');
+                    filterFiles(filter);
+                });
+            });
+            
+            // Sort buttons
+            document.querySelectorAll('[data-sort]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sortBy = this.getAttribute('data-sort');
+                    sortFiles(sortBy);
+                });
+            });
+            
+            // URL input validation
+            document.getElementById('urlInput').addEventListener('input', validateURLs);
+        }
+
+        // ==================== CONNECTION MANAGEMENT ====================
+        async function checkConnection() {
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    updateConnectionStatus('connected');
+                } else {
+                    updateConnectionStatus('disconnected');
+                }
+            } catch (error) {
+                updateConnectionStatus('disconnected');
+                console.error('Connection error:', error);
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            switch(status) {
+                case 'connected':
+                    statusElement.className = 'badge bg-success';
+                    statusElement.textContent = 'Connected';
+                    break;
+                case 'disconnected':
+                    statusElement.className = 'badge bg-danger';
+                    statusElement.textContent = 'Disconnected';
+                    break;
+                default:
+                    statusElement.className = 'badge bg-warning';
+                    statusElement.textContent = 'Unknown';
+            }
+        }
+
+        // ==================== DATA LOADING ====================
+        async function loadInitialData() {
+            await Promise.all([
+                loadFiles(),
+                loadTasks(),
+                loadStats()
+            ]);
+        }
+
+        // ==================== DOWNLOAD FUNCTIONALITY ====================
+        function validateURLs() {
+            const textarea = document.getElementById('urlInput');
+            const value = textarea.value.trim();
+            
+            if (!value) {
+                document.getElementById('downloadBtn').disabled = true;
+                return false;
+            }
+            
+            // Simple URL validation
+            const urlPattern = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+            const matches = value.match(urlPattern);
+            
+            const count = matches ? matches.length : 0;
+            
+            // Update UI based on validation
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (count > 0) {
+                downloadBtn.disabled = false;
+                if (count > 1) {
+                    showToast(`Found ${count} URLs`, 'info');
+                }
+            } else {
+                downloadBtn.disabled = true;
+            }
+            
+            return count > 0;
+        }
+
+        async function startDownload() {
+            const urls = document.getElementById('urlInput').value;
+            const contentType = document.querySelector('input[name="contentType"]:checked').value;
+            const quality = document.querySelector('input[name="quality"]:checked').value;
+            
+            // Parse URLs
+            const urlList = parseURLs(urls);
+            
+            if (urlList.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No URLs Found',
+                    text: 'Please enter at least one valid URL.',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+            
+            // Show progress section
+            const progressSection = document.getElementById('progressSection');
+            progressSection.style.display = 'block';
+            
+            // Reset progress
+            updateProgress(0, 0, urlList.length, 'Starting download...');
+            
+            // Disable download button
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            
+            try {
+                // Start download task
+                const response = await fetch('/api/download/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        urls: urlList,
+                        content_type: contentType,
+                        quality: quality
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                currentTaskId = data.task_id;
+                
+                // Show success message
+                showToast(`Download started for ${urlList.length} URLs`, 'success');
+                
+                // Connect to WebSocket for real-time updates
+                connectWebSocket(currentTaskId);
+                
+                // Poll task status as fallback
+                pollTaskStatus(currentTaskId);
+                
+            } catch (error) {
+                console.error('Download error:', error);
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Download Failed',
+                    text: error.message || 'Failed to start download. Please try again.',
+                    confirmButtonColor: '#E0245E'
+                });
+                
+                // Reset UI
+                resetDownloadUI();
+            }
+        }
+
+        function parseURLs(text) {
+            if (!text) return [];
+            
+            // Split by new lines, spaces, commas, or pipes
+            const lines = text.split(/[\n\s,|]+/);
+            
+            // Filter and clean URLs
+            const urlPattern = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/;
+            
+            return lines
+                .map(url => url.trim())
+                .filter(url => {
+                    // Remove empty strings and validate URL pattern
+                    if (!url) return false;
+                    
+                    // Check if it's a Twitter/X URL
+                    if (!url.includes('x.com') && !url.includes('twitter.com')) {
+                        console.warn(`Skipping non-Twitter URL: ${url}`);
+                        return false;
+                    }
+                    
+                    return urlPattern.test(url);
+                });
+        }
+
+        // ==================== WEBSOCKET HANDLING ====================
+        function connectWebSocket(taskId) {
+            if (websocket) {
+                websocket.close();
+            }
+            
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/tasks/${taskId}`;
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function() {
+                console.log('WebSocket connected');
+            };
+            
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'ping') {
+                    return; // Ignore ping messages
+                }
+                
+                // Update UI with task data
+                updateTaskUI(data);
+                
+                // If task is completed, load files and tasks
+                if (data.status === 'completed') {
+                    loadFiles();
+                    loadTasks();
+                    loadStats();
+                    
+                    // Show completion message
+                    showCompletionMessage(data);
+                }
+            };
+            
+            websocket.onclose = function() {
+                console.log('WebSocket disconnected');
+                websocket = null;
+            };
+            
+            websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // ==================== TASK MANAGEMENT ====================
+        async function pollTaskStatus(taskId) {
+            if (!taskId) return;
+            
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}`);
+                    const task = await response.json();
+                    
+                    updateTaskUI(task);
+                    
+                    // Stop polling if task is completed or failed
+                    if (task.status === 'completed' || task.status === 'failed') {
+                        clearInterval(pollInterval);
+                        
+                        if (task.status === 'completed') {
+                            loadFiles();
+                            loadTasks();
+                            loadStats();
+                            showCompletionMessage(task);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function updateTaskUI(task) {
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `${task.progress}%`;
+            progressBar.textContent = `${Math.round(task.progress)}%`;
+            
+            // Update status text
+            const statusText = document.getElementById('statusText');
+            const progressText = document.getElementById('progressText');
+            
+            statusText.textContent = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+            progressText.textContent = `${task.processed_urls}/${task.total_urls} URLs processed`;
+            
+            // Update task details
+            const taskDetails = document.getElementById('taskDetails');
+            taskDetails.innerHTML = `
+                <div class="card bg-dark">
+                    <div class="card-body">
+                        <h6>Task Details</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Task ID:</small>
+                                <p class="mb-2"><code>${task.task_id}</code></p>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Files Downloaded:</small>
+                                <p class="mb-2">${task.downloaded_files?.length || 0}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Total Size:</small>
+                                <p class="mb-2">${task.total_size_mb || 0} MB</p>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Errors:</small>
+                                <p class="mb-2">${task.errors?.length || 0}</p>
+                            </div>
+                        </div>
+                        ${task.errors?.length > 0 ? `
+                        <div class="mt-2">
+                            <small class="text-muted">Recent Errors:</small>
+                            <div class="small text-danger">
+                                ${task.errors.slice(0, 3).map(e => `<div>${e.url?.substring(0, 50)}... - ${e.error}</div>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function showCompletionMessage(task) {
+            const filesCount = task.downloaded_files?.length || 0;
+            const progressSection = document.getElementById('progressSection');
+            
+            if (filesCount > 0) {
+                showToast(`Download completed! ${filesCount} files downloaded.`, 'success');
+                
+                // Reset UI after a delay
+                setTimeout(() => {
+                    resetDownloadUI();
+                    progressSection.style.display = 'none';
+                }, 3000);
+            } else {
+                showToast('Download completed but no files were downloaded.', 'warning');
+                resetDownloadUI();
+            }
+        }
+
+        function resetDownloadUI() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Start Download';
+            
+            // Clear progress
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '0%';
+            progressBar.textContent = '';
+            
+            // Clear task details
+            document.getElementById('taskDetails').innerHTML = '';
+        }
+
+        function clearInput() {
+            document.getElementById('urlInput').value = '';
+            document.getElementById('progressSection').style.display = 'none';
+            resetDownloadUI();
+        }
+
+        // ==================== FILE MANAGEMENT ====================
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error('Failed to load files');
+                
+                files = await response.json();
+                renderFilesTable();
+                updateFilesCount();
+                
+            } catch (error) {
+                console.error('Error loading files:', error);
+                showToast('Failed to load files', 'error');
+            }
+        }
+
+        function renderFilesTable() {
+            allFiles = files; // Store files globally
+            
+            const tbody = document.getElementById('filesTable');
+            const noFiles = document.getElementById('noFiles');
+            const loading = document.getElementById('filesLoading');
+            
+            // Hide loading
+            if (loading) loading.style.display = 'none';
+            
+            if (files.length === 0) {
+                tbody.innerHTML = '';
+                noFiles.style.display = 'block';
+                updateUploadButtonState();
+                return;
+            }
+            
+            noFiles.style.display = 'none';
+            
+            // Render files with checkboxes
+            tbody.innerHTML = files.map(file => {
+                const isVideo = file.type === 'video';
+                const isSelected = selectedFiles.has(file.name);
+                
+                return `
+                <tr class="file-item ${isSelected ? 'selected-row table-primary' : ''}" data-type="${file.type}" data-file="${file.name}">
+                    <td class="text-center" onclick="event.stopPropagation()">
+                        <div class="position-relative">
+                            <div class="selection-indicator"></div>
+                            <input type="checkbox" 
+                                   class="form-check-input file-checkbox" 
+                                   value="${escapeHtml(file.name)}" 
+                                   ${isSelected ? 'checked' : ''}
+                                   onchange="toggleFileSelection(this, '${escapeHtml(file.name)}')">
+                        </div>
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <div class="d-flex align-items-center">
+                            <div class="file-icon me-2">
+                                ${isVideo ? 
+                                    '<i class="fas fa-video text-danger"></i>' : 
+                                    '<i class="fas fa-image text-success"></i>'}
+                            </div>
+                            <div>
+                                <strong class="d-block">${escapeHtml(file.name)}</strong>
+                                ${file.resolution ? `<small class="text-muted">${file.resolution}</small>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td onclick="selectFileRow(this)">
+                        <span class="badge ${isVideo ? 'badge-video' : 'badge-image'}">
+                            ${isVideo ? 'Video' : 'Image'}
+                        </span>
+                    </td>
+                    <td onclick="selectFileRow(this)">${file.size_mb.toFixed(2)} MB</td>
+                    <td onclick="selectFileRow(this)">
+                        <small>${formatDate(file.modified)}</small>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="/download/${encodeURIComponent(file.name)}" 
+                               class="btn btn-success" 
+                               download="${file.name}"
+                               data-bs-toggle="tooltip"
+                               title="Download">
+                                <i class="fas fa-download"></i>
+                            </a>
+                            <button onclick="previewFile('${escapeHtml(file.name)}', '${file.type}')" 
+                                    class="btn btn-info"
+                                    data-bs-toggle="tooltip"
+                                    title="Preview">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="uploadSingle('${escapeHtml(file.name)}')" 
+                                    class="btn btn-telegram"
+                                    data-bs-toggle="tooltip"
+                                    title="Upload to Telegram">
+                                <i class="fab fa-telegram-plane"></i>
+                            </button>
+                            <button onclick="deleteFile('${escapeHtml(file.name)}')" 
+                                    class="btn btn-danger"
+                                    data-bs-toggle="tooltip"
+                                    title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+            
+            // Re-initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+            updateSelectAllCheckbox();
+        }
+
+        function updateFilesCount() {
+            const countElement = document.getElementById('filesCount');
+            if (countElement) {
+                countElement.textContent = files.length;
+            }
+        }
+
+        function filterFiles(filter) {
+            const rows = document.querySelectorAll('.file-item');
+            
+            rows.forEach(row => {
+                if (filter === 'all' || row.getAttribute('data-type') === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function sortFiles(sortBy) {
+            switch(sortBy) {
+                case 'newest':
+                    files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+                    break;
+                case 'largest':
+                    files.sort((a, b) => b.size_mb - a.size_mb);
+                    break;
+                case 'name':
+                    files.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                default:
+                    files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+            }
+            
+            renderFilesTable();
+        }
+
+        // ==================== FILE ACTIONS ====================
+        function previewFile(filename, type) {
+            if (type === 'video') {
+                Swal.fire({
+                    title: 'Video Preview',
+                    html: `
+                        <div class="text-center">
+                            <video controls width="100%" style="max-width: 500px;">
+                                <source src="/download/${encodeURIComponent(filename)}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                            <p class="mt-2"><strong>${escapeHtml(filename)}</strong></p>
+                        </div>
+                    `,
+                    showCloseButton: true,
+                    showConfirmButton: false,
+                    width: '600px'
+                });
+            } else if (type === 'image') {
+                Swal.fire({
+                    title: 'Image Preview',
+                    html: `
+                        <div class="text-center">
+                            <img src="/download/${encodeURIComponent(filename)}" 
+                                 alt="${escapeHtml(filename)}" 
+                                 style="max-width: 100%; max-height: 500px; border-radius: 10px;">
+                            <p class="mt-2"><strong>${escapeHtml(filename)}</strong></p>
+                        </div>
+                    `,
+                    showCloseButton: true,
+                    showConfirmButton: false,
+                    width: '600px'
+                });
+            }
+        }
+
+        async function deleteFile(filename) {
+            const result = await Swal.fire({
+                title: 'Delete File?',
+                text: `Are you sure you want to delete "${filename}"?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#E0245E',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        showToast('File deleted successfully', 'success');
+                        loadFiles(); // Refresh list
+                        // Remove from selection if selected
+                        selectedFiles.delete(filename);
+                        updateUploadButtonState();
+                        // Remove custom caption if exists
+                        if (customCaptions[filename]) {
+                            delete customCaptions[filename];
+                            updateCustomCaptionsDisplay();
+                        }
+                    } else {
+                        throw new Error('Failed to delete file');
+                    }
+                } catch (error) {
+                    console.error('Error deleting file:', error);
+                    showToast('Failed to delete file', 'error');
+                }
+            }
+        }
+
+        async function clearAllFiles() {
+            const result = await Swal.fire({
+                title: 'Clear All Files?',
+                text: 'This will permanently delete all downloaded files. This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#E0245E',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete all!',
+                cancelButtonText: 'Cancel'
+            });
+            
+            if (result.isConfirmed) {
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('clearAllModal'));
+                if (modal) modal.hide();
+                
+                try {
+                    // Delete each file one by one to avoid overwhelming the server
+                    for (const file of files) {
+                        await fetch(`/api/files/${encodeURIComponent(file.name)}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                    
+                    showToast('All files deleted successfully', 'success');
+                    loadFiles(); // Refresh list
+                    // Clear selection
+                    selectedFiles.clear();
+                    // Clear custom captions
+                    customCaptions = {};
+                    updateCustomCaptionsDisplay();
+                    updateUploadButtonState();
+                } catch (error) {
+                    console.error('Error clearing files:', error);
+                    showToast('Failed to clear all files', 'error');
+                }
+            }
+        }
+
+        // ==================== CAPTION MANAGEMENT ====================
+        function updateCaptionUI() {
+            const enableCaptions = document.getElementById('enableCaptions').checked;
+            const captionsContainer = document.getElementById('captionsContainer');
+            
+            if (enableCaptions) {
+                captionsContainer.style.display = 'block';
+                updateCustomCaptionsDisplay();
+            } else {
+                captionsContainer.style.display = 'none';
+            }
+        }
+
+        function updateCustomCaptionsDisplay() {
+            const container = document.getElementById('customCaptionsContainer');
+            const clearBtn = document.getElementById('clearCaptionsBtn');
+            
+            if (Object.keys(customCaptions).length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-3">
+                        <i class="fas fa-comment-dots fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No custom captions added</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCustomCaption()">
+                            <i class="fas fa-plus me-1"></i>Add Custom Caption
+                        </button>
+                    </div>
+                `;
+                clearBtn.style.display = 'none';
+                return;
+            }
+            
+            let html = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">Custom Captions (${Object.keys(customCaptions).length} files)</small>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomCaption()">
+                        <i class="fas fa-plus me-1"></i>Add More
+                    </button>
+                </div>
+            `;
+            
+            for (const [filename, caption] of Object.entries(customCaptions)) {
+                html += `
+                    <div class="custom-caption-item mb-2 p-2 bg-dark rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted d-block">${escapeHtml(filename)}</small>
+                                <input type="text" 
+                                       class="form-control form-control-sm mt-1 caption-input" 
+                                       value="${escapeHtml(caption)}" 
+                                       data-filename="${escapeHtml(filename)}"
+                                       placeholder="Enter caption for ${escapeHtml(filename)}">
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeCustomCaption('${escapeHtml(filename)}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            clearBtn.style.display = 'inline-block';
+            
+            // Add event listeners for caption inputs
+            document.querySelectorAll('.caption-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const filename = this.getAttribute('data-filename');
+                    customCaptions[filename] = this.value;
+                });
+            });
+        }
+
+        function addCustomCaption() {
+            if (selectedFiles.size === 0) {
+                Swal.fire({
+                    title: 'No Files Selected',
+                    text: 'Please select files first to add custom captions.',
+                    icon: 'warning',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+            
+            // Create a modal or dropdown to select file and add caption
+            let optionsHtml = '';
+            Array.from(selectedFiles).forEach(filename => {
+                if (!customCaptions[filename]) {
+                    optionsHtml += `<option value="${escapeHtml(filename)}">${escapeHtml(filename)}</option>`;
+                }
+            });
+            
+            if (!optionsHtml) {
+                Swal.fire({
+                    title: 'All Files Have Captions',
+                    text: 'All selected files already have custom captions.',
+                    icon: 'info',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Add Custom Caption',
+                html: `
+                    <div class="mb-3">
+                        <label class="form-label">Select File:</label>
+                        <select class="form-select" id="captionFileSelect">
+                            <option value="">Choose a file...</option>
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Custom Caption:</label>
+                        <input type="text" class="form-control" id="customCaptionText" 
+                               placeholder="Enter custom caption...">
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Add Caption',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#1DA1F2',
+                cancelButtonColor: '#6c757d',
+                preConfirm: () => {
+                    const filename = document.getElementById('captionFileSelect').value;
+                    const caption = document.getElementById('customCaptionText').value.trim();
+                    
+                    if (!filename) {
+                        Swal.showValidationMessage('Please select a file');
+                        return false;
+                    }
+                    
+                    if (!caption) {
+                        Swal.showValidationMessage('Please enter a caption');
+                        return false;
+                    }
+                    
+                    return { filename, caption };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { filename, caption } = result.value;
+                    customCaptions[filename] = caption;
+                    updateCustomCaptionsDisplay();
+                    showToast(`Added custom caption for ${filename}`, 'success');
+                }
+            });
+        }
+
+        function removeCustomCaption(filename) {
+            delete customCaptions[filename];
+            updateCustomCaptionsDisplay();
+            showToast(`Removed custom caption for ${filename}`, 'info');
+        }
+
+        function clearAllCustomCaptions() {
+            customCaptions = {};
+            updateCustomCaptionsDisplay();
+            showToast('Cleared all custom captions', 'info');
+        }
+
+        // ==================== UPLOAD FUNCTIONALITY ====================
+        // File selection functions
+        function toggleFileSelection(checkbox, filename) {
+            const row = checkbox.closest('tr');
+            
+            if (checkbox.checked) {
+                selectedFiles.add(filename);
+                if (row) row.classList.add('selected-row', 'table-primary');
+            } else {
+                selectedFiles.delete(filename);
+                if (row) row.classList.remove('selected-row', 'table-primary');
+            }
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+            updateSelectAllCheckbox();
+        }
+
+        function toggleSelectAll(checked) {
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            const rows = document.querySelectorAll('.file-item');
+            
+            if (checked) {
+                // Select all
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                    const filename = checkbox.value;
+                    selectedFiles.add(filename);
+                });
+                rows.forEach(row => row.classList.add('selected-row', 'table-primary'));
+            } else {
+                // Deselect all
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                    const filename = checkbox.value;
+                    selectedFiles.delete(filename);
+                });
+                rows.forEach(row => row.classList.remove('selected-row', 'table-primary'));
+            }
+            
+            updateUploadButtonState();
+            updateSelectionInfo();
+        }
+
+        function selectAllFiles() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            selectAllCheckbox.checked = true;
+            toggleSelectAll(true);
+        }
+
+        function deselectAllFiles() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            selectAllCheckbox.checked = false;
+            toggleSelectAll(false);
+        }
+
+        function clearSelection() {
+            deselectAllFiles();
+        }
+
+        function updateUploadButtonState() {
+            const uploadBtn = document.getElementById('uploadSelectedBtn');
+            const selectedCountBadge = document.getElementById('selectedCountBadge');
+            
+            if (selectedFiles.size > 0) {
+                uploadBtn.disabled = false;
+                selectedCountBadge.textContent = selectedFiles.size;
+                selectedCountBadge.style.display = 'inline';
+                uploadBtn.classList.add('uploading');
+            } else {
+                uploadBtn.disabled = false; // Changed from true to false - always enabled
+                selectedCountBadge.style.display = 'none';
+                uploadBtn.classList.remove('uploading');
+            }
+        }
+
+        function updateSelectionInfo() {
+            const info = document.getElementById('selectionInfo');
+            const selectedCount = document.getElementById('selectedCount');
+            const selectedVideos = document.getElementById('selectedVideos');
+            const selectedImages = document.getElementById('selectedImages');
+            
+            if (selectedFiles.size > 0) {
+                info.style.display = 'block';
+                selectedCount.textContent = selectedFiles.size;
+                
+                // Count videos and images
+                let videoCount = 0;
+                let imageCount = 0;
+                
+                selectedFiles.forEach(filename => {
+                    const file = allFiles.find(f => f.name === filename);
+                    if (file) {
+                        if (file.type === 'video') videoCount++;
+                        else if (file.type === 'image') imageCount++;
+                    }
+                });
+                
+                selectedVideos.textContent = videoCount;
+                selectedImages.textContent = imageCount;
+            } else {
+                info.style.display = 'none';
+            }
+        }
+
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            
+            if (checkboxes.length === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+                return;
+            }
+            
+            const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+            
+            if (checkedCount === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+            } else if (checkedCount === checkboxes.length) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.indeterminate = true;
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        // Helper function for row click selection
+        function selectFileRow(cell) {
+            const row = cell.closest('tr');
+            const checkbox = row.querySelector('.file-checkbox');
+            const filename = checkbox.value;
+            
+            checkbox.checked = !checkbox.checked;
+            toggleFileSelection(checkbox, filename);
+        }
+
+        // Show upload options
+        function showUploadOptions() {
+            if (selectedFiles.size === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Files Selected',
+                    text: 'Please select files to upload.',
+                    confirmButtonColor: '#1DA1F2'
+                });
+                return;
+            }
+
+            // Update queue items
+            updateUploadQueue();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('uploadOptionsModal'));
+            modal.show();
+        }
+
+        function updateUploadQueue() {
+            const queueItems = document.getElementById('uploadQueueItems');
+            const count = document.getElementById('uploadQueueCount');
+            
+            if (selectedFiles.size === 0) {
+                queueItems.innerHTML = `
+                    <div class="text-center py-3">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No files selected</p>
+                    </div>
+                `;
+                count.textContent = '0';
+                return;
+            }
+
+            let itemsHTML = '';
+            let videoCount = 0;
+            let imageCount = 0;
+            let totalSize = 0;
+            let hasCaptions = document.getElementById('enableCaptions').checked;
+            
+            Array.from(selectedFiles).forEach(filename => {
+                // Find file info from allFiles array
+                const fileInfo = allFiles.find(f => f.name === filename);
+                const isVideo = filename.toLowerCase().endsWith('.mp4') || 
+                               filename.toLowerCase().endsWith('.mkv') ||
+                               filename.toLowerCase().endsWith('.avi');
+                
+                if (fileInfo) {
+                    if (isVideo) videoCount++;
+                    else imageCount++;
+                    totalSize += fileInfo.size_mb;
+                }
+                
+                // Check if this file has a custom caption
+                const hasCustomCaption = customCaptions[filename] ? true : false;
+                const captionStatus = hasCaptions ? 
+                    (hasCustomCaption ? 
+                        '<span class="badge bg-info badge-sm">Custom Caption</span>' : 
+                        '<span class="badge bg-secondary badge-sm">Default Caption</span>') : 
+                    '<span class="badge bg-dark badge-sm">No Caption</span>';
+                
+                itemsHTML += `
+                    <div class="upload-queue-item p-2 mb-2 bg-dark rounded">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <i class="fas ${isVideo ? 'fa-video text-danger' : 'fa-image text-success'} me-2"></i>
+                                <div>
+                                    <span class="small d-block">${escapeHtml(filename)}</span>
+                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                        ${fileInfo ? `<small class="text-muted">${fileInfo.size_mb.toFixed(2)} MB</small>` : ''}
+                                        ${captionStatus}
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeFromQueue('${escapeHtml(filename)}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Add summary at the top
+            itemsHTML = `
+                <div class="alert alert-info mb-2 p-2">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <small><strong>${selectedFiles.size}</strong> files selected</small>
+                        <small><strong>${videoCount}</strong> videos, <strong>${imageCount}</strong> images</small>
+                        <small>Total: <strong>${totalSize.toFixed(2)} MB</strong></small>
+                        <small>Captions: <strong>${hasCaptions ? 'Enabled' : 'Disabled'}</strong></small>
+                    </div>
+                </div>
+                ${itemsHTML}
+            `;
+
+            queueItems.innerHTML = itemsHTML;
+            count.textContent = selectedFiles.size;
+        }
+
+        function removeFromQueue(filename) {
+            // Uncheck the checkbox
+            const checkbox = document.querySelector(`.file-checkbox[value="${filename}"]`);
+            if (checkbox) {
+                checkbox.checked = false;
+                toggleFileSelection(checkbox, filename);
+            }
+            
+            updateUploadQueue();
+        }
+
+        // Start upload
+        async function startUpload() {
+            if (selectedFiles.size === 0) {
+                showToast('No files selected for upload', 'warning');
+                return;
+            }
+
+            const uploadMode = document.getElementById('uploadMode').value;
+            const uploadDelay = document.getElementById('uploadDelay').value;
+            const enableCaptions = document.getElementById('enableCaptions').checked;
+            const defaultCaption = document.getElementById('defaultCaption').value;
+            
+            // Prepare caption data
+            let captionsData = null;
+            
+            if (enableCaptions) {
+                // Use custom captions if available, otherwise generate from template
+                captionsData = {};
+                Array.from(selectedFiles).forEach(filename => {
+                    if (customCaptions[filename]) {
+                        // Use custom caption
+                        captionsData[filename] = customCaptions[filename];
+                    } else if (defaultCaption) {
+                        // Generate from template
+                        let caption = defaultCaption;
+                        caption = caption.replace(/{filename}/g, filename);
+                        
+                        // Get file size if {size} is in template
+                        if (caption.includes('{size}')) {
+                            const fileInfo = allFiles.find(f => f.name === filename);
+                            if (fileInfo) {
+                                caption = caption.replace(/{size}/g, `${fileInfo.size_mb.toFixed(2)} MB`);
+                            }
+                        }
+                        
+                        captionsData[filename] = caption;
+                    }
+                    // If no caption template and no custom caption, leave empty (no caption)
+                });
+            }
+
+            // Close options modal
+            const optionsModal = bootstrap.Modal.getInstance(document.getElementById('uploadOptionsModal'));
+            if (optionsModal) optionsModal.hide();
+
+            // Show progress modal
+            const progressModal = new bootstrap.Modal(document.getElementById('uploadProgressModal'));
+            progressModal.show();
+
+            // Update progress UI
+            document.getElementById('uploadingFileCount').textContent = selectedFiles.size;
+            document.getElementById('uploadedCount').textContent = '0';
+            document.getElementById('failedCount').textContent = '0';
+            document.getElementById('remainingCount').textContent = selectedFiles.size;
+
+            try {
+                const response = await fetch('/api/upload/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filenames: Array.from(selectedFiles),
+                        upload_mode: uploadMode,
+                        delay: parseInt(uploadDelay),
+                        add_caption: enableCaptions,
+                        captions: captionsData  // Send captions data (can be null)
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                uploadTaskId = data.task_id;
+
+                // Connect to WebSocket for real-time updates
+                connectUploadWebSocket(uploadTaskId);
+
+                // Show success message
+                showToast(`Upload started for ${selectedFiles.size} files`, 'success');
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                progressModal.hide();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Upload Failed',
+                    text: error.message || 'Failed to start upload.',
+                    confirmButtonColor: '#E0245E'
+                });
+            }
+        }
+
+        // Connect to upload WebSocket
+        function connectUploadWebSocket(taskId) {
+            if (uploadWebSocket) {
+                uploadWebSocket.close();
+            }
+
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/tasks/${taskId}`;
+            uploadWebSocket = new WebSocket(wsUrl);
+
+            uploadWebSocket.onopen = function() {
+                console.log('Upload WebSocket connected');
+            };
+
+            uploadWebSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateUploadProgress(data);
+
+                if (data.status === 'completed' || data.status === 'failed') {
+                    setTimeout(() => {
+                        showUploadSummary(data);
+                    }, 1000);
+                    uploadWebSocket.close();
+                }
+            };
+
+            uploadWebSocket.onclose = function() {
+                console.log('Upload WebSocket disconnected');
+                uploadWebSocket = null;
+            };
+
+            uploadWebSocket.onerror = function(error) {
+                console.error('Upload WebSocket error:', error);
+            };
+        }
+
+        function updateUploadProgress(task) {
+            // Update overall progress
+            const overallProgress = document.getElementById('uploadOverallProgress');
+            const uploadStatus = document.getElementById('uploadStatus');
+            
+            overallProgress.style.width = `${task.progress}%`;
+            overallProgress.textContent = `${Math.round(task.progress)}%`;
+            uploadStatus.textContent = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+
+            // Update current file progress
+            const currentProgress = document.getElementById('uploadCurrentProgress');
+            const currentFile = document.getElementById('currentFileName');
+            
+            if (task.current_file) {
+                currentFile.textContent = task.current_file.name;
+                currentProgress.style.width = `${task.current_file.progress || 0}%`;
+            }
+
+            // Update counts
+            const uploadedCount = document.getElementById('uploadedCount');
+            const failedCount = document.getElementById('failedCount');
+            const remainingCount = document.getElementById('remainingCount');
+            
+            const uploaded = task.downloaded_files?.length || 0;
+            const failed = task.errors?.length || 0;
+            const total = task.total_urls || selectedFiles.size;
+            const remaining = total - uploaded - failed;
+            
+            uploadedCount.textContent = uploaded;
+            failedCount.textContent = failed;
+            remainingCount.textContent = remaining > 0 ? remaining : 0;
+
+            // Update details
+            const details = document.getElementById('uploadDetails');
+            if (task.downloaded_files?.length > 0) {
+                const lastFile = task.downloaded_files[task.downloaded_files.length - 1];
+                const captionInfo = lastFile.caption_used ? 'with caption' : 'without caption';
+                details.innerHTML = `
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    Last uploaded: <strong>${lastFile.name}</strong> (${captionInfo})
+                    <br>
+                    <small class="text-muted">Progress: ${uploaded}/${total} files</small>
+                `;
+            }
+        }
+
+        function showUploadSummary(task) {
+            const progressModal = bootstrap.Modal.getInstance(document.getElementById('uploadProgressModal'));
+            if (progressModal) progressModal.hide();
+
+            const summaryContent = document.getElementById('uploadSummaryContent');
+            const successCount = task.downloaded_files?.length || 0;
+            const failedCount = task.errors?.length || 0;
+            const totalCount = successCount + failedCount;
+
+            let summaryHTML = `
+                <div class="text-center mb-4">
+                    <i class="fas ${task.status === 'completed' ? 'fa-check-circle text-success' : 'fa-exclamation-triangle text-warning'} fa-3x mb-3"></i>
+                    <h4>Upload ${task.status === 'completed' ? 'Complete' : 'Failed'}</h4>
+                    <p class="text-muted">${totalCount} files processed</p>
+                </div>
+            `;
+
+            if (successCount > 0) {
+                const withCaption = task.downloaded_files.filter(f => f.caption_used).length;
+                const withoutCaption = successCount - withCaption;
+                
+                summaryHTML += `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>${successCount} files uploaded successfully</strong>
+                        <br>
+                        <small>${withCaption} with caption, ${withoutCaption} without caption</small>
+                    </div>
+                    
+                    <h6 class="mt-3">Uploaded Files:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Caption</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                task.downloaded_files.slice(0, 5).forEach(file => {
+                    const captionStatus = file.caption_used ? 
+                        '<span class="badge bg-info badge-sm">Yes</span>' : 
+                        '<span class="badge bg-secondary badge-sm">No</span>';
+                    
+                    summaryHTML += `
+                        <tr>
+                            <td><small>${escapeHtml(file.name)}</small></td>
+                            <td><span class="badge ${file.type === 'video' ? 'bg-danger' : 'bg-success'}">${file.type}</span></td>
+                            <td><small>${file.size_mb ? file.size_mb.toFixed(2) : '0.00'} MB</small></td>
+                            <td>${captionStatus}</td>
+                        </tr>
+                    `;
+                });
+
+                summaryHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            if (failedCount > 0) {
+                summaryHTML += `
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>${failedCount} files failed to upload</strong>
+                    </div>
+                    
+                    <h6 class="mt-3">Failed Files:</h6>
+                    <ul class="list-group">
+                `;
+
+                task.errors.slice(0, 3).forEach(error => {
+                    summaryHTML += `
+                        <li class="list-group-item">
+                            <small class="text-danger">${escapeHtml(error.filename || 'Unknown file')}</small><br>
+                            <small>${escapeHtml(error.error)}</small>
+                        </li>
+                    `;
+                });
+
+                summaryHTML += `</ul>`;
+            }
+
+            summaryContent.innerHTML = summaryHTML;
+
+            // Clear selection after upload
+            deselectAllFiles();
+            // Clear custom captions after successful upload
+            customCaptions = {};
+            updateCustomCaptionsDisplay();
+
+            const summaryModal = new bootstrap.Modal(document.getElementById('uploadCompleteModal'));
+            summaryModal.show();
+        }
+
+        // Single file upload
+        function uploadSingle(filename) {
+            // Find file info
+            const fileInfo = allFiles.find(f => f.name === filename);
+            
+            if (!fileInfo) {
+                showToast('File not found', 'error');
+                return;
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('singleUploadModal'));
+            document.getElementById('singleFileName').textContent = filename;
+            document.getElementById('singleFileSize').textContent = `Size: ${fileInfo.size_mb.toFixed(2)} MB`;
+            modal.show();
+        }
+
+        async function uploadSingleFile() {
+            const filename = document.getElementById('singleFileName').textContent;
+            const caption = document.getElementById('singleFileCaption').value.trim();
+
+            try {
+                const response = await fetch('/api/upload/single', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filename: filename,
+                        caption: caption || ""  // Send empty string if no caption
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`File uploaded ${caption ? 'with caption' : 'without caption'}`, 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('singleUploadModal'));
+                    if (modal) modal.hide();
+                } else {
+                    showToast(`Upload failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showToast('Upload failed', 'error');
+                console.error(error);
+            }
+        }
+
+        // Telegram connection test
+        async function testTelegramConnection() {
+            try {
+                showToast('Testing Telegram connection...', 'info');
+                const response = await fetch('/api/upload/test-connection');
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Telegram connection successful', 'success');
+                } else {
+                    showToast(`Connection failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showToast('Connection test failed', 'error');
+            }
+        }
+
+        // Save telegram config
+        function saveTelegramConfig() {
+            const botToken = document.getElementById('botToken').value;
+            const chatId = document.getElementById('chatId').value;
+
+            if (!botToken || !chatId) {
+                showToast('Please fill in all fields', 'warning');
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('telegram_bot_token', botToken);
+            localStorage.setItem('telegram_chat_id', chatId);
+
+            showToast('Settings saved successfully', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('telegramConfigModal'));
+            if (modal) modal.hide();
+        }
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.classList.remove('fa-eye');
+                button.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                button.classList.remove('fa-eye-slash');
+                button.classList.add('fa-eye');
+            }
+        }
+
+        // ==================== TASKS MANAGEMENT ====================
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks?limit=5');
+                if (!response.ok) throw new Error('Failed to load tasks');
+                
+                tasks = await response.json();
+                renderTasks();
+                updateTasksCount();
+                
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        function renderTasks() {
+            const tasksList = document.getElementById('tasksList');
+            
+            if (tasks.length === 0) {
+                tasksList.innerHTML = `
+                    <div class="col-12 text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <h5>No Recent Tasks</h5>
+                        <p class="text-muted">Start a download to see tasks here.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            tasksList.innerHTML = tasks.map(task => `
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="task-card ${task.status}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-0">${formatTaskId(task.task_id)}</h6>
+                                <small class="text-muted">${formatDate(task.start_time)}</small>
+                            </div>
+                            <span class="badge ${getStatusBadgeClass(task.status)}">
+                                ${task.status}
+                            </span>
+                        </div>
+                        
+                        <div class="progress mb-2" style="height: 5px;">
+                            <div class="progress-bar ${getProgressBarClass(task.status)}" 
+                                 style="width: ${task.progress}%"></div>
+                        </div>
+                        
+                        <div class="row small text-muted">
+                            <div class="col-6">
+                                <i class="fas fa-link"></i> ${task.total_urls} URLs
+                            </div>
+                            <div class="col-6 text-end">
+                                <i class="fas fa-file"></i> ${task.downloaded_files?.length || 0} files
+                            </div>
+                        </div>
+                        
+                        ${task.errors?.length > 0 ? `
+                        <div class="mt-2">
+                            <small class="text-danger">
+                                <i class="fas fa-exclamation-triangle"></i> ${task.errors.length} errors
+                            </small>
+                        </div>
+                        ` : ''}
+                        
+                        <button onclick="viewTaskDetails('${task.task_id}')" 
+                                class="btn btn-sm btn-outline-primary w-100 mt-2">
+                            <i class="fas fa-info-circle"></i> Details
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewTaskDetails(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`);
+                const task = await response.json();
+                
+                const modalContent = document.getElementById('taskDetailsContent');
+                modalContent.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Task ID:</strong>
+                            <p><code>${task.task_id}</code></p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Status:</strong>
+                            <p><span class="badge ${getStatusBadgeClass(task.status)}">${task.status}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Start Time:</strong>
+                            <p>${formatDateTime(task.start_time)}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>End Time:</strong>
+                            <p>${task.end_time ? formatDateTime(task.end_time) : 'In progress'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Progress:</strong>
+                            <p>${task.progress}% (${task.processed_urls}/${task.total_urls} URLs)</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Total Size:</strong>
+                            <p>${task.total_size_mb || 0} MB</p>
+                        </div>
+                        ${task.add_caption !== undefined ? `
+                        <div class="col-md-6">
+                            <strong>Captions:</strong>
+                            <p>${task.add_caption ? 'Enabled' : 'Disabled'}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <h6 class="mt-3">Downloaded Files (${task.downloaded_files?.length || 0})</h6>
+                    ${task.downloaded_files?.length > 0 ? `
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${task.downloaded_files.slice(0, 10).map(file => `
+                                <tr>
+                                    <td>${escapeHtml(file.name)}</td>
+                                    <td><span class="badge ${file.type === 'video' ? 'badge-video' : 'badge-image'}">${file.type}</span></td>
+                                    <td>${file.size_mb} MB</td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${task.downloaded_files.length > 10 ? `<p class="text-muted">... and ${task.downloaded_files.length - 10} more files</p>` : ''}
+                    </div>
+                    ` : '<p class="text-muted">No files downloaded</p>'}
+                    
+                    ${task.errors?.length > 0 ? `
+                    <h6 class="mt-3">Errors (${task.errors.length})</h6>
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            ${task.errors.slice(0, 5).map(error => `<li>${escapeHtml(error.url?.substring(0, 50) || error.filename || 'Unknown')}... - ${escapeHtml(error.error)}</li>`).join('')}
+                        </ul>
+                        ${task.errors.length > 5 ? `<p class="mt-2 mb-0">... and ${task.errors.length - 5} more errors</p>` : ''}
+                    </div>
+                    ` : ''}
+                `;
+                
+                const modal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
+                modal.show();
+                
+            } catch (error) {
+                console.error('Error loading task details:', error);
+                showToast('Failed to load task details', 'error');
+            }
+        }
+
+        function updateTasksCount() {
+            const countElement = document.getElementById('tasksCount');
+            if (countElement) {
+                countElement.textContent = tasks.length;
+            }
+        }
+
+        // ==================== STATISTICS ====================
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (!response.ok) throw new Error('Failed to load stats');
+                
+                const stats = await response.json();
+                renderStats(stats);
+                
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function renderStats(stats) {
+            const statsCards = document.getElementById('statsCards');
+            
+            if (!statsCards) return;
+            
+            // Calculate additional stats from files
+            const videoFiles = files.filter(f => f.type === 'video');
+            const imageFiles = files.filter(f => f.type === 'image');
+            const totalSize = files.reduce((sum, file) => sum + file.size_mb, 0);
+            
+            statsCards.innerHTML = `
+                <div class="col-md-3 col-6 mb-3">
+                    <div class="stat-card">
+                        <i class="fas fa-download text-primary"></i>
+                        <div class="stat-value">${stats.total_downloads || files.length}</div>
+                        <div class="stat-label">Total Downloads</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                    <div class="stat-card">
+                        <i class="fas fa-video text-danger"></i>
+                        <div class="stat-value">${videoFiles.length}</div>
+                        <div class="stat-label">Videos</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                    <div class="stat-card">
+                        <i class="fas fa-image text-success"></i>
+                        <div class="stat-value">${imageFiles.length}</div>
+                        <div class="stat-label">Images</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6 mb-3">
+                    <div class="stat-card">
+                        <i class="fas fa-database text-warning"></i>
+                        <div class="stat-value">${totalSize.toFixed(0)}</div>
+                        <div class="stat-label">Total MB</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function updateProgress(current, total, totalUrls, message) {
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            const progressText = document.getElementById('progressText');
+            
+            const percentage = total > 0 ? (current / total) * 100 : 0;
+            
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${Math.round(percentage)}%`;
+            statusText.textContent = message;
+            progressText.textContent = `${current}/${totalUrls} URLs`;
+        }
+
+        function startAutoRefresh() {
+            if (autoRefresh) {
+                setInterval(() => {
+                    if (!document.hidden) {
+                        loadTasks();
+                        loadStats();
+                    }
+                }, 30000); // Refresh every 30 seconds
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-success';
+                case 'failed': return 'bg-danger';
+                case 'processing': return 'bg-warning';
+                case 'pending': return 'bg-info';
+                default: return 'bg-secondary';
+            }
+        }
+
+        function getProgressBarClass(status) {
+            switch(status) {
+                case 'completed': return 'bg-success';
+                case 'failed': return 'bg-danger';
+                case 'processing': return 'progress-bar-animated bg-warning';
+                case 'pending': return 'bg-info';
+                default: return 'bg-secondary';
+            }
+        }
+
+        function formatTaskId(taskId) {
+            return taskId.length > 20 ? taskId.substring(0, 20) + '...' : taskId;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showToast(message, type = 'info') {
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} me-2"></i>
+                            ${escapeHtml(message)}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            // Create container if it doesn't exist
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(container);
+            }
+            
+            // Add toast to container
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            
+            // Show toast
+            const toastEl = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+            
+            // Remove toast after it's hidden
+            toastEl.addEventListener('hidden.bs.toast', function() {
+                toastEl.remove();
+                // Remove container if empty
+                if (container.children.length === 0) {
+                    container.remove();
+                }
+            });
+        }
+
+        // ==================== EXPORT FUNCTIONS TO GLOBAL SCOPE ====================
+        window.toggleFileSelection = toggleFileSelection;
+        window.selectAllFiles = selectAllFiles;
+        window.deselectAllFiles = deselectAllFiles;
+        window.clearSelection = clearSelection;
+        window.showUploadOptions = showUploadOptions;
+        window.removeFromQueue = removeFromQueue;
+        window.startUpload = startUpload;
+        window.uploadSingle = uploadSingle;
+        window.uploadSingleFile = uploadSingleFile;
+        window.testTelegramConnection = testTelegramConnection;
+        window.saveTelegramConfig = saveTelegramConfig;
+        window.togglePassword = togglePassword;
+        window.selectFileRow = selectFileRow;
+        window.previewFile = previewFile;
+        window.deleteFile = deleteFile;
+        window.viewTaskDetails = viewTaskDetails;
+        window.addCustomCaption = addCustomCaption;
+        window.removeCustomCaption = removeCustomCaption;
+        window.clearAllCustomCaptions = clearAllCustomCaptions;
+    </script>
+</body>
+</html>
