@@ -15,7 +15,7 @@ import sys
 # Get the absolute path to the Telegram-Bot folder
 TELEGRAM_BOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 VIDEO_FOLDER = os.path.join(TELEGRAM_BOT_DIR, "videos")  # Absolute path to videos
-PORT = 8080
+PORT = 5000
 API_PREFIX = "/api"
 STATIC_FOLDER = os.path.dirname(__file__)  # Current directory
 
@@ -570,7 +570,7 @@ def run_server():
     print("=" * 60 + "\n")
     
     # Initialize server
-    server_address = ('', PORT)
+    server_address = ('0.0.0.0', PORT)
     httpd = HTTPServer(server_address, VideoGalleryHandler)
     
     try:
