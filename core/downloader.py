@@ -141,33 +141,36 @@ class VideoDownloader:
         
         print(f"🔄 Starting bulk download for {total} URLs (videos and images)")
         
+        initial_text = (
+            f"📥 **Bulk Download Started**\n\n"
+            f"🔢 **Total URLs:** {total}\n"
+            f"⚙️ **Status:** Initializing...\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+        
         if detection_msg:
             status_msg = detection_msg
-            await status_msg.edit_text(
-                f"📥 **Starting Bulk Download**\n\n"
-                f"Total URLs: {total}\n"
-                f"Processing videos and images..."
-            )
+            await status_msg.edit_text(initial_text)
         else:
-            status_msg = await message.reply_text(
-                f"📥 **Starting Bulk Download**\n\n"
-                f"Total URLs: {total}\n"
-                f"Processing videos and images..."
-            )
+            status_msg = await message.reply_text(initial_text)
         
         overall_start = time.time()
         
         # Download phase - try both video and image for each URL
         for idx, url in enumerate(urls, 1):
             try:
+                processed = idx - 1
+                remaining = total - processed
+                
                 await status_msg.edit_text(
-                    f"📥 **Bulk Download Progress**\n\n"
-                    f"**URL {idx}/{total}**\n"
-                    f"🎬 Videos: {video_success_count}\n"
-                    f"🖼️ Images: {image_success_count}\n"
-                    f"❌ Failed: {failed_count}\n\n"
-                    f"🔗 Current URL:\n`{url[:50]}...`\n\n"
-                    f"⏳ Processing..."
+                    f"📥 **Bulk Download in Progress**\n\n"
+                    f"🔄 **Processing:** {idx}/{total}\n"
+                    f"🎬 **Videos:** {video_success_count}\n"
+                    f"📸 **Images:** {image_success_count}\n"
+                    f"❌ **Failed:** {failed_count}\n"
+                    f"⏳ **Remaining:** {remaining}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🔗 **Current:** `{url[:40]}...`"
                 )
                 
                 # Try video download first

@@ -121,9 +121,10 @@ class VideoUploader:
         failed_count = 0
         
         status_msg = await message.reply_text(
-            f"📤 **Starting Bulk Upload**\n\n"
-            f"Total videos: {total}\n"
-            f"Preparing upload..."
+            f"🚀 **Bulk Upload Started**\n\n"
+            f"🔢 **Total Files:** {total}\n"
+            f"⚙️ **Status:** Preparing files...\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
         )
         
         overall_start = time.time()
@@ -132,15 +133,16 @@ class VideoUploader:
             try:
                 video_name = os.path.basename(video_path)
                 file_size = os.path.getsize(video_path)
+                remaining = total - (idx - 1)
                 
                 await status_msg.edit_text(
-                    f"📤 **Bulk Upload Progress**\n\n"
-                    f"**Video {idx}/{total}**\n"
-                    f"✅ Completed: {success_count}\n"
-                    f"❌ Failed: {failed_count}\n\n"
-                    f"📁 Current: `{video_name[:35]}...`\n"
-                    f"💾 Size: {Formatter.size(file_size)}\n\n"
-                    f"⏳ Preparing upload..."
+                    f"🚀 **Bulk Upload in Progress**\n\n"
+                    f"🔄 **File:** {idx}/{total}\n"
+                    f"✅ **Success:** {success_count}\n"
+                    f"❌ **Failed:** {failed_count}\n"
+                    f"⏳ **Remaining:** {remaining}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📦 **Current:** `{video_name[:30]}...`"
                 )
                 
                 # Pass the client from the message context

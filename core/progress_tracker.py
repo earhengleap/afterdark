@@ -42,20 +42,22 @@ class ProgressTracker:
                 ProgressTracker.callback.last_update = {}
             
             last_update = ProgressTracker.callback.last_update.get(progress_key, 0)
-            if elapsed_time - last_update >= 2:
+            if elapsed_time - last_update >= 1:
                 ProgressTracker.callback.last_update[progress_key] = elapsed_time
                 
                 progress_bar = Formatter.progress_bar(percentage)
                 speed_mb = speed / (1024 * 1024)
                 
                 status_text = (
-                    f"📤 **Uploading to Group**\n\n"
-                    f"📁 **File:** `{video_name[:35]}...`\n\n"
-                    f"**Progress:** {percentage:.1f}%\n"
+                    f"🚀 **Uploading to Telegram**\n\n"
+                    f"📦 **File:** `{video_name[:35]}...`\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📈 **Progress:** {percentage:.1f}%\n"
                     f"`{progress_bar}`\n\n"
-                    f"📊 **Size:** {Formatter.size(current)} / {Formatter.size(total)}\n"
-                    f"⚡ **Speed:** {speed_mb:.2f} MB/s\n"
+                    f"📊 **Speed:** {speed_mb:.2f} MB/s\n"
+                    f"💾 **Size:** {Formatter.size(current)} / {Formatter.size(total)}\n"
                     f"⏱️ **ETA:** {Formatter.eta(eta)}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━"
                 )
                 
                 try:
