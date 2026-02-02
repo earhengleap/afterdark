@@ -57,28 +57,52 @@ app = Client(
 
 # ==================== SETUP HANDLERS ====================
 
-# Setup command handlers
-setup_command_handlers(app)
+# Handlers are now setup inside __main__ for cleaner logging
 
-# Setup callback handlers  
-setup_callback_handlers(app)
+def print_banner():
+    """Print a professional banner on startup"""
+    width = 60
+    border = "━" * width
+    print(f"\n\033[1;36m┏{border}┓\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;33m{BOT_NAME.center(width-2)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;32m{'Production Ready • Stable Version'.center(width-2)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┣{border}┫\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:  {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┗{border}┛\033[0m")
 
-# ==================== MAIN ====================
+def log_info(message):
+    print(f"\033[1;34m[INFO]\033[0m \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
+
+def log_success(message):
+    print(f"\033[1;32m[OK]\033[0m   \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
+
+def log_warning(message):
+    print(f"\033[1;33m[WARN]\033[0m \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
+
+def log_error(message):
+    print(f"\033[1;31m[ERROR]\033[0m\033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
 
 if __name__ == "__main__":
-    print("="*50)
-    print(f"🤖 {BOT_NAME}")
-    print(f"📦 Version: {BOT_VERSION}")
-    print(f"📅 Release: {VERSION_DATE}")
-    print("="*50)
-    print("✅ Bot is starting...")
-    print("⏳ Connecting to Telegram...")
+    print_banner()
+    log_info("Initializing system directories...")
+    setup_directories()
+    
+    log_info("Setting up handlers...")
+    setup_command_handlers(app)
+    setup_callback_handlers(app)
+    
+    log_info("Connecting to Telegram API...")
     
     try:
+        log_success(f"Bot '{BOT_NAME}' is now LIVE and listening for events")
         app.run()
     except KeyboardInterrupt:
-        print("\n⚠️ Bot stopped by user")
+        print("")
+        log_warning("Bot stopped by user interrupt")
     except Exception as e:
-        print(f"❌ Bot crashed: {e}")
+        log_error(f"Critical system failure: {e}")
     finally:
-        print("👋 Bot shutdown complete")
+        log_info("Graceful shutdown sequence complete")
