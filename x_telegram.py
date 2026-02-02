@@ -69,7 +69,7 @@ def print_banner():
     print(f"\033[1;36m┣{border}┫\033[0m")
     print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
     print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:  {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+    print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:   {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
     print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
     print(f"\033[1;36m┗{border}┛\033[0m")
 
