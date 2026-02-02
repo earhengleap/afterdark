@@ -142,9 +142,10 @@ def setup_command_handlers(app: Client):
     @app.on_message(filters.private & filters.command("start"))
     async def start_handler(client: Client, message: Message) -> None:
         """Handle /start command"""
+        user_id = message.from_user.id
         user_name = message.from_user.first_name
         keyboard = Keyboards.main_menu()
-        welcome_text = Messages.welcome(user_name)
+        welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"
         await message.reply_text(welcome_text + version_footer, reply_markup=keyboard)
 

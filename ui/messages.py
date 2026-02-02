@@ -34,22 +34,14 @@ class Messages:
     @staticmethod
     def welcome(user_name, user_id=None):
         """Welcome message for /start command"""
-        if user_id and LANG_SUPPORT:
-            welcome_text = get_text(user_id, 'welcome_title', 'Welcome')
-            bot_name = get_text(user_id, 'bot_name', 'X Video Downloader Bot')
-            description = get_text(user_id, 'welcome_description', 'I help you download videos from X (Twitter) quickly and easily!')
-            quick_actions = get_text(user_id, 'quick_actions', 'Quick Actions:')
-            download_video = get_text(user_id, 'download_video', 'Download Video')
-            bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
-            statistics = get_text(user_id, 'statistics', 'Statistics')
-        else:
-            welcome_text = 'Welcome'
-            bot_name = 'X Video Downloader Bot'
-            description = 'I help you download videos from X (Twitter) quickly and easily!'
-            quick_actions = 'Quick Actions:'
-            download_video = 'Download Video'
-            bulk_upload = 'Bulk Upload'
-            statistics = 'Statistics'
+        welcome_text = get_text(user_id, 'welcome_title', 'Welcome')
+        bot_name = get_text(user_id, 'bot_name', 'X Video Downloader Bot')
+        description = get_text(user_id, 'welcome_description', 'I help you download videos and images from X (Twitter) quickly and easily!')
+        quick_actions = get_text(user_id, 'quick_actions', 'Quick Actions:')
+        download_video = get_text(user_id, 'download_video', 'Download Video')
+        download_images = get_text(user_id, 'download_images', 'Download Images')
+        bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
+        statistics = get_text(user_id, 'statistics', 'Statistics')
         
         return f"""👋 **{welcome_text} {user_name}!**
 
@@ -58,12 +50,12 @@ class Messages:
 {description}
 
 **{quick_actions}**
-• Click **{Messages.DOWNLOAD} {download_video}** to get started
-• Use **{Messages.UPLOAD} {bulk_upload}** to send multiple videos to group
-• View your **{Messages.STATS} {statistics}** to see download history
+• Click **{Messages.DOWNLOAD} {download_video}** or **🖼️ {download_images}**
+• Use **{Messages.UPLOAD} {bulk_upload}** to send multiple files to group
+• View your **{Messages.STATS} {statistics}** to see history
 • Need help? Check **❓ Help** section
 
-Simply send me any X/Twitter video URL and I'll handle the rest!
+Simply send me any X/Twitter URL and I'll handle the rest!
 
 ━━━━━━━━━━━━━━━━━━━━
 *Powered by Moonlight • Fast & Reliable*"""

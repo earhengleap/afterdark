@@ -65,7 +65,7 @@ def setup_callback_handlers(app: Client):
         elif data == "main_menu":
             keyboard = Keyboards.main_menu()
             user_name = callback_query.from_user.first_name
-            await callback_query.message.edit_text(Messages.welcome(user_name), reply_markup=keyboard)
+            await callback_query.message.edit_text(Messages.welcome(user_name, user_id=user_id), reply_markup=keyboard)
         
         elif data == "cancel":
             keyboard = Keyboards.main_menu()
