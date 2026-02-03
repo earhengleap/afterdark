@@ -24,13 +24,16 @@ A Telegram bot for downloading X/Twitter videos and images, with a web-based vid
 ## Running the Application
 
 ### Video Gallery Server (Main)
-The video gallery web server runs on port 5000:
+The video gallery web server runs on port 5000: 
+  - This server.py is the website for browsing or the place to watch the videos after downloaded.
+  - [MUST] if you add this in to new project, make sure dont make any log of this website into the main log of @x_telegram.py, keep the main @x_telegram.py clean and simple. but if this already fixed no need to use this [MUST].
 ```bash
 python telegram-bot-websites/server.py
 ```
 
-### Telegram Bot (Optional)
+### Telegram Bot
 Requires BOT_TOKEN, API_ID, API_HASH environment variables:
+  @x_telegram.py is the main file for the bot to run. Make sure this file is the pirority file to run the bot.  
 ```bash
 python x_telegram.py
 ```
@@ -41,20 +44,6 @@ python x_telegram.py
 - Pyrogram/Pyrofork for Telegram integration
 - FastAPI + Uvicorn (available for advanced usage)
 - gallery-dl for additional download support
-
-## Features
-- Video gallery web interface for browsing downloads
-- Download videos from X/Twitter URLs
-- Upload to Telegram
-- Video streaming with range requests
-- SVG placeholder thumbnails
-
-## Recent Changes
-- 2026-02-02: Configured for Replit environment
-  - Changed video gallery server port from 8080 to 5000
-  - Configured server to bind to 0.0.0.0
-  - Installed Python 3.11 and all dependencies
-  - Set up workflow for video gallery server
 
 ## Always add thi ENV into the .replit whenever create a new replit account 
 [userenv]
