@@ -511,19 +511,15 @@ class VideoGalleryHandler(BaseHTTPRequestHandler):
                     pass
     
     def log_message(self, format, *args):
-        """Custom log format - suppress normal connection errors"""
+        """Custom log format - suppress all logs except errors"""
         message = format % args
         
-        # Skip logging for common client disconnects during video streaming
-        if '500' in message and ('10053' in message or '10054' in message or 'An established connection' in message):
-            # Don't log normal client disconnects as errors
-            return
-        
-        if '404' in message or '500' in message:
+        # Only log errors (4xx or 5xx) to keep the console clean
+        if ' 4' in message or ' 5' in message:
             print(f"⚠️  {datetime.now().strftime('%H:%M:%S')} - {message}")
-        elif '/api/' in message:
-            # Reduced logging for API calls
-            pass
+        
+        # Completely suppress standard 200/300 status logs
+        return
 
 def run_server():
     """Start the HTTP server"""
