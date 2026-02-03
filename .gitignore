@@ -1,0 +1,58 @@
+# Media files - DO NOT UPLOAD
+videos/
+images/
+uploadthing_videos/
+x_downloader_web/data/videos/
+x_downloader_web/data/images/
+audio/
+*.mp4
+*.mp3
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.part
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Telegram session files and user data
+*.session
+*.session-journal
+*.session.*
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pythonlibs/
+
+# Log files and data
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Replit
+.replit
+replit.nix

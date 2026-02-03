@@ -1,0 +1,93 @@
+🔄 Starting bulk download for 3 URLs (videos and images)
+/home/runner/workspace/core/downloader.py:145: RuntimeWarning: coroutine 'Message.edit_text' was never awaited
+  status_msg.edit_text(
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+/home/runner/workspace/core/downloader.py:162: RuntimeWarning: coroutine 'Message.edit_text' was never awaited
+  status_msg.edit_text(
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+ERROR: [twitter] 2017771379731337232: No video could be found in this tweet
+🖼️ No video found, trying image download for https://x.com/balletcoregf/status/2017771379731337232?s=20
+📦 Installing gallery-dl...
+error: externally-managed-environment
+
+× This environment is externally managed
+╰─> This command has been disabled as it tries to modify the immutable
+    `/nix/store` filesystem.
+    
+    To use Python with Nix and nixpkgs, have a look at the online documentation:
+    <https://nixos.org/manual/nixpkgs/stable/#python>.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+❌ Unexpected error in image download: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/home/runner/workspace/core/image_downloader.py", line 51, in ensure_gallery_dl
+    import gallery_dl  # noqa
+    ^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'gallery_dl'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/core/image_downloader.py", line 68, in download
+    ImageDownloader.ensure_gallery_dl()
+  File "/home/runner/workspace/core/image_downloader.py", line 62, in ensure_gallery_dl
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "gallery-dl"])
+  File "/nix/store/6334pjf6w2q623rgvwi499qaiym1p6yv-python3-3.11.14/lib/python3.11/subprocess.py", line 413, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+❌ Image download failed for https://x.com/balletcoregf/status/2017771379731337232?s=20: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+❌ Failed to download from 1/3: https://x.com/balletcoregf/status/2017771379731337232?s=20
+ERROR: [twitter] 2017629099960017230: No video could be found in this tweet
+🖼️ No video found, trying image download for https://x.com/xiezwuyu/status/2017629099960017230?s=20
+📦 Installing gallery-dl...
+error: externally-managed-environment
+
+× This environment is externally managed
+╰─> This command has been disabled as it tries to modify the immutable
+    `/nix/store` filesystem.
+    
+    To use Python with Nix and nixpkgs, have a look at the online documentation:
+    <https://nixos.org/manual/nixpkgs/stable/#python>.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+❌ Unexpected error in image download: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/home/runner/workspace/core/image_downloader.py", line 51, in ensure_gallery_dl
+    import gallery_dl  # noqa
+    ^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'gallery_dl'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/workspace/core/image_downloader.py", line 68, in download
+    ImageDownloader.ensure_gallery_dl()
+  File "/home/runner/workspace/core/image_downloader.py", line 62, in ensure_gallery_dl
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "gallery-dl"])
+  File "/nix/store/6334pjf6w2q623rgvwi499qaiym1p6yv-python3-3.11.14/lib/python3.11/subprocess.py", line 413, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+❌ Image download failed for https://x.com/xiezwuyu/status/2017629099960017230?s=20: Command '['/home/runner/workspace/.pythonlibs/bin/python', '-m', 'pip', 'install', 'gallery-dl']' returned non-zero exit status 1.
+❌ Failed to download from 2/3: https://x.com/xiezwuyu/status/2017629099960017230?s=20
+✅ Added to log (#1957): 03-𝖇𝖔𝖆 𝖌0𝖙𝖍 🕸️ - home movies from ur horny e-gf 🎥 💦_00001.mp4 (2.10 MB)
+✅ Downloaded 1 video(s) with High Quality
+✅ Downloaded 1 video(s) from 3/3: https://x.com/boagoth111/status/2017375717017755932?s=20
+/home/runner/workspace/core/downloader.py:190: RuntimeWarning: coroutine 'Message.edit_text' was never awaited
+  status_msg.edit_text(
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+📊 Bulk download completed: 1 success (1 videos, 0 images), 2 failed
+📁 Total downloaded videos: 1
+📁 Total downloaded images: 0
+/home/runner/workspace/core/downloader.py:265: RuntimeWarning: coroutine 'Message.delete' was never awaited
+  status_msg.delete()
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+🔄 Sending 1 videos and 0 images to user...
+/home/runner/workspace/core/downloader.py:294: RuntimeWarning: coroutine 'Message.reply_video' was never awaited
+  message.reply_video(
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+✅ Sent video 1/1: 03-𝖇𝖔𝖆 𝖌0𝖙𝖍 🕸️ - home movies from ur horny e-gf 🎥 💦_00001.mp4
+/home/runner/workspace/core/downloader.py:400: RuntimeWarning: coroutine 'Message.reply_text' was never awaited
+  message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
