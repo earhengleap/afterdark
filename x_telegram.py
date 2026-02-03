@@ -1,4 +1,4 @@
-# twitter_download/x_telegram.py
+# x_telegram.py
 
 """
 X Video Downloader Bot - Clean Architecture Implementation
