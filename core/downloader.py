@@ -21,14 +21,20 @@ from utils.video_processor import VideoProcessor
 from models.enums import user_downloads
 from ui.keyboards import Keyboards
 from core.logger import setup_logger
+from core.progress_tracker import download_tracker, ProgressTracker
+from utils.media_info import MediaInfo
 
 logger = setup_logger("VideoDownloader")
 
 class VideoDownloader:
     """Handle video downloads from X (Twitter) - SUPPORTS MULTIPLE VIDEOS PER URL"""
     
+    # Class variable to store progress state
+    _progress_data = {}
+    
     @staticmethod
-    def download(url: str, message: Optional[Message] = None) -> Tuple[Optional[List[str]], Optional[Dict]]:
+    def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None, 
+                 index: int = 1, total: int = 1) -> Tuple[Optional[List[str]], Optional[Dict]]:
         """
         Download video(s) from URL - SUPPORTS MULTIPLE VIDEOS
         Returns: (list_of_video_paths, info_dict) or (None, None)
@@ -55,6 +61,27 @@ class VideoDownloader:
         
         for profile in quality_profiles:
             try:
+                # Progress hook for yt-dlp
+                def progress_hook(d):
+                    if status_msg and d['status'] == 'downloading':
+                        try:
+                            downloaded = d.get('downloaded_bytes', 0)
+                            total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                            speed = d.get('speed', 0) or 0
+                            filename = d.get('filename', 'video.mp4')
+                            if '/' in filename:
+                                filename = filename.split('/')[-1]
+                            elif '\\' in filename:
+                                filename = filename.split('\\')[-1]
+                            
+                            # Store for async update
+                            VideoDownloader._progress_data['downloaded'] = downloaded
+                            VideoDownloader._progress_data['total'] = total_bytes
+                            VideoDownloader._progress_data['speed'] = speed
+                            VideoDownloader._progress_data['filename'] = filename
+                        except Exception:
+                            pass
+                
                 ydl_opts = {
                     'cookiefile': COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
                     'format': profile['format'],
@@ -67,6 +94,7 @@ class VideoDownloader:
                     'no_color': True,
                     'extract_flat': False,
                     'ignoreerrors': False,
+                    'progress_hooks': [progress_hook] if status_msg else [],
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -165,19 +193,26 @@ class VideoDownloader:
                 processed = idx - 1
                 remaining = total - processed
                 
+                # Format URL for display
+                url_display = url.replace('https://', '').replace('http://', '')
+                if len(url_display) > 40:
+                    url_display = url_display[:37] + '...'
+                
                 await status_msg.edit_text(
-                    f"📥 **Bulk Download in Progress**\n\n"
-                    f"🔄 **Processing:** {idx}/{total}\n"
-                    f"🎬 **Videos:** {video_success_count}\n"
-                    f"📸 **Images:** {image_success_count}\n"
-                    f"❌ **Failed:** {failed_count}\n"
-                    f"⏳ **Remaining:** {remaining}\n"
+                    f"📥 **Analyzing URL** ({idx}/{total})\n\n"
+                    f"🔗 **Source:** `{url_display}`\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🔗 **Current:** `{url[:40]}...`"
+                    f"📊 **Statistics:**\n"
+                    f"• 🎬 Videos: {video_success_count}\n"
+                    f"• 📸 Images: {image_success_count}\n"
+                    f"• ❌ Failed: {failed_count}\n"
+                    f"• ⏳ Remaining: {remaining}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⚙️ Processing..."
                 )
                 
-                # Try video download first
-                video_paths, video_info = VideoDownloader.download(url, message)
+                # Try video download first with progress tracking
+                video_paths, video_info = VideoDownloader.download(url, message, status_msg, idx, total)
                 
                 if video_paths and len(video_paths) > 0:
                     video_success_count += 1
@@ -194,15 +229,19 @@ class VideoDownloader:
                     
                     logger.info(f"Downloaded {len(video_paths)} video(s) from URL {idx}/{total}")
                     
-                    await status_msg.edit_text(
-                        f"📥 **Bulk Download Progress**\n\n"
-                        f"**URL {idx}/{total}**\n"
-                        f"🎬 Videos: {video_success_count}\n"
-                        f"🖼️ Images: {image_success_count}\n"
-                        f"❌ Failed: {failed_count}\n\n"
-                        f"✅ **Video Success:** {len(video_paths)} video(s) from URL\n\n"
+                    # Show success message briefly
+                    success_msg = (
+                        f"✅ **Downloaded** ({idx}/{total})\n\n"
+                        f"📹 Found {len(video_paths)} video(s)\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"📊 **Statistics:**\n"
+                        f"• 🎬 Videos: {video_success_count}\n"
+                        f"• 📸 Images: {image_success_count}\n"
+                        f"• ❌ Failed: {failed_count}\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
                         f"⏳ Continuing..."
                     )
+                    await status_msg.edit_text(success_msg)
                     await asyncio.sleep(0.5)
                 else:
                     # Video download failed, try image download
@@ -286,26 +325,54 @@ class VideoDownloader:
     async def _send_downloaded_content(video_paths: List[str], image_paths: List[str], 
                                message: Message, user_id: int) -> None:
         """Send downloaded videos and images to user"""
-        # Send videos
+        # Send videos with progress tracking
         for idx, video_path in enumerate(video_paths):
             try:
-                width, height = VideoProcessor.get_resolution(video_path)
-                file_size = os.path.getsize(video_path) / (1024 * 1024)
                 video_name = os.path.basename(video_path)
+                file_size = os.path.getsize(video_path)
                 
-                # Use short key for videos too
+                # Create enhanced caption with detailed info
+                caption = MediaInfo.create_caption(video_path, include_filename=True)
+                
+                # Use short key for videos
                 video_key = f"{user_id}_v_{idx}"
                 user_downloads[video_key] = video_path
                 
+                # Create upload status message
+                upload_msg = await message.reply_text(
+                    f"📤 **Preparing upload**\n\n"
+                    f"📹 {video_name[:30]}{'...' if len(video_name) > 30 else ''}\n"
+                    f"💾 Size: {file_size / (1024 * 1024):.1f} MB\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ Starting upload..."
+                )
+                
+                # Get resolution for video
+                width, height = VideoProcessor.get_resolution(video_path)
+                
+                # Track upload start time for progress
+                start_time = time.time()
+                progress_key = f"upload_{user_id}_{idx}"
+                
+                # Send video with upload progress
                 await message.reply_video(
                     video=video_path,
                     width=width if width else 720,
                     height=height if height else 1280,
                     supports_streaming=True,
-                    caption=f"🎬 {video_name}\n💾 Size: {file_size:.2f} MB",
-                    reply_markup=Keyboards.single_video_upload(video_key)
+                    caption=caption,
+                    reply_markup=Keyboards.single_video_upload(video_key),
+                    progress=ProgressTracker.callback,
+                    progress_args=(progress_key, upload_msg, video_name, start_time)
                 )
-                logger.info(f"Sent video [{idx+1}/{len(video_paths)}]: {video_name} ({file_size:.2f} MB)")
+                
+                # Delete upload status message
+                try:
+                    await upload_msg.delete()
+                except Exception:
+                    pass
+                
+                logger.info(f"Sent video [{idx+1}/{len(video_paths)}]: {video_name} ({file_size / (1024 * 1024):.2f} MB)")
                 
             except Exception as e:
                 logger.error(f"Failed to send video {os.path.basename(video_path)}: {e}")
