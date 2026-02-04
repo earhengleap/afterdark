@@ -16,7 +16,11 @@ from utils.video_processor import VideoProcessor
 from utils.upload_logger import UploadLogger
 from utils.formatters import Formatter
 from core.progress_tracker import ProgressTracker
+from core.progress_tracker import ProgressTracker
 from models.enums import user_downloads
+from core.logger import setup_logger
+
+logger = setup_logger("VideoUploader")
 
 class VideoUploader:
     """Handle video uploads to Telegram"""
@@ -78,7 +82,7 @@ class VideoUploader:
                 wait_time = e.value
                 retry_count += 1
                 
-                print(f"⚠️ FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
+                logger.warning(f"FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
                 
                 if status_msg:
                     try:
@@ -108,7 +112,7 @@ class VideoUploader:
                 continue
 
             except Exception as e:
-                print(f"❌ Upload to group failed: {e}")
+                logger.error(f"Upload to group failed: {e}")
                 return False, str(e)
         
         return False, f"Failed after {max_retries} attempts due to rate limiting"
@@ -152,16 +156,16 @@ class VideoUploader:
                 
                 if success:
                     success_count += 1
-                    print(f"✅ Uploaded {idx}/{total}: {video_name}")
+                    logger.info(f"Uploaded {idx}/{total}: {video_name}")
                 else:
                     failed_count += 1
-                    print(f"❌ Failed {idx}/{total}: {video_name} - {msg}")
+                    logger.error(f"Failed {idx}/{total}: {video_name} - {msg}")
                 
                 if idx < total:
                     await asyncio.sleep(3)
                     
             except Exception as e:
-                print(f"Error uploading {video_path}: {e}")
+                logger.error(f"Error uploading {video_path}: {e}")
                 failed_count += 1
         
         total_time = time.time() - overall_start

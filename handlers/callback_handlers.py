@@ -4,6 +4,7 @@ Callback query handlers for the bot
 import os
 import time
 import asyncio
+from datetime import datetime
 
 from pyrogram import Client
 from pyrogram.types import CallbackQuery, Message
@@ -551,3 +552,123 @@ def setup_callback_handlers(app: Client):
                     f"Error: {message}",
                     reply_markup=Keyboards.back_to_main()
                 )
+        
+        elif data.startswith("history:"):
+            from core.database import history_db
+            from utils.history_formatter import format_history_message, format_export_message, format_clear_confirmation
+            
+            parts = data.split(":")
+            
+            if len(parts) == 3 and parts[1] == "clear" and parts[2] == "confirm":
+                # Clear history confirmation
+                total_count = history_db.get_total_count(user_id)
+                if history_db.clear_user_history(user_id):
+                    await callback_query.answer("✅ History cleared!", show_alert=True)
+                    keyboard = Keyboards.main_menu()
+                    await callback_query.message.edit_text(
+                        f"🗑️ **History Cleared**\n\n"
+                        f"Successfully deleted {total_count} entries.\n\n"
+                        f"Your download history is now empty.",
+                        reply_markup=keyboard
+                    )
+                    logger.info(f"User {user_id} cleared {total_count} history entries")
+                else:
+                    await callback_query.answer("❌ Failed to clear history", show_alert=True)
+            
+            elif parts[1] == "clear":
+                # Show clear confirmation
+                total_count = history_db.get_total_count(user_id)
+                if total_count == 0:
+                    await callback_query.answer("No history to clear!", show_alert=True)
+                    return
+                
+                keyboard = Keyboards.clear_history_confirmation()
+                await callback_query.message.edit_text(
+                    format_clear_confirmation(total_count),
+                    reply_markup=keyboard
+                )
+            
+            elif parts[1] == "export":
+                # Export history
+                all_history = history_db.get_all_user_history(user_id)
+                
+                if not all_history:
+                    await callback_query.answer("No history to export!", show_alert=True)
+                    return
+                
+                keyboard = Keyboards.export_format_selection()
+                await callback_query.message.edit_text(
+                    format_export_message(len(all_history)),
+                    reply_markup=keyboard
+                )
+            
+            else:
+                # View history (pagination)
+                try:
+                    page = int(parts[1])
+                except (ValueError, IndexError):
+                    page = 1
+                
+                # Get history from database
+                per_page = 10
+                offset = (page - 1) * per_page
+                history = history_db.get_user_history(user_id, limit=per_page, offset=offset)
+                total_count = history_db.get_total_count(user_id)
+                total_pages = max(1, (total_count + per_page - 1) // per_page)
+                
+                # Format message
+                message = format_history_message(history, page, total_pages, total_count)
+                
+                # Send with pagination keyboard
+                keyboard = Keyboards.history_pagination(page, total_pages)
+                await callback_query.message.edit_text(
+                    message,
+                    reply_markup=keyboard,
+                    disable_web_page_preview=True
+                )
+                
+                await callback_query.answer(f"📜 Page {page}/{total_pages}")
+        
+        # Export format selection
+        elif data.startswith("export:"):
+            from core.database import history_db
+            from utils.history_exporter import export_to_csv, export_to_text
+            
+            format_type = data.split(":")[1]
+            
+            # Get all history
+            all_history = history_db.get_all_user_history(user_id)
+            
+            if not all_history:
+                await callback_query.answer("No history to export!", show_alert=True)
+                return
+            
+            # Show processing message
+            await callback_query.answer("📊 Generating export file...")
+            
+            # Generate file
+            if format_type == 'csv':
+                file_data = export_to_csv(all_history)
+                filename = f"download_history_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                caption = f"📊 **Download History (CSV)**\n\n{len(all_history)} total entries"
+            else:  # txt
+                file_data = export_to_text(all_history)
+                filename = f"download_history_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                caption = f"📄 **Download History (Text)**\n\n{len(all_history)} total entries"
+            
+            # Send file
+            await callback_query.message.reply_document(
+                document=file_data,
+                file_name=filename,
+                caption=caption
+            )
+            
+            # Delete the export selection message
+            try:
+                await callback_query.message.delete()
+            except Exception:
+                pass
+            
+            await callback_query.answer("✅ History exported!")
+            logger.info(f"User {user_id} exported {len(all_history)} history entries as {format_type}")
+

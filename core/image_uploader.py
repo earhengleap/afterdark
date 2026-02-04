@@ -14,6 +14,9 @@ from pyrogram.errors import FloodWait
 from config.settings import CHAT_ID
 from utils.formatters import Formatter
 from models.enums import user_downloads
+from core.logger import setup_logger
+
+logger = setup_logger("ImageUploader")
 
 class ImageUploader:
     """Handle image uploads to Telegram"""
@@ -42,7 +45,7 @@ class ImageUploader:
                 # Send images INDIVIDUALLY (no grouping)
                 for idx, img_path in enumerate(image_paths):
                     if not os.path.exists(img_path):
-                        print(f"⚠️ Image file not found: {img_path}")
+                        logger.warning(f"Image file not found: {img_path}")
                         continue
                     
                     # Send single photo WITHOUT caption
@@ -71,7 +74,7 @@ class ImageUploader:
                 wait_time = e.value
                 retry_count += 1
                 
-                print(f"⚠️ FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
+                logger.warning(f"FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
                 
                 if status_msg:
                     try:
@@ -100,7 +103,7 @@ class ImageUploader:
                 continue
 
             except Exception as e:
-                print(f"❌ Image upload to group failed: {e}")
+                logger.error(f"Image upload to group failed: {e}")
                 return False, str(e)
         
         return False, f"Failed after {max_retries} attempts due to rate limiting"
@@ -136,7 +139,7 @@ class ImageUploader:
                 wait_time = e.value
                 retry_count += 1
                 
-                print(f"⚠️ FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
+                logger.warning(f"FLOOD_WAIT: Need to wait {wait_time} seconds (Attempt {retry_count}/{max_retries})")
                 
                 if status_msg:
                     try:
@@ -160,7 +163,7 @@ class ImageUploader:
                 continue
 
             except Exception as e:
-                print(f"❌ Single image upload failed: {e}")
+                logger.error(f"Single image upload failed: {e}")
                 return False, str(e)
         
         return False, f"Failed after {max_retries} attempts due to rate limiting"
@@ -187,10 +190,10 @@ class ImageUploader:
         
         if success:
             success_count = total
-            print(f"✅ Uploaded all {total} images individually")
+            logger.info(f"Uploaded all {total} images individually")
         else:
             failed_count = total
-            print(f"❌ Failed to upload images: {msg}")
+            logger.error(f"Failed to upload images: {msg}")
         
         total_time = time.time() - overall_start
         

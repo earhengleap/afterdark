@@ -9,6 +9,9 @@ from typing import List, Dict, Optional
 
 from config.paths import LOG_FILE, DOWNLOAD_FOLDER
 from core.file_manager import FileManager
+from core.logger import setup_logger
+
+logger = setup_logger("LogManager")
 
 class LogManager:
     """Handles download log operations - FIXED VERSION"""
@@ -89,7 +92,7 @@ class LogManager:
             LogManager.save(synced_log)
             # Only print summary, not every single file
             if files_to_remove:
-                print(f"📊 Log sync: Removed {len(files_to_remove)} entries, {len(synced_log)} entries remain")
+                logger.info(f"Log sync: Removed {len(files_to_remove)} entries, {len(synced_log)} entries remain")
 
         return synced_log
 
@@ -100,12 +103,12 @@ class LogManager:
         filepath = os.path.join(DOWNLOAD_FOLDER, filename)
 
         if not os.path.exists(filepath):
-            print(f"⚠️ Warning: File not found, not adding to log: {filepath}")
+            logger.warning(f"File not found, not adding to log: {filepath}")
             return
 
         # Check for duplicates
         if any(entry.get('filename') == filename for entry in log):
-            print(f"ℹ️ File already in log: {filename}")
+            logger.info(f"File already in log: {filename}")
             return
 
         # Get the next number from the LOG, not from folder
@@ -114,7 +117,7 @@ class LogManager:
         try:
             actual_filesize = os.path.getsize(filepath)
         except Exception as e:
-            print(f"⚠️ Error getting file size: {e}")
+            logger.warning(f"Error getting file size: {e}")
             actual_filesize = 0
 
         duration = video_info.get('duration') or video_info.get('duration_seconds') or 0
@@ -134,7 +137,7 @@ class LogManager:
 
         log.append(log_entry)
         LogManager.save(log)
-        print(f"✅ Added to log (#{next_number}): {filename} ({actual_filesize / (1024 * 1024):.2f} MB)")
+        logger.info(f"Added to log (#{next_number}): {filename} ({actual_filesize / (1024 * 1024):.2f} MB)")
 
     @staticmethod
     def _get_next_log_number(log_data: List[Dict]) -> int:
@@ -199,10 +202,10 @@ class LogManager:
 
         if removed_count > 0:
             LogManager.save(cleaned_log)
-            print(f"🗑️ Cleaned up {removed_count} entries older than {days_old} days")
+            logger.info(f"Cleaned up {removed_count} entries older than {days_old} days")
 
     @staticmethod
     def force_sync() -> None:
         """Force sync with folder and show detailed info"""
-        print("🔄 Forcing log sync with folder...")
+        logger.info("Forcing log sync with folder...")
         LogManager.sync_with_folder()

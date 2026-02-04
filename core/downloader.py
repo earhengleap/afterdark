@@ -23,6 +23,8 @@ from ui.keyboards import Keyboards
 from core.logger import setup_logger
 from core.progress_tracker import download_tracker, ProgressTracker
 from utils.media_info import MediaInfo
+from core.database import history_db
+from utils.url_parser import extract_twitter_username
 
 logger = setup_logger("VideoDownloader")
 
@@ -218,12 +220,28 @@ class VideoDownloader:
                     video_success_count += 1
                     downloaded_video_paths.extend(video_paths)
                     
+                    # Track each video in history
+                    source_username = extract_twitter_username(url)
                     for video_path in video_paths:
+                        file_size = os.path.getsize(video_path)
+                        filename = os.path.basename(video_path)
+                        
+                        # Add to history
+                        history_db.add_entry(
+                            user_id=user_id,
+                            url=url,
+                            source_username=source_username,
+                            filename=filename,
+                            status='success',
+                            content_type='video',
+                            file_size=file_size
+                        )
+                        
                         url_results.append(DownloadResult(
                             url=url,
                             status='success',
-                            filename=os.path.basename(video_path),
-                            size=os.path.getsize(video_path) / (1024 * 1024),
+                            filename=filename,
+                            size=file_size / (1024 * 1024),
                             content_type='video'
                         ))
                     
@@ -251,6 +269,21 @@ class VideoDownloader:
                     if image_paths and len(image_paths) > 0:
                         image_success_count += 1
                         downloaded_image_paths.extend(image_paths)
+                        
+                        # Track image download in history
+                        source_username = extract_twitter_username(url)
+                        total_size = sum(os.path.getsize(img) for img in image_paths if os.path.exists(img))
+                        
+                        # Add to history
+                        history_db.add_entry(
+                            user_id=user_id,
+                            url=url,
+                            source_username=source_username,
+                            filename=f"{len(image_paths)} images",
+                            status='success',
+                            content_type='image',
+                            file_size=total_size
+                        )
                         
                         for img_path in image_paths:
                             url_results.append(DownloadResult(
@@ -287,6 +320,20 @@ class VideoDownloader:
             except Exception as e:
                 error_msg = VideoDownloader._parse_error(str(e))
                 failed_count += 1
+                
+                # Track failed download in history
+                source_username = extract_twitter_username(url)
+                history_db.add_entry(
+                    user_id=user_id,
+                    url=url,
+                    source_username=source_username,
+                    filename=None,
+                    status='failed',
+                    content_type='unknown',
+                    file_size=0,
+                    error_message=error_msg
+                )
+                
                 url_results.append(DownloadResult(
                     url=url,
                     status='failed',

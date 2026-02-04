@@ -22,12 +22,12 @@ class Keyboards:
                 InlineKeyboardButton("📂 Bulk Images", callback_data="bulk_upload_images")
             ],
             [
-                InlineKeyboardButton("📊 My Stats", callback_data="stats"),
-                InlineKeyboardButton("💡 Help & FAQ", callback_data="help")
+                InlineKeyboardButton("📜 Download History", callback_data="history:1"),
+                InlineKeyboardButton("📊 My Stats", callback_data="stats")
             ],
             [
-                InlineKeyboardButton("✨ Settings", callback_data="settings"),
-                InlineKeyboardButton("🔗 Support", callback_data="about")
+                InlineKeyboardButton("💡 Help & FAQ", callback_data="help"),
+                InlineKeyboardButton("✨ Settings", callback_data="settings")
             ]
         ])
     
@@ -310,3 +310,48 @@ class Keyboards:
         ])
 
         return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
+    def history_pagination(current_page: int, total_pages: int):
+        """History view pagination keyboard"""
+        buttons = []
+        
+        # Navigation buttons
+        nav_row = []
+        if current_page > 1:
+            nav_row.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"history:{current_page-1}"))
+        if current_page < total_pages:
+            nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"history:{current_page+1}"))
+        
+        if nav_row:
+            buttons.append(nav_row)
+        
+        # Action buttons
+        buttons.append([
+            InlineKeyboardButton("📊 Export", callback_data="history:export"),
+            InlineKeyboardButton("🗑️ Clear", callback_data="history:clear")
+        ])
+        
+        # Back button
+        buttons.append([InlineKeyboardButton("🔙 Back to Menu", callback_data="main_menu")])
+        
+        return InlineKeyboardMarkup(buttons)
+    
+    @staticmethod
+    def export_format_selection():
+        """Export format selection keyboard"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 CSV (Excel)", callback_data="export:csv")],
+            [InlineKeyboardButton("📄 Text File", callback_data="export:txt")],
+            [InlineKeyboardButton("🔙 Cancel", callback_data="history:1")]
+        ])
+    
+    @staticmethod
+    def clear_history_confirmation():
+        """Confirm clearing history"""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Yes, Clear All", callback_data="history:clear:confirm"),
+                InlineKeyboardButton("❌ Cancel", callback_data="history:1")
+            ]
+        ])
