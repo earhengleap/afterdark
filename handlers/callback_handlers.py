@@ -7,6 +7,10 @@ import asyncio
 
 from pyrogram import Client
 from pyrogram.types import CallbackQuery, Message
+import logging
+
+# Get logger
+logger = logging.getLogger("XVideoBot")
 
 from core.file_manager import FileManager
 from core.uploader import VideoUploader
@@ -403,7 +407,7 @@ def setup_callback_handlers(app: Client):
                 await callback_query.answer("❌ No downloaded images found!", show_alert=True)
                 return
             
-            print(f"📁 Found {len(downloaded_paths)} images for bulk upload")
+            logger.info(f"Found {len(downloaded_paths)} images for bulk upload")
             await callback_query.answer("📤 Starting bulk image upload...")
             await ImageUploader.upload_multiple_images(downloaded_paths, callback_query.message, user_id)
 
@@ -436,7 +440,7 @@ def setup_callback_handlers(app: Client):
                 await callback_query.answer("❌ No downloaded content found!", show_alert=True)
                 return
             
-            print(f"📁 Found {len(video_paths)} videos and {len(image_paths)} images for bulk upload")
+            logger.info(f"Found {len(video_paths)} videos and {len(image_paths)} images for bulk upload")
             await callback_query.answer(f"📤 Starting bulk upload of {len(all_paths)} files...")
             
             # Upload videos first, then images

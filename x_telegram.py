@@ -2,49 +2,33 @@
 
 """
 X Video Downloader Bot - Clean Architecture Implementation
-Version: 1.0.0
+Version: 1.0.1
 """
 
 import os
 import time
+import sys
+import signal
+import asyncio
+import logging
 from datetime import datetime
 
-from pyrogram import Client
+from pyrogram import Client, idle
+from pyrogram.errors import ApiIdInvalid, AuthKeyInvalid
 
 # Configuration imports
 from config.settings import BOT_TOKEN, API_ID, API_HASH, BOT_VERSION, BOT_NAME, VERSION_DATE
 from config.paths import setup_directories
 
 # Core functionality imports
-from core.downloader import VideoDownloader
-from core.image_downloader import ImageDownloader # ADD THIS IMPORT
-from core.uploader import VideoUploader
-from core.image_uploader import ImageUploader
-from core.file_manager import FileManager
-from core.log_manager import LogManager
-from core.progress_tracker import ProgressTracker
-
-# Models imports
-from models.data_models import VideoInfo, DownloadResult
-from models.enums import user_downloads, user_selections, upload_progress
-
-# Utilities imports
-from utils.formatters import Formatter
-from utils.url_extractor import URLExtractor
-from utils.video_processor import VideoProcessor
-from utils.upload_logger import UploadLogger
-
-# UI imports
-from ui.keyboards import Keyboards
-from ui.messages import Messages
-from ui.languages import language_manager
+from core.logger import setup_logger
 
 # Handler imports
 from handlers.command_handlers import setup_command_handlers
 from handlers.callback_handlers import setup_callback_handlers
 
-# User management
-from users.users import log_user_action
+# Initialize Logger
+logger = setup_logger()
 
 # ==================== PYROGRAM CLIENT ====================
 
@@ -55,9 +39,34 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# ==================== SETUP HANDLERS ====================
+# ==================== SHUTDOWN HANDLER ====================
 
-# Handlers are now setup inside __main__ for cleaner logging
+async def shutdown(signal_name, loop):
+    """Graceful shutdown handler"""
+    logger.info(f"Received signal {signal_name}: Initiating graceful shutdown...")
+    
+    # Perform cleanup tasks here (close DB connections, save buffers, etc.)
+    logger.info("Cleaning up resources...")
+    
+    try:
+        await app.stop()
+        logger.info("Telegram client stopped successfully")
+    except Exception as e:
+        logger.warning(f"Error stopping client: {e}")
+        
+    # Cancel all running tasks
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    
+    logger.info(f"Cancelled {len(tasks)} pending tasks")
+    logger.info("Goodbye! 👋")
+    loop.stop()
+
+def handle_exception(loop, context):
+    msg = context.get("exception", context["message"])
+    logger.error(f"Unhandled exception: {msg}")
+
+# ==================== MAIN ENTRY POINT ====================
 
 def print_banner():
     """Print a professional banner on startup"""
@@ -73,36 +82,58 @@ def print_banner():
     print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
     print(f"\033[1;36m┗{border}┛\033[0m")
 
-def log_info(message):
-    print(f"\033[1;34m[INFO]\033[0m \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
-
-def log_success(message):
-    print(f"\033[1;32m[OK]\033[0m   \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
-
-def log_warning(message):
-    print(f"\033[1;33m[WARN]\033[0m \033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
-
-def log_error(message):
-    print(f"\033[1;31m[ERROR]\033[0m\033[1;37m{datetime.now().strftime('%H:%M:%S')}\033[0m | {message}")
-
-if __name__ == "__main__":
+async def main():
     print_banner()
-    log_info("Initializing system directories...")
+    logger.info("Initializing system directories...")
     setup_directories()
     
-    log_info("Setting up handlers...")
+    logger.info("Setting up handlers...")
     setup_command_handlers(app)
     setup_callback_handlers(app)
     
-    log_info("Connecting to Telegram API...")
+    logger.info("Connecting to Telegram API...")
     
     try:
-        log_success(f"Bot '{BOT_NAME}' is now LIVE and listening for events")
-        app.run()
-    except KeyboardInterrupt:
-        print("")
-        log_warning("Bot stopped by user interrupt")
+        await app.start()
+        me = await app.get_me()
+        logger.info(f"Bot '{me.first_name}' (@{me.username}) is now LIVE")
+        logger.info("Press Ctrl+C to stop")
+        
+        # Keep the bot running
+        await idle()
+        
+    except (ApiIdInvalid, AuthKeyInvalid):
+        logger.critical("Invalid API_ID, API_HASH, or BOT_TOKEN. Please check your configuration.")
     except Exception as e:
-        log_error(f"Critical system failure: {e}")
+        logger.critical(f"Critical system failure: {e}", exc_info=True)
     finally:
-        log_info("Graceful shutdown sequence complete")
+        try:
+            if app.is_connected:
+                await app.stop()
+        except:
+            pass
+        logger.info("Bot execution ended")
+
+if __name__ == "__main__":
+    # Setup signal handlers
+    loop = asyncio.get_event_loop()
+    
+    # Windows doesn't support adding signal handlers to the loop easily for SIGINT/SIGTERM in some versions
+    # but we can try basic signal handling. 
+    # For better cross-platform support, we just rely on KeyboardInterrupt for local dev, 
+    # but for production on Linux, add_signal_handler is better.
+    
+    if os.name != 'nt':
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+        for s in signals:
+            loop.add_signal_handler(
+                s, lambda s=s: asyncio.create_task(shutdown(s.name, loop)))
+    
+    loop.set_exception_handler(handle_exception)
+
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        logger.warning("Bot stopped by user interrupt (KeyboardInterrupt)")
+    finally:
+        logger.info("System shutdown complete")

@@ -23,6 +23,9 @@ from core.log_manager import LogManager
 from utils.formatters import Formatter
 from models.enums import user_downloads
 from ui.keyboards import Keyboards
+from core.logger import setup_logger
+
+logger = setup_logger("ImageDownloader")
 
 class ImageDownloader:
     """Handle image downloads from X (Twitter) using gallery-dl - ENHANCED FIX"""
@@ -42,7 +45,7 @@ class ImageDownloader:
         # Ensure URL ends cleanly (no trailing slashes or fragments)
         url = url.rstrip('/').split('#')[0]
         
-        print(f"🔧 Normalized URL: {url}")
+        logger.debug(f"URL normalized: {url}")
         return url
     
     @staticmethod
@@ -52,8 +55,7 @@ class ImageDownloader:
             # NORMALIZE URL FIRST - This is critical!
             original_url = url
             url = ImageDownloader.normalize_twitter_url(url)
-            print(f"📎 Original URL: {original_url}")
-            print(f"✨ Clean URL: {url}")
+            logger.debug(f"Cleaned URL: {original_url} -> {url}")
             
             # Use separate images folder (not inside videos)
             download_folder = IMAGES_FOLDER
@@ -66,23 +68,22 @@ class ImageDownloader:
                         full_path = os.path.join(root, file)
                         existing_files.add(full_path)
             
-            print(f"📊 Existing files before download: {len(existing_files)}")
+            logger.debug(f"Existing image files before download: {len(existing_files)}")
             
             # First, check if cookies file exists and is valid
             if not os.path.exists(COOKIE_FILE):
-                print(f"⚠️ Cookie file '{COOKIE_FILE}' not found - downloads may fail for some tweets")
-                print(f"💡 To fix: Export your Twitter cookies using a browser extension")
+                logger.warning(f"Cookie file not found: {COOKIE_FILE}")
             else:
                 # Check if cookies file is not empty
                 if os.path.getsize(COOKIE_FILE) == 0:
-                    print(f"⚠️ Cookie file is empty - authentication may fail")
+                    logger.warning("Cookie file is empty")
             
             # Try Method 1: Syndication API first (most reliable for public tweets)
-            print("🔄 Method 1: Trying syndication API (best for public tweets)...")
+            logger.debug("Attempting Method 1: Syndication API")
             downloaded_files = await ImageDownloader._try_syndication_method(url, download_folder, existing_files)
             
             if downloaded_files:
-                print(f"✅ Method 1 succeeded: Downloaded {len(downloaded_files)} images")
+                logger.info(f"Method 1 success: Downloaded {len(downloaded_files)} images")
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -95,7 +96,7 @@ class ImageDownloader:
             downloaded_files = await ImageDownloader._try_config_method(url, download_folder, existing_files)
             
             if downloaded_files:
-                print(f"✅ Method 2 succeeded: Downloaded {len(downloaded_files)} images")
+                logger.info(f"Method 2 success: Downloaded {len(downloaded_files)} images")
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -108,7 +109,7 @@ class ImageDownloader:
             downloaded_files = await ImageDownloader._try_simple_method(url, download_folder, existing_files)
             
             if downloaded_files:
-                print(f"✅ Method 3 succeeded: Downloaded {len(downloaded_files)} images")
+                logger.info(f"Method 3 success: Downloaded {len(downloaded_files)} images")
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -121,7 +122,7 @@ class ImageDownloader:
             downloaded_files = await ImageDownloader._try_aggressive_method(url, download_folder, existing_files)
             
             if downloaded_files:
-                print(f"✅ Method 4 succeeded: Downloaded {len(downloaded_files)} images")
+                logger.info(f"Method 4 success: Downloaded {len(downloaded_files)} images")
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -129,13 +130,11 @@ class ImageDownloader:
                 }
                 return downloaded_files, info
             
-            print("❌ All download methods failed - no images found")
+            logger.warning("All download methods failed - no images found")
             return None, None
                 
         except Exception as e:
-            print(f"❌ Unexpected error in image download: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Image download error: {e}", exc_info=True)
             return None, None
     
     @staticmethod
@@ -170,7 +169,7 @@ class ImageDownloader:
                     url
                 ]
                 
-                print(f"🖼️ Method 1 (Syndication): Downloading from: {url}")
+                logger.debug(f"Method 1 (Syndication): Downloading from syndication API")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -179,7 +178,7 @@ class ImageDownloader:
                 stdout, stderr = await process.communicate()
                 
                 if process.returncode != 0:
-                    print(f"⚠️ Method 1 exit code: {process.returncode}")
+                    logger.debug(f"Method 1 exit code: {process.returncode}")
                 
                 await asyncio.sleep(0.5)
                 
@@ -199,7 +198,7 @@ class ImageDownloader:
                     pass
                     
         except Exception as e:
-            print(f"❌ Method 1 error: {e}")
+            logger.debug(f"Method 1 error: {e}")
             return None
     
     @staticmethod
@@ -255,7 +254,7 @@ class ImageDownloader:
                 if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
                     cmd.extend(["--cookies", COOKIE_FILE])
                 
-                print(f"🖼️ Method 2 (Config): Downloading from: {url}")
+                logger.debug(f"Method 2 (Config): Downloading with detailed config")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -264,7 +263,7 @@ class ImageDownloader:
                 stdout, stderr = await process.communicate()
                 
                 if process.returncode != 0:
-                    print(f"⚠️ Method 2 exit code: {process.returncode}")
+                    logger.debug(f"Method 2 exit code: {process.returncode}")
                 
                 await asyncio.sleep(0.5)
                 
@@ -284,7 +283,7 @@ class ImageDownloader:
                     pass
                     
         except Exception as e:
-            print(f"❌ Method 2 error: {e}")
+            logger.debug(f"Method 2 error: {e}")
             return None
     
     @staticmethod
@@ -302,7 +301,7 @@ class ImageDownloader:
             if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
                 cmd.extend(["--cookies", COOKIE_FILE])
             
-            print(f"🖼️ Method 3 (Simple): Downloading from: {url}")
+            logger.debug(f"Method 3 (Simple): Downloading with simple method")
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -311,7 +310,7 @@ class ImageDownloader:
             stdout, stderr = await process.communicate()
             
             if process.returncode != 0:
-                print(f"⚠️ Method 3 exit code: {process.returncode}")
+                logger.debug(f"Method 3 exit code: {process.returncode}")
             
             await asyncio.sleep(0.5)
             
@@ -325,7 +324,7 @@ class ImageDownloader:
             return new_files
             
         except Exception as e:
-            print(f"❌ Method 3 error: {e}")
+            logger.debug(f"Method 3 error: {e}")
             return None
     
     @staticmethod
@@ -371,7 +370,7 @@ class ImageDownloader:
                 if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
                     cmd.extend(["--cookies", COOKIE_FILE])
                 
-                print(f"🖼️ Method 4 (Aggressive): Downloading from: {url}")
+                logger.debug(f"Method 4 (Aggressive): Downloading with aggressive config")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -380,7 +379,7 @@ class ImageDownloader:
                 stdout, stderr = await process.communicate()
                 
                 if process.returncode != 0:
-                    print(f"⚠️ Method 4 exit code: {process.returncode}")
+                    logger.debug(f"Method 4 exit code: {process.returncode}")
                 
                 await asyncio.sleep(0.5)
                 
@@ -400,7 +399,7 @@ class ImageDownloader:
                     pass
                     
         except Exception as e:
-            print(f"❌ Method 4 error: {e}")
+            logger.debug(f"Method 4 error: {e}")
             return None
     
     @staticmethod
@@ -425,7 +424,7 @@ class ImageDownloader:
                 return downloaded_files
             return None
         except Exception as e:
-            print(f"❌ Error parsing gallery-dl output: {e}")
+            logger.error(f"Error parsing gallery-dl output: {e}")
             return None
     
     @staticmethod
@@ -453,7 +452,7 @@ class ImageDownloader:
             try:
                 await message.reply_media_group(media=media_group)
             except Exception as e:
-                print(f"❌ Error sending image media group: {e}")
+                logger.error(f"Error sending image group: {e}")
 
     @staticmethod
     def _safe_rename_with_number(original_path: str) -> Optional[str]:

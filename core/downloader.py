@@ -20,6 +20,9 @@ from utils.formatters import Formatter
 from utils.video_processor import VideoProcessor
 from models.enums import user_downloads
 from ui.keyboards import Keyboards
+from core.logger import setup_logger
+
+logger = setup_logger("VideoDownloader")
 
 class VideoDownloader:
     """Handle video downloads from X (Twitter) - SUPPORTS MULTIPLE VIDEOS PER URL"""
@@ -74,7 +77,7 @@ class VideoDownloader:
                     # Check if this is a playlist/multiple videos
                     if 'entries' in info:
                         # Multiple videos found
-                        print(f"📹 Found {len(info['entries'])} videos in this tweet")
+                        logger.info(f"Found {len(info['entries'])} videos in tweet")
                         for entry in info['entries']:
                             if entry and 'requested_downloads' in entry:
                                 for download in entry['requested_downloads']:
@@ -98,7 +101,7 @@ class VideoDownloader:
                             LogManager.add_entry(info, os.path.basename(new_path), url)
                     
                     if downloaded_files:
-                        print(f"✅ Downloaded {len(downloaded_files)} video(s) with {profile['name']}")
+                        logger.info(f"Downloaded {len(downloaded_files)} video(s) using {profile['name']}")
                         return downloaded_files, info
                     
             except yt_dlp.utils.DownloadError as e:
@@ -110,7 +113,7 @@ class VideoDownloader:
                     return None, None
                 
                 # Otherwise it's a quality/format issue, try next profile
-                print(f"⚠️ {profile['name']} failed, trying next profile...")
+                logger.warning(f"{profile['name']} failed, trying next profile")
                 continue
                 
             except Exception as e:
@@ -121,7 +124,7 @@ class VideoDownloader:
                     return None, None
                 
                 # Try next profile for other errors
-                print(f"⚠️ {profile['name']} error: {e}, trying next profile...")
+                logger.warning(f"{profile['name']} error: {e}, trying next profile")
                 continue
         
         # All profiles failed
@@ -139,7 +142,7 @@ class VideoDownloader:
         downloaded_image_paths = []
         url_results = []
         
-        print(f"🔄 Starting bulk download for {total} URLs (videos and images)")
+        logger.info(f"Starting bulk download: {total} URLs (videos and images)")
         
         initial_text = (
             f"📥 **Bulk Download Started**\n\n"
@@ -189,7 +192,7 @@ class VideoDownloader:
                             content_type='video'
                         ))
                     
-                    print(f"✅ Downloaded {len(video_paths)} video(s) from {idx}/{total}: {url}")
+                    logger.info(f"Downloaded {len(video_paths)} video(s) from URL {idx}/{total}")
                     
                     await status_msg.edit_text(
                         f"📥 **Bulk Download Progress**\n\n"
@@ -203,7 +206,7 @@ class VideoDownloader:
                     await asyncio.sleep(0.5)
                 else:
                     # Video download failed, try image download
-                    print(f"🖼️ No video found, trying image download for {url}")
+                    logger.debug(f"No video found, attempting image download for URL {idx}/{total}")
                     image_paths, image_info = await ImageDownloader.download(url, message)
                     
                     if image_paths and len(image_paths) > 0:
@@ -219,7 +222,7 @@ class VideoDownloader:
                                 content_type='image'
                             ))
                         
-                        print(f"✅ Downloaded {len(image_paths)} images from {idx}/{total}: {url}")
+                        logger.info(f"Downloaded {len(image_paths)} image(s) from URL {idx}/{total}")
                         
                         await status_msg.edit_text(
                             f"📥 **Bulk Download Progress**\n\n"
@@ -240,7 +243,7 @@ class VideoDownloader:
                             error='Download failed - No video or images found',
                             content_type='unknown'
                         ))
-                        print(f"❌ Failed to download from {idx}/{total}: {url}")
+                        logger.warning(f"Failed to download from URL {idx}/{total}")
                         
             except Exception as e:
                 error_msg = VideoDownloader._parse_error(str(e))
@@ -251,7 +254,7 @@ class VideoDownloader:
                     error=error_msg,
                     content_type='unknown'
                 ))
-                print(f"❌ Error downloading {idx}/{total}: {error_msg}")
+                logger.error(f"Error downloading URL {idx}/{total}: {error_msg}")
         
         total_time = time.time() - overall_start
         total_success = video_success_count + image_success_count
@@ -261,9 +264,8 @@ class VideoDownloader:
         user_downloads[f"{user_id}_bulk_downloaded_images"] = downloaded_image_paths
         user_downloads[f"{user_id}_bulk_downloaded_all"] = downloaded_video_paths + downloaded_image_paths
         
-        print(f"📊 Bulk download completed: {total_success} success ({video_success_count} videos, {image_success_count} images), {failed_count} failed")
-        print(f"📁 Total downloaded videos: {len(downloaded_video_paths)}")
-        print(f"📁 Total downloaded images: {len(downloaded_image_paths)}")
+        logger.info(f"Bulk download complete: {total_success} success ({video_success_count} videos, {image_success_count} images), {failed_count} failed")
+        logger.info(f"Downloaded {len(downloaded_video_paths)} video files, {len(downloaded_image_paths)} image files")
         
         try:
             await status_msg.delete()
@@ -272,7 +274,7 @@ class VideoDownloader:
         
         # Send downloaded content to user
         if downloaded_video_paths or downloaded_image_paths:
-            print(f"🔄 Sending {len(downloaded_video_paths)} videos and {len(downloaded_image_paths)} images to user...")
+            logger.info(f"Sending {len(downloaded_video_paths)} videos and {len(downloaded_image_paths)} images to user")
             await VideoDownloader._send_downloaded_content(downloaded_video_paths, downloaded_image_paths, message, user_id)
         
         # Send summary
@@ -303,21 +305,21 @@ class VideoDownloader:
                     caption=f"🎬 {video_name}\n💾 Size: {file_size:.2f} MB",
                     reply_markup=Keyboards.single_video_upload(video_key)
                 )
-                print(f"✅ Sent video {idx+1}/{len(video_paths)}: {video_name}")
+                logger.info(f"Sent video [{idx+1}/{len(video_paths)}]: {video_name} ({file_size:.2f} MB)")
                 
             except Exception as e:
-                print(f"❌ Error sending video {video_path}: {e}")
+                logger.error(f"Failed to send video {os.path.basename(video_path)}: {e}")
         
         # Send images individually to avoid Pyrogram media group bug
         if image_paths:
-            print(f"🔄 Sending {len(image_paths)} images to user individually...")
+            logger.info(f"Sending {len(image_paths)} images individually")
             for img_path in image_paths:
                 try:
                     if os.path.exists(img_path):
                         await message.reply_photo(photo=img_path)
                         await asyncio.sleep(0.5) # Avoid flood wait
                 except Exception as e:
-                    print(f"❌ Error sending image {img_path}: {e}")
+                    logger.error(f"Failed to send image {os.path.basename(img_path)}: {e}")
     
     @staticmethod
     async def _send_summary(url_results: List[DownloadResult], video_success_count: int, 

@@ -1,9 +1,7 @@
-"""
-Command handlers for the bot - FIXED TO SUPPORT MULTIPLE VIDEOS PER URL
-"""
 import os
 import re
 import asyncio
+import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message, InputMediaPhoto
 from datetime import datetime
@@ -18,6 +16,9 @@ from utils.video_processor import VideoProcessor
 from ui.messages import Messages
 from ui.keyboards import Keyboards
 from users.users import log_user_action
+
+# Get logger
+logger = logging.getLogger("XVideoBot")
 
 def get_version_info() -> str:
     """Get formatted version information"""
@@ -67,12 +68,12 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
     total_videos = len(video_paths)
     formatted_url = format_url_for_display(url)
     
-    print(f"📤 Sending {total_videos} video(s) to user...")
+    logger.info(f"Sending {total_videos} video(s) to user {user_id}...")
     
     for idx, video_path in enumerate(video_paths, 1):
         try:
             if not os.path.exists(video_path):
-                print(f"⚠️ Video file not found: {video_path}")
+                logger.warning(f"Video file not found: {video_path}")
                 continue
             
             file_size = os.path.getsize(video_path) / (1024 * 1024)
@@ -138,10 +139,10 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     duration=120
                 )
             
-            print(f"✅ Sent video {idx}/{total_videos}: {file_name}")
+            logger.info(f"Sent video {idx}/{total_videos}: {file_name}")
             
         except Exception as e:
-            print(f"❌ Error sending video {idx}/{total_videos}: {e}")
+            logger.error(f"Error sending video {idx}/{total_videos}: {e}")
             await message.reply_text(
                 f"❌ **Error Sending Video {idx}/{total_videos}**\n\n"
                 f"📁 **File:** `{os.path.basename(video_path)}`\n"
@@ -321,7 +322,7 @@ def setup_command_handlers(app: Client):
                         )
                     
                     log_user_action(user_id, username, url, "success", f"video({total_videos})")
-                    print(f"✅ Successfully sent {total_videos} video(s) from: {url}")
+                    logger.info(f"Successfully sent {total_videos} video(s) from: {url}")
                     
                 elif user_intent == "auto":
                     # Video not found, try images (only in auto mode)
@@ -366,7 +367,7 @@ def setup_command_handlers(app: Client):
                                         await app.send_photo(chat_id=message.chat.id, photo=img_path)
                                         await asyncio.sleep(0.5) # Avoid flood wait
                                 except Exception as e:
-                                    print(f"❌ Error sending image: {e}")
+                                    logger.error(f"Error sending image: {e}")
                             
                             try:
                                 sent_msg = await message.reply_text(
@@ -390,12 +391,12 @@ def setup_command_handlers(app: Client):
                                     duration=120
                                 )
                                 log_user_action(user_id, username, url, "success", "image")
-                                print(f"✅ Image download successful for {url} - Sent {len(image_paths)} images")
+                                logger.info(f"Image download successful for {url} - Sent {len(image_paths)} images")
                             except Exception as e:
-                                print(f"❌ Error sending confirmation message: {e}")
+                                logger.error(f"Error sending confirmation message: {e}")
                             
                         except Exception as e:
-                            print(f"❌ Error sending images: {e}")
+                            logger.error(f"Error sending images: {e}")
                             try:
                                 await status_msg.edit_text(
                                     f"❌ **Image Send Failed**\n\n"
@@ -479,7 +480,7 @@ def setup_command_handlers(app: Client):
                                     await app.send_photo(chat_id=message.chat.id, photo=img_path)
                                     await asyncio.sleep(0.5)
                             except Exception as e:
-                                print(f"❌ Error sending image: {e}")
+                                logger.error(f"Error sending image: {e}")
                         
                         try:
                             sent_msg = await message.reply_text(
@@ -504,7 +505,7 @@ def setup_command_handlers(app: Client):
                             )
                             log_user_action(user_id, username, url, "success", "image")
                         except Exception as e:
-                            print(f"❌ Error sending confirmation message: {e}")
+                            logger.error(f"Error sending confirmation message: {e}")
                         
                     except Exception as e:
                         try:

@@ -1,27 +1,26 @@
-"""
-Configuration settings and constants
-"""
-
 import os
 import tempfile
+from .config_loader import config_instance
 
-# Import from local config.py in the same directory
-try:
-    from .config import BOT_TOKEN, API_ID, API_HASH, CHAT_ID
-except ImportError:
-    # Fallback if config.py is not found
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-    API_ID = int(os.environ.get("API_ID", 0))
-    API_HASH = os.environ.get("API_HASH", "")
-    CHAT_ID = int(os.environ.get("CHAT_ID", 0))
+# ==================== BOT CONFIGURATION ====================
+BOT_TOKEN = config_instance.bot_token
+API_ID = config_instance.api_id
+API_HASH = config_instance.api_hash
+CHAT_ID = config_instance.chat_id
 
 # ==================== BOT METADATA ====================
 
-BOT_VERSION = "1.0.0"
+BOT_VERSION = "1.0.1"
 BOT_NAME = "X Video Downloader Bot"
-VERSION_DATE = "October 2024"
+VERSION_DATE = "February 2026"
 
 CHANGELOG = {
+    "1.0.1": [
+        "Enhanced logging system",
+        "Robust configuration validation",
+        "Graceful shutdown handling",
+        "Improved error tracking"
+    ],
     "1.0.0": [
         "Initial release",
         "Single video download support",
