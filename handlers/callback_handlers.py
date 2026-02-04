@@ -257,6 +257,11 @@ def setup_callback_handlers(app: Client):
         
         # Upload callbacks - UPDATED TO SUPPORT MULTIPLE VIDEOS PER URL
         elif data.startswith("upload_to_group_"):
+            # Cancel auto-upload if pending
+            from core.auto_scheduler import AutoScheduler
+            AutoScheduler.cancel_task(user_id, "video_single")
+            AutoScheduler.cancel_task(user_id, "video_bulk")
+            
             # Handle both single video and multiple videos
             video_path = user_downloads.get(user_id)
             
@@ -312,6 +317,10 @@ def setup_callback_handlers(app: Client):
                 await callback_query.answer("❌ Video file not found. Please download again.", show_alert=True)
 
         elif data.startswith("upload_images_to_group_"):
+            # Cancel auto-upload if pending
+            from core.auto_scheduler import AutoScheduler
+            AutoScheduler.cancel_task(user_id, "image_bulk")
+            
             image_paths = user_downloads.get(user_id, [])
             
             if not image_paths or (isinstance(image_paths, str) and not os.path.exists(image_paths)):
@@ -349,7 +358,11 @@ def setup_callback_handlers(app: Client):
                     reply_markup=Keyboards.back_to_main()
                 )
 
-        elif data == "upload_bulk_downloaded":
+        elif data == "upload_bulk_downloaded" or data == "upload_bulk_videos_downloaded":
+            # Cancel auto-upload if pending
+            from core.auto_scheduler import AutoScheduler
+            AutoScheduler.cancel_task(user_id, "video_bulk")
+            
             # Handle multiple videos from bulk downloads
             downloaded_paths = user_downloads.get(f"{user_id}_bulk_downloaded", [])
             
@@ -365,6 +378,10 @@ def setup_callback_handlers(app: Client):
             await VideoUploader.upload_multiple(downloaded_paths, callback_query.message, user_id)
 
         elif data == "upload_bulk_images_downloaded":
+            # Cancel auto-upload if pending
+            from core.auto_scheduler import AutoScheduler
+            AutoScheduler.cancel_task(user_id, "image_bulk")
+            
             # Try multiple possible keys for bulk images
             downloaded_paths = None
             
@@ -391,6 +408,12 @@ def setup_callback_handlers(app: Client):
             await ImageUploader.upload_multiple_images(downloaded_paths, callback_query.message, user_id)
 
         elif data == "upload_bulk_all_downloaded":
+            # Cancel ALL potential auto-uploads
+            from core.auto_scheduler import AutoScheduler
+            AutoScheduler.cancel_task(user_id, "video_bulk")
+            AutoScheduler.cancel_task(user_id, "image_bulk")
+            AutoScheduler.cancel_task(user_id, "mixed_bulk")
+            
             # Get both videos and images from multiple sources
             video_paths = user_downloads.get(f"{user_id}_bulk_downloaded_videos", [])
             image_paths = user_downloads.get(f"{user_id}_bulk_downloaded_images", [])
@@ -429,6 +452,13 @@ def setup_callback_handlers(app: Client):
         elif data.startswith("upload_single_"):
             video_key = data.replace("upload_single_", "")
             video_path = user_downloads.get(video_key)
+            
+            # Cancel auto-upload if pending (specifically single video key or bulk)
+            from core.auto_scheduler import AutoScheduler
+            if video_key == f"{user_id}_bulk_videos":
+                AutoScheduler.cancel_task(user_id, "video_bulk")
+            else:
+                AutoScheduler.cancel_task(user_id, "video_single")
             
             # Check if this is a bulk videos key
             if video_key == f"{user_id}_bulk_videos":

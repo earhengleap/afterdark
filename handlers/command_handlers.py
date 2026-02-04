@@ -115,7 +115,7 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     f"✅ X Video Downloader Bot"
                 )
             
-            await app.send_video(
+            sent_msg = await app.send_video(
                 chat_id=message.chat.id,
                 video=video_path,
                 width=width,
@@ -124,6 +124,19 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 caption=caption,
                 reply_markup=Keyboards.single_video_upload(video_key)
             )
+            
+            # Start auto-upload timer ONLY for single video
+            # For bulk, we'll do it on the summary message
+            if total_videos == 1:
+                from core.auto_scheduler import AutoScheduler
+                await AutoScheduler.start_timer(
+                    client=app,
+                    message=sent_msg,
+                    user_id=user_id,
+                    content_type="video_single",
+                    content_path=video_path,
+                    duration=120
+                )
             
             print(f"✅ Sent video {idx}/{total_videos}: {file_name}")
             
@@ -285,7 +298,7 @@ def setup_command_handlers(app: Client):
                         from models.enums import user_downloads
                         user_downloads[f"{user_id}_bulk_videos"] = video_paths
                         
-                        await message.reply_text(
+                        summary_msg = await message.reply_text(
                             f"✅ **All Videos Sent Successfully**\n\n"
                             f"👤 **X User:** {clickable_username}\n"
                             f"🔗 **Source:** {formatted_url}\n"
@@ -295,6 +308,16 @@ def setup_command_handlers(app: Client):
                             f"What would you like to do next?",
                             reply_markup=Keyboards.bulk_download_complete_mixed(user_id, video_paths, []),
                             disable_web_page_preview=False
+                        )
+                        
+                        from core.auto_scheduler import AutoScheduler
+                        await AutoScheduler.start_timer(
+                            client=app,
+                            message=summary_msg,
+                            user_id=user_id,
+                            content_type="video_bulk",
+                            content_path=video_paths,
+                            duration=120
                         )
                     
                     log_user_action(user_id, username, url, "success", f"video({total_videos})")
@@ -346,7 +369,7 @@ def setup_command_handlers(app: Client):
                                     print(f"❌ Error sending image: {e}")
                             
                             try:
-                                await message.reply_text(
+                                sent_msg = await message.reply_text(
                                     f"✅ **Images Download Successful**\n\n"
                                     f"👤 **X User:** {clickable_username}\n"
                                     f"🔗 **Source:** {formatted_url}\n"
@@ -356,6 +379,15 @@ def setup_command_handlers(app: Client):
                                     f"What would you like to do next?",
                                     reply_markup=Keyboards.image_actions_with_upload(user_id),
                                     disable_web_page_preview=False
+                                )
+                                from core.auto_scheduler import AutoScheduler
+                                await AutoScheduler.start_timer(
+                                    client=app,
+                                    message=sent_msg,
+                                    user_id=user_id,
+                                    content_type="image_bulk",
+                                    content_path=image_paths,
+                                    duration=120
                                 )
                                 log_user_action(user_id, username, url, "success", "image")
                                 print(f"✅ Image download successful for {url} - Sent {len(image_paths)} images")
@@ -450,7 +482,7 @@ def setup_command_handlers(app: Client):
                                 print(f"❌ Error sending image: {e}")
                         
                         try:
-                            await message.reply_text(
+                            sent_msg = await message.reply_text(
                                 f"✅ **Images Download Successful**\n\n"
                                 f"👤 **X User:** {clickable_username}\n"
                                 f"🔗 **Source:** {formatted_url}\n"
@@ -460,6 +492,15 @@ def setup_command_handlers(app: Client):
                                 f"What would you like to do next?",
                                 reply_markup=Keyboards.image_actions_with_upload(user_id),
                                 disable_web_page_preview=False
+                            )
+                            from core.auto_scheduler import AutoScheduler
+                            await AutoScheduler.start_timer(
+                                client=app,
+                                message=sent_msg,
+                                user_id=user_id,
+                                content_type="image_bulk",
+                                content_path=image_paths,
+                                duration=120
                             )
                             log_user_action(user_id, username, url, "success", "image")
                         except Exception as e:

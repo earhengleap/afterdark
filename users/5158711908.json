@@ -131,5 +131,54 @@
     "status": "failed",
     "content_type": "unknown",
     "timestamp": "2026-02-03 03:59:37"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/basilultramotor/status/2016727359811178614?s=46",
+    "status": "success",
+    "content_type": "image",
+    "timestamp": "2026-02-04 13:48:12"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/xiaoyizimeihao/status/2018135894033895641?s=46",
+    "status": "success",
+    "content_type": "image",
+    "timestamp": "2026-02-04 14:11:29"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/owo_8kiy/status/2015834619007139902?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-04 14:14:14"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/cravedromance/status/2018767947494564149?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-04 14:25:45"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/cravedromance/status/2018767947494564149?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-04 14:29:16"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/hinbi261276/status/2018388509816660026?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-04 14:45:41"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/ivan89676536/status/2018541826446332373?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-04 14:48:15"
   }
 ]

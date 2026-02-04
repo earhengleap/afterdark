@@ -407,7 +407,37 @@ class VideoDownloader:
             summary_text += "💡 **Tip:** Check if the URLs contain videos/images and are publicly accessible."
             keyboard = Keyboards.back_to_main()
         
-        await message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
+        sent_msg = await message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
+        
+        # Start Auto-Upload Timer if there is success content
+        if total_success > 0:
+            from core.auto_scheduler import AutoScheduler
+            
+            # Determine content type and payload
+            content_type = ""
+            content_path = None
+            
+            if video_paths and image_paths:
+                content_type = "mixed_bulk"
+                content_path = {'videos': video_paths, 'images': image_paths}
+            elif video_paths:
+                content_type = "video_bulk"
+                content_path = video_paths
+            elif image_paths:
+                content_type = "image_bulk"
+                content_path = image_paths
+            
+            if content_type:
+                # Use the client from the message
+                app = message._client
+                await AutoScheduler.start_timer(
+                    client=app,
+                    message=sent_msg,
+                    user_id=user_id,
+                    content_type=content_type,
+                    content_path=content_path,
+                    duration=120
+                )
     
     @staticmethod
     def _parse_error(error_msg: str) -> str:
