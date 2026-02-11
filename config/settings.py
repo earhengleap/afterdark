@@ -10,11 +10,17 @@ CHAT_ID = config_instance.chat_id
 
 # ==================== BOT METADATA ====================
 
-BOT_VERSION = "1.0.1"
-BOT_NAME = "X Video Downloader Bot"
+BOT_VERSION = "1.1.0"
+BOT_NAME = "X Video Downloader Pro"
 VERSION_DATE = "February 2026"
 
 CHANGELOG = {
+    "1.1.0": [
+        "Premium UI upgrade with dashboard layout",
+        "Bulk Content Hub for advanced link processing",
+        "Social community integration",
+        "Performance optimizations for bulk downloads"
+    ],
     "1.0.1": [
         "Enhanced logging system",
         "Robust configuration validation",

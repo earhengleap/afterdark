@@ -50,8 +50,25 @@ def setup_callback_handlers(app: Client):
             await callback_query.message.edit_text(Messages.about_text(), reply_markup=keyboard)
         
         elif data == "help":
-            keyboard = Keyboards.back_to_main()
-            await callback_query.message.edit_text(Messages.help_text(), reply_markup=keyboard)
+            help_text = Messages.help_text()
+            await callback_query.message.edit_text(help_text, reply_markup=Keyboards.back_to_main())
+        
+        elif data == "bulk_content":
+            await callback_query.message.edit_text(
+                Messages.bulk_content_prompt(),
+                reply_markup=Keyboards.back_to_main()
+            )
+
+        elif data == "socials":
+            await callback_query.message.edit_text(
+                "🌍 **Community & Socials**\n\n"
+                "Stay updated and get support from our community:\n\n"
+                "📢 **Channel:** @XDownloaderPro_News\n"
+                "💬 **Support Group:** @XDownloaderPro_Support\n"
+                "🛠️ **Developer:** @DevMoonlight\n\n"
+                "Feel free to report bugs or suggest features!",
+                reply_markup=Keyboards.back_to_main()
+            )
         
         elif data == "stats":
             from core.log_manager import LogManager
