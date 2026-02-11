@@ -15,19 +15,22 @@ class Keyboards:
         return InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("🎬 Download Video", callback_data="download"),
-                InlineKeyboardButton("📸 Download Images", callback_data="download_images")
+                InlineKeyboardButton("🖼️ Download Images", callback_data="download_images")
             ],
             [
-                InlineKeyboardButton("📂 Bulk Videos", callback_data="bulk_upload"),
-                InlineKeyboardButton("📂 Bulk Images", callback_data="bulk_upload_images")
+                InlineKeyboardButton("📦 Bulk Videos", callback_data="bulk_upload"),
+                InlineKeyboardButton("📦 Bulk Images", callback_data="bulk_upload_images")
             ],
             [
-                InlineKeyboardButton("📜 Download History", callback_data="history:1"),
-                InlineKeyboardButton("📊 My Stats", callback_data="stats")
+                InlineKeyboardButton("🔍 Bulk Content Detection", callback_data="bulk_content")
             ],
             [
-                InlineKeyboardButton("💡 Help & FAQ", callback_data="help"),
-                InlineKeyboardButton("✨ Settings", callback_data="settings")
+                InlineKeyboardButton("📜 History", callback_data="history:1"),
+                InlineKeyboardButton("📊 Stats", callback_data="stats")
+            ],
+            [
+                InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
+                InlineKeyboardButton("❓ Help", callback_data="help")
             ]
         ])
     
