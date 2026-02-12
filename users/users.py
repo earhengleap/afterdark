@@ -92,11 +92,9 @@ class UserManager:
         history = await cls.load_user_log(user_id)
         history.append(log_entry)
         
-        # Keep last 100 entries only to save space
-        if len(history) > 100:
-            history = history[-100:]
-            
+        # Save full history - Never truncate
         await cls.save_user_log(user_id, history)
+
         
         # Professional Logging
         cls._log_to_console(username, url, status, content_type)

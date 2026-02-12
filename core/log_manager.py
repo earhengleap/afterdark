@@ -46,55 +46,33 @@ class LogManager:
     @staticmethod
     def sync_with_folder(log_data: Optional[List[Dict]] = None) -> List[Dict]:
         """
-        Sync log entries with actual files in folder
-        Args:
-            log_data: Existing log data (will load if not provided)
-        Returns: Synced log data
+        Sync log entries - UPDATED: Never removes entries, only updates metadata
         """
-        # Load log if not provided
         if log_data is None:
             log_data = LogManager.load(sync=False)
-
-        # Don't proceed if no log data
+            
         if not log_data:
             return []
-
-        # Get actual files in download folder
-        actual_files = set()
-        if os.path.exists(DOWNLOAD_FOLDER):
-            for filename in os.listdir(DOWNLOAD_FOLDER):
-                filepath = os.path.join(DOWNLOAD_FOLDER, filename)
-                if os.path.isfile(filepath) and filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov')):
-                    actual_files.add(filename)
-
-        # Create new synced log
-        synced_log = []
-        files_to_remove = []
-
+            
+        # Update file sizes if file exists, but NEVER remove entries
+        updates_made = False
         for entry in log_data:
             filename = entry.get('filename', '')
             filepath = os.path.join(DOWNLOAD_FOLDER, filename)
-
-            # Check if file exists
-            if os.path.exists(filepath) and filename in actual_files:
-                # Update filesize if available
+            
+            if os.path.exists(filepath):
                 try:
-                    entry['filesize'] = os.path.getsize(filepath)
+                    current_size = os.path.getsize(filepath)
+                    if entry.get('filesize') != current_size:
+                        entry['filesize'] = current_size
+                        updates_made = True
                 except Exception:
                     pass
-                synced_log.append(entry)
-            else:
-                # Mark for removal (but don't print here)
-                files_to_remove.append(filename)
-
-        # Save if changes were made
-        if len(synced_log) != len(log_data):
-            LogManager.save(synced_log)
-            # Only print summary, not every single file
-            if files_to_remove:
-                logger.info(f"Log sync: Removed {len(files_to_remove)} entries, {len(synced_log)} entries remain")
-
-        return synced_log
+                    
+        if updates_made:
+            LogManager.save(log_data)
+            
+        return log_data
 
     @staticmethod
     def add_entry(video_info: Dict, filename: str, url: str) -> None:
@@ -171,38 +149,10 @@ class LogManager:
     @staticmethod
     def cleanup_old_entries(days_old: int = 30) -> None:
         """
-        Clean up old log entries
-        Args:
-            days_old: Remove entries older than this many days
+        Clean up old log entries - DISABLED to preserve full history
         """
-        log = LogManager.load(sync=False)
-        if not log:
-            return
-
-        cutoff_date = datetime.now().timestamp() - (days_old * 24 * 60 * 60)
-        cleaned_log = []
-        removed_count = 0
-
-        for entry in log:
-            try:
-                # Parse download date
-                download_date_str = entry.get('download_date', '')
-                if download_date_str:
-                    download_date = datetime.strptime(download_date_str, '%Y-%m-%d %H:%M:%S')
-                    if download_date.timestamp() > cutoff_date:
-                        cleaned_log.append(entry)
-                    else:
-                        removed_count += 1
-                else:
-                    # Keep entries without date
-                    cleaned_log.append(entry)
-            except Exception:
-                # Keep entries with invalid date format
-                cleaned_log.append(entry)
-
-        if removed_count > 0:
-            LogManager.save(cleaned_log)
-            logger.info(f"Cleaned up {removed_count} entries older than {days_old} days")
+        # logger.info("Log cleanup is disabled to prevent history loss")
+        return
 
     @staticmethod
     def force_sync() -> None:
