@@ -251,7 +251,7 @@ def setup_command_handlers(app: Client):
                 "• Multiple URLs separated by spaces, pipes (|), or newlines\n\n"
                 "Or use the menu buttons for specific actions."
             )
-            log_user_action(user_id, username, text, "invalid_input", "unknown")
+            await log_user_action(user_id, username, text, "invalid_input", "unknown")
             return
         
         # Bulk download (multiple URLs)
@@ -368,7 +368,7 @@ def setup_command_handlers(app: Client):
                             duration=120
                         )
                     
-                    log_user_action(user_id, username, url, "success", f"video({total_videos})")
+                    await log_user_action(user_id, username, url, "success", f"video({total_videos})")
                     logger.info(f"Successfully sent {total_videos} video(s) from: {url}")
                     
                 elif user_intent == "auto":
@@ -437,7 +437,7 @@ def setup_command_handlers(app: Client):
                                     content_path=image_paths,
                                     duration=120
                                 )
-                                log_user_action(user_id, username, url, "success", "image")
+                                await log_user_action(user_id, username, url, "success", "image")
                                 logger.info(f"Image download successful for {url} - Sent {len(image_paths)} images")
                             except Exception as e:
                                 logger.error(f"Error sending confirmation message: {e}")
@@ -456,7 +456,7 @@ def setup_command_handlers(app: Client):
                                 )
                             except:
                                 pass
-                            log_user_action(user_id, username, url, "failed", "image")
+                            await log_user_action(user_id, username, url, "failed", "image")
                     else:
                         # Both video and image failed
                         await status_msg.edit_text(
@@ -472,7 +472,7 @@ def setup_command_handlers(app: Client):
                             f"• Content is restricted",
                             disable_web_page_preview=False
                         )
-                        log_user_action(user_id, username, url, "failed", "unknown")
+                        await log_user_action(user_id, username, url, "failed", "unknown")
                 else:
                     # Video explicitly requested but not found
                     await status_msg.edit_text(
@@ -484,7 +484,7 @@ def setup_command_handlers(app: Client):
                         f"⚠️ No video content found at this URL.",
                         disable_web_page_preview=False
                     )
-                    log_user_action(user_id, username, url, "failed", "video")
+                    await log_user_action(user_id, username, url, "failed", "video")
             
             elif user_intent == "images":
                 # User explicitly wants images
@@ -550,7 +550,7 @@ def setup_command_handlers(app: Client):
                                 content_path=image_paths,
                                 duration=120
                             )
-                            log_user_action(user_id, username, url, "success", "image")
+                            await log_user_action(user_id, username, url, "success", "image")
                         except Exception as e:
                             logger.error(f"Error sending confirmation message: {e}")
                         
@@ -563,7 +563,7 @@ def setup_command_handlers(app: Client):
                             )
                         except:
                             pass
-                        log_user_action(user_id, username, url, "failed", "image")
+                        await log_user_action(user_id, username, url, "failed", "image")
                 else:
                     # Try video as fallback
                     await status_msg.edit_text(
@@ -589,14 +589,14 @@ def setup_command_handlers(app: Client):
                         
                         await status_msg.delete()
                         await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
-                        log_user_action(user_id, username, url, "success", "video")
+                        await log_user_action(user_id, username, url, "success", "video")
                     else:
                         await status_msg.edit_text(
                             f"❌ **No Media Found**\n\n"
                             f"⚠️ No images or videos found at this URL.",
                             disable_web_page_preview=False
                         )
-                        log_user_action(user_id, username, url, "failed", "unknown")
+                        await log_user_action(user_id, username, url, "failed", "unknown")
         else:
             # Non-X/Twitter URL
             await status_msg.edit_text(
@@ -612,7 +612,7 @@ def setup_command_handlers(app: Client):
             if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
                 await status_msg.delete()
                 await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
-                log_user_action(user_id, username, url, "success", "video")
+                await log_user_action(user_id, username, url, "success", "video")
             else:
                 await status_msg.edit_text(
                     f"❌ **Download Failed**\n\n"
@@ -620,4 +620,4 @@ def setup_command_handlers(app: Client):
                     f"⚠️ Could not download video from this URL.",
                     disable_web_page_preview=False
                 )
-                log_user_action(user_id, username, url, "failed", "unknown")
+                await log_user_action(user_id, username, url, "failed", "unknown")
