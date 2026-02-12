@@ -22,6 +22,9 @@ from config.paths import setup_directories
 
 # Core functionality imports
 from core.logger import setup_logger
+from core.metrics import metrics, get_metrics
+from core.config_validator import validate_configuration
+from core.health_monitor import start_health_monitor, get_health_monitor
 
 # Handler imports
 from handlers.command_handlers import setup_command_handlers
@@ -42,23 +45,44 @@ app = Client(
 # ==================== SHUTDOWN HANDLER ====================
 
 async def shutdown(signal_name, loop):
-    """Graceful shutdown handler"""
+    """Enhanced graceful shutdown handler with timeout and cleanup"""
     logger.info(f"Received signal {signal_name}: Initiating graceful shutdown...")
     
-    # Perform cleanup tasks here (close DB connections, save buffers, etc.)
-    logger.info("Cleaning up resources...")
+    # Set shutdown timeout
+    shutdown_timeout = 30
     
     try:
-        await app.stop()
-        logger.info("Telegram client stopped successfully")
+        # Stop accepting new requests
+        logger.info("Stopping bot client...")
+        await asyncio.wait_for(app.stop(), timeout=10)
+        logger.info("✓ Telegram client stopped successfully")
+    except asyncio.TimeoutError:
+        logger.error("⏱️ Timeout while stopping client - forcing shutdown")
     except Exception as e:
-        logger.warning(f"Error stopping client: {e}")
-        
-    # Cancel all running tasks
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
+        logger.warning(f"⚠️ Error stopping client: {e}")
     
-    logger.info(f"Cancelled {len(tasks)} pending tasks")
+    # Cancel all running tasks gracefully
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if tasks:
+        logger.info(f"Cancelling {len(tasks)} pending tasks...")
+        
+        for task in tasks:
+            task.cancel()
+        
+        # Wait for tasks to complete cancellation
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=10
+            )
+            logger.info("✓ All tasks cancelled successfully")
+        except asyncio.TimeoutError:
+            logger.warning("⏱️ Some tasks did not cancel in time")
+    
+    # Log final metrics
+    logger.info("📊 Final metrics:")
+    logger.info(f"\n{metrics.get_summary()}")
+    
     logger.info("Goodbye! 👋")
     loop.stop()
 
@@ -83,35 +107,86 @@ def print_banner():
     print(f"\033[1;36m┗{border}┛\033[0m")
 
 async def main():
+    """Main bot entry point with enhanced error handling and monitoring"""
     print_banner()
+    
+    # Step 1: Validate configuration
+    logger.info("Validating configuration...")
+    try:
+        validate_configuration(raise_on_error=True)
+        logger.info("✓ Configuration validated successfully")
+    except ValueError as e:
+        logger.critical(f"Configuration validation failed: {e}")
+        return
+    
+    # Step 2: Setup directories
     logger.info("Initializing system directories...")
     setup_directories()
+    logger.info("✓ Directories initialized")
     
-    logger.info("Setting up handlers...")
+    # Step 3: Setup handlers
+    logger.info("Setting up command and callback handlers...")
     setup_command_handlers(app)
     setup_callback_handlers(app)
+    logger.info("✓ Handlers configured")
     
+    # Step 4: Start bot with retry logic
     logger.info("Connecting to Telegram API...")
+    max_retries = 3
+    retry_count = 0
     
-    try:
-        await app.start()
-        me = await app.get_me()
-        logger.info(f"Bot '{me.first_name}' (@{me.username}) is now LIVE")
-        logger.info("Press Ctrl+C to stop")
-        
-        # Keep the bot running
-        await idle()
-        
-    except (ApiIdInvalid, AuthKeyInvalid):
-        logger.critical("Invalid API_ID, API_HASH, or BOT_TOKEN. Please check your configuration.")
-    except Exception as e:
-        logger.critical(f"Critical system failure: {e}", exc_info=True)
-    finally:
+    while retry_count < max_retries:
         try:
-            if app.is_connected:
-                await app.stop()
-        except:
-            pass
+            await app.start()
+            me = await app.get_me()
+            logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")
+            logger.info(f"🆔 Bot ID: {me.id}")
+            logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("⌨️ Press Ctrl+C to stop")
+            
+            # Step 5: Start health monitoring
+            logger.info("Starting health monitor...")
+            asyncio.create_task(start_health_monitor(app, interval=300))
+            
+            # Step 6: Log initial metrics
+            logger.info("📊 Metrics tracking enabled")
+            
+            # Keep the bot running
+            await idle()
+            break
+            
+        except (ApiIdInvalid, AuthKeyInvalid) as e:
+            logger.critical("❌ Invalid API_ID, API_HASH, or BOT_TOKEN")
+            logger.critical("Please check your .env configuration file")
+            return
+            
+        except ConnectionError as e:
+            retry_count += 1
+            if retry_count < max_retries:
+                wait_time = 2 ** retry_count
+                logger.warning(
+                    f"⚠️ Connection failed (attempt {retry_count}/{max_retries}). "
+                    f"Retrying in {wait_time}s..."
+                )
+                await asyncio.sleep(wait_time)
+            else:
+                logger.critical(f"❌ Failed to connect after {max_retries} attempts")
+                return
+                
+        except Exception as e:
+            logger.critical(f"❌ Critical system failure: {e}", exc_info=True)
+            metrics.increment_errors("critical_startup_error")
+            return
+            
+    # Cleanup on exit
+    try:
+        if app.is_connected:
+            logger.info("Disconnecting bot...")
+            await app.stop()
+            logger.info("✓ Bot disconnected")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+    finally:
         logger.info("Bot execution ended")
 
 if __name__ == "__main__":

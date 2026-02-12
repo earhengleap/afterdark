@@ -9,6 +9,7 @@ from datetime import datetime
 from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME
 from core.log_manager import LogManager
 from core.file_manager import FileManager
+from core.metrics import metrics
 from utils.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
@@ -126,6 +127,11 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 reply_markup=Keyboards.single_video_upload(video_key)
             )
             
+            # Track successful video send
+            file_size_bytes = os.path.getsize(video_path)
+            metrics.increment_videos(1)
+            metrics.download_completed(success=True, bytes_downloaded=file_size_bytes)
+            
             # Start auto-upload timer ONLY for single video
             # For bulk, we'll do it on the summary message
             if total_videos == 1:
@@ -158,6 +164,11 @@ def setup_command_handlers(app: Client):
         """Handle /start command"""
         user_id = message.from_user.id
         user_name = message.from_user.first_name
+        
+        # Track metrics
+        metrics.increment_commands("start")
+        metrics.add_user(user_id)
+        
         keyboard = Keyboards.main_menu()
         welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"
@@ -166,13 +177,17 @@ def setup_command_handlers(app: Client):
     @app.on_message(filters.private & filters.command("help"))
     async def help_handler(client: Client, message: Message) -> None:
         """Handle /help command"""
+        metrics.increment_commands("help")
+        
         text = Messages.help_text()
         keyboard = Keyboards.back_to_main()
         await message.reply_text(text, reply_markup=keyboard)
 
-    @app.on_message(filters.private & filters.command("stats"))
+    @app.on_message(filters.private & filters.command(["stats", "stat"]))
     async def stats_handler(client: Client, message: Message) -> None:
-        """Handle /stats command"""
+        """Handle /stats command - Enhanced with bot metrics"""
+        metrics.increment_commands("stats")
+        
         stats_info = LogManager.get_stats()
         log = stats_info['log_data']
         
@@ -180,16 +195,40 @@ def setup_command_handlers(app: Client):
         if not stats_info['synced']:
             sync_status = f"\n\n⚠️ Log entries: {stats_info['log_entries']} | Folder videos: {stats_info['actual_videos']}"
         
-        text = Messages.stats_text(log) + sync_status
+        # Add bot metrics
+        bot_metrics = f"\n\n{metrics.get_summary()}"
+        
+        text = Messages.stats_text(log) + sync_status + bot_metrics
         keyboard = Keyboards.back_to_main()
         await message.reply_text(text, reply_markup=keyboard)
 
-    @app.on_message(filters.private & filters.command("version"))
+    @app.on_message(filters.private & filters.command(["version", "ver"]))
     async def version_handler(client: Client, message: Message) -> None:
         """Handle /version command"""
+        metrics.increment_commands("version")
+        
         version_text = get_version_info()
         keyboard = Keyboards.back_to_main()
         await message.reply_text(version_text, reply_markup=keyboard)
+    
+    @app.on_message(filters.private & filters.command(["health", "status"]))
+    async def health_handler(client: Client, message: Message) -> None:
+        """Handle /health command - Show bot health and system metrics"""
+        metrics.increment_commands("health")
+        
+        from core.health_monitor import get_health_monitor
+        
+        # Create health monitor and check health
+        health_monitor = get_health_monitor(app)
+        health_data = await health_monitor.check_health()
+        
+        # Get health summary
+        summary = health_monitor.get_health_summary()
+        
+        # Just show health summary without rate limits
+        text = summary
+        keyboard = Keyboards.back_to_main()
+        await message.reply_text(text, reply_markup=keyboard)
 
     @app.on_message(filters.private & filters.text)
     async def text_handler(client: Client, message: Message) -> None:
@@ -197,6 +236,10 @@ def setup_command_handlers(app: Client):
         text = message.text.strip()
         username = message.from_user.username or message.from_user.first_name
         user_id = message.from_user.id
+        
+        # Track user
+        metrics.add_user(user_id)
+        metrics.increment_commands("download_request")
 
         urls = URLExtractor.extract(text)
         
@@ -208,11 +251,14 @@ def setup_command_handlers(app: Client):
                 "• Multiple URLs separated by spaces, pipes (|), or newlines\n\n"
                 "Or use the menu buttons for specific actions."
             )
-            log_user_action(user_id, username, text, "failed", "unknown")
+            log_user_action(user_id, username, text, "invalid_input", "unknown")
             return
         
         # Bulk download (multiple URLs)
         if len(urls) > 1:
+            # Track download attempt
+            metrics.increment_downloads()
+            
             detection_msg = await message.reply_text(
                 f"🔍 **Bulk URL Detection**\n\n"
                 f"📊 **Detected {len(urls)} URLs**\n"
@@ -220,6 +266,7 @@ def setup_command_handlers(app: Client):
                 f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
                 f"⏳ Starting bulk download process..."
             )
+            
             await VideoDownloader.download_multiple(urls, message, user_id, detection_msg)
             return
         

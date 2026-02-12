@@ -56,6 +56,8 @@ def log_user_action(user_id, username, url, status, content_type="unknown"):
             print(f"✅ Images downloaded from {url[:50]}...")
         else:
             print(f"✅ Content downloaded from {url[:50]}...")
+    elif status == "invalid_input":
+        print(f"⚠️ Invalid input from {username}: {url[:20]}...")
     else:
         # Don't log failed attempts for normal cases (no video in image URLs)
         if "No video could be found" not in str(url) and "Unsupported URL" not in str(url):

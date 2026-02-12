@@ -201,5 +201,19 @@
     "status": "success",
     "content_type": "video(1)",
     "timestamp": "2026-02-11 02:56:04"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "/stat",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-12 14:01:07"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "/stat",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-12 14:10:54"
   }
 ]
