@@ -156,12 +156,83 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 f"The video was downloaded but couldn't be sent."
             )
 
+async def process_shared_url(client: Client, message: Message, url: str, user_id: int, username: str):
+    """
+    Process URL shared via deep link and auto-download content
+    
+    Args:
+        client: Pyrogram client
+        message: Message object
+        url: The X/Twitter URL to download
+        user_id: User ID
+        username: Username
+    """
+    try:
+        # Try video download first
+        status_msg = await message.reply_text(
+            f"📥 **Downloading Video...**\n\n"
+            f"🔗 Source: `{url[:50]}...`\n"
+            f"⏳ This may take a moment..."
+        )
+        
+        # Extract X Username for caption
+        x_username, profile_url = extract_x_username_and_url(url)
+        
+        video_paths, video_info = VideoDownloader.download(url, message)
+        
+        if video_paths and len(video_paths) > 0:
+            # Send videos to user
+            await status_msg.edit_text(f"📤 **Sending {len(video_paths)} video(s)...**")
+            
+            # Use existing send function which handles formatting and buttons
+            try:
+                await send_videos_to_user(video_paths, message, user_id, x_username, url, username, client)
+            except Exception as e:
+                logger.error(f"Error sending video: {e}")
+                await status_msg.edit_text(f"❌ Error sending video: {str(e)[:100]}")
+                return
+            
+            await status_msg.delete()
+            return
+        
+        # Try image download
+        await status_msg.edit_text("🖼️ **Trying image download...**")
+        image_paths, image_info = await ImageDownloader.download(url, message)
+        
+        if image_paths and len(image_paths) > 0:
+            await status_msg.edit_text(f"📤 **Sending {len(image_paths)} image(s)...**")
+            
+            # Send images as media group
+            media_group = [InputMediaPhoto(img) for img in image_paths[:10]]
+            await client.send_media_group(message.chat.id, media_group)
+            
+            await status_msg.edit_text(
+                f"✅ **Download Complete!**\n\n"
+                f"📥 {len(image_paths)} image(s) sent successfully!"
+            )
+            return
+        
+        # No content found
+        await status_msg.edit_text(
+            f"❌ **No Media Found**\n\n"
+            f"The URL doesn't contain any downloadable videos or images.\n\n"
+            f"Please try a different X post."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error processing shared URL: {e}")
+        await message.reply_text(
+            f"❌ **Download Failed**\n\n"
+            f"Error: {str(e)[:100]}\n\n"
+            f"Please try again or use a different URL."
+        )
+
 def setup_command_handlers(app: Client):
     """Setup all command handlers"""
     
     @app.on_message(filters.private & filters.command("start"))
     async def start_handler(client: Client, message: Message) -> None:
-        """Handle /start command"""
+        """Handle /start command with deep link support"""
         user_id = message.from_user.id
         user_name = message.from_user.first_name
         
@@ -169,6 +240,30 @@ def setup_command_handlers(app: Client):
         metrics.increment_commands("start")
         metrics.add_user(user_id)
         
+        # Check for deep link parameter
+        if len(message.command) > 1:
+            param = message.command[1]
+            
+            # Import deep link helper
+            from utils.deep_link import DeepLinkHelper
+            
+            # Try to decode URL from deep link
+            decoded_url = DeepLinkHelper.decode_url(param)
+            
+            if decoded_url:
+                # Auto-download from shared X link
+                await message.reply_text(
+                    f"🎯 **Auto-Download Started!**\n\n"
+                    f"✨ Received from X Share!\n"
+                    f"🔗 Processing: `{decoded_url[:50]}...`\n\n"
+                    f"⏳ Please wait..."
+                )
+                
+                # Process the URL automatically
+                await process_shared_url(client, message, decoded_url, user_id, message.from_user.username or user_name)
+                return
+        
+        # Normal start message
         keyboard = Keyboards.main_menu()
         welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"

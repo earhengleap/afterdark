@@ -53,3 +53,7 @@ else:
     COOKIE_FILE = 'config/twitter_cookies.txt'
 
 FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
+
+# ==================== BOT USERNAME ====================
+# Bot username for deep linking (without @)
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "Vuploads_bot")

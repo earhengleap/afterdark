@@ -25,6 +25,9 @@ class Keyboards:
                 InlineKeyboardButton("🔍 Bulk Content Detection", callback_data="bulk_content")
             ],
             [
+                InlineKeyboardButton("📤 Share to Bot", callback_data="get_share_link")
+            ],
+            [
                 InlineKeyboardButton("📜 History", callback_data="history:1"),
                 InlineKeyboardButton("📊 Stats", callback_data="stats")
             ],

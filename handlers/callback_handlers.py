@@ -58,6 +58,27 @@ def setup_callback_handlers(app: Client):
                 Messages.bulk_content_prompt(),
                 reply_markup=Keyboards.back_to_main()
             )
+        
+        elif data == "get_share_link":
+            from config.settings import BOT_USERNAME, BOT_NAME
+            from utils.deep_link import DeepLinkHelper
+            
+            share_link = DeepLinkHelper.generate_share_link(BOT_USERNAME)
+            
+            await callback_query.message.edit_text(
+                f"📤 **Share to Bot**\n\n"
+                f"Share an X video to this bot without copying the link!\n\n"
+                f"**Method 1: Mobile Share**\n"
+                f"1. Tap Share on any X post\n"
+                f"2. Select Telegram\n"
+                f"3. Select **{BOT_NAME}** (@{BOT_USERNAME})\n"
+                f"4. Video downloads instantly!\n\n"
+                f"**Method 2: Deep Link**\n"
+                f"Add this link to your X bio:\n"
+                f"`{share_link}`\n\n"
+                f"Anyone who clicks it can send you videos!",
+                reply_markup=Keyboards.back_to_main()
+            )
 
         elif data == "socials":
             await callback_query.message.edit_text(

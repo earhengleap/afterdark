@@ -215,5 +215,19 @@
     "status": "failed",
     "content_type": "unknown",
     "timestamp": "2026-02-12 14:10:54"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/vaultedgallery/status/2021744053751345417?s=12",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-13 15:25:56"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/22xehmt9xs16685/status/2021825296253792760?s=12",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-13 15:31:47"
   }
 ]
