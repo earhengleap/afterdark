@@ -14,6 +14,7 @@ import logging
 from datetime import datetime
 
 from pyrogram import Client, idle
+from pyrogram.types import BotCommand
 from pyrogram.errors import ApiIdInvalid, AuthKeyInvalid
 
 # Configuration imports
@@ -139,6 +140,16 @@ async def main():
         try:
             await app.start()
             me = await app.get_me()
+            
+            # Set bot commands for autocomplete
+            await app.set_bot_commands([
+                BotCommand("start", "Start the bot"),
+                BotCommand("help", "Get help instructions"),
+                BotCommand("stats", "View download statistics"),
+                BotCommand("version", "Check bot version"),
+                BotCommand("health", "System health status")
+            ])
+            
             logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")
             logger.info(f"🆔 Bot ID: {me.id}")
             logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
