@@ -48,6 +48,26 @@ class HistoryDB:
                 )
             ''')
             
+            # Create download_queue table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS download_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    url TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Create user_settings table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    user_id INTEGER NOT NULL,
+                    key TEXT NOT NULL,
+                    value TEXT,
+                    PRIMARY KEY (user_id, key)
+                )
+            ''')
+            
             # Create indexes for better performance
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_user_timestamp 
@@ -64,6 +84,96 @@ class HistoryDB:
             logger.info("Database initialized successfully")
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
+    
+    # ... (keep existing methods) ...
+
+    # ==================== SETTINGS METHODS ====================
+    
+    def set_setting(self, user_id: int, key: str, value: str) -> bool:
+        """Set a user setting"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO user_settings (user_id, key, value)
+                VALUES (?, ?, ?)
+            ''', (user_id, key, str(value)))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set setting: {e}")
+            return False
+            
+    def get_setting(self, user_id: int, key: str, default: str = None) -> str:
+        """Get a user setting"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT value FROM user_settings WHERE user_id = ? AND key = ?', (user_id, key))
+            result = cursor.fetchone()
+            conn.close()
+            return result[0] if result else default
+        except Exception as e:
+            logger.error(f"Failed to get setting: {e}")
+            return default
+
+    # ==================== QUEUE METHODS ====================
+
+    def add_to_queue(self, user_id: int, url: str) -> bool:
+        """Add URL to user's download queue"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO download_queue (user_id, url)
+                VALUES (?, ?)
+            ''', (user_id, url))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add to queue: {e}")
+            return False
+            
+    def get_queue(self, user_id: int) -> List[str]:
+        """Get all URLs in user's queue"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT url FROM download_queue WHERE user_id = ? ORDER BY timestamp ASC', (user_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            return [row[0] for row in rows]
+        except Exception as e:
+            logger.error(f"Failed to get queue: {e}")
+            return []
+            
+    def clear_queue(self, user_id: int) -> bool:
+        """Clear user's queue"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM download_queue WHERE user_id = ?', (user_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to clear queue: {e}")
+            return False
+            
+    def get_queue_count(self, user_id: int) -> int:
+        """Get count of items in queue"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM download_queue WHERE user_id = ?', (user_id,))
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get queue count: {e}")
+            return 0
     
     def add_entry(self, user_id: int, url: str, source_username: Optional[str],
                   filename: Optional[str], status: str, content_type: str,

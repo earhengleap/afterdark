@@ -59,6 +59,80 @@ def setup_callback_handlers(app: Client):
                 reply_markup=Keyboards.back_to_main()
             )
         
+        # ==================== BULK QUEUE HANDLERS ====================
+        elif data == "bulk_queue":
+            from core.database import history_db
+            
+            queue_count = history_db.get_queue_count(user_id)
+            is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
+            
+            await callback_query.message.edit_text(
+                f"📦 **Bulk Download Queue**\n\n"
+                f"📊 **Items in Queue:** {queue_count}\n"
+                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
+            )
+            
+        elif data.startswith("toggle_bulk:"):
+            from core.database import history_db
+            action = data.split(":")[1]
+            new_value = "1" if action == "enable" else "0"
+            
+            history_db.set_setting(user_id, "bulk_mode", new_value)
+            
+            # Refresh menu
+            queue_count = history_db.get_queue_count(user_id)
+            is_bulk_mode = new_value == "1"
+            
+            await callback_query.message.edit_text(
+                f"📦 **Bulk Download Queue**\n\n"
+                f"📊 **Items in Queue:** {queue_count}\n"
+                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
+            )
+            
+        elif data == "process_queue":
+            from core.database import history_db
+            from core.downloader import VideoDownloader
+            
+            urls = history_db.get_queue(user_id)
+            if not urls:
+                await callback_query.answer("❌ Queue is empty!", show_alert=True)
+                return
+            
+            # Clear queue immediately to prevent double processing
+            history_db.clear_queue(user_id)
+            
+            await callback_query.answer(f"🚀 Processing {len(urls)} links...")
+            
+            status_msg = await callback_query.message.edit_text(
+                f"🚀 **Processing Bulk Queue**\n\n"
+                f"📊 **Links:** {len(urls)}\n"
+                f"⏳ Starting download process...",
+                reply_markup=None
+            )
+            
+            # Use existing bulk download logic
+            await VideoDownloader.download_multiple(urls, callback_query.message, user_id, status_msg)
+            
+        elif data == "clear_queue":
+            from core.database import history_db
+            
+            history_db.clear_queue(user_id)
+            await callback_query.answer("✅ Queue cleared!")
+            
+            # Refresh menu
+            is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
+            await callback_query.message.edit_text(
+                f"📦 **Bulk Download Queue**\n\n"
+                f"📊 **Items in Queue:** 0\n"
+                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"__Queue cleared successfully.__",
+                reply_markup=Keyboards.bulk_queue_menu(0, is_bulk_mode)
+            )
+        
         elif data == "get_share_link":
             from config.settings import BOT_USERNAME, BOT_NAME
             from utils.deep_link import DeepLinkHelper

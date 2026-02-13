@@ -22,10 +22,11 @@ class Keyboards:
                 InlineKeyboardButton("📦 Bulk Images", callback_data="bulk_upload_images")
             ],
             [
-                InlineKeyboardButton("🔍 Bulk Content Detection", callback_data="bulk_content")
+                InlineKeyboardButton("🔍 Detect", callback_data="bulk_content"),
+                InlineKeyboardButton("📥 Share", callback_data="get_share_link")
             ],
             [
-                InlineKeyboardButton("📤 Share to Bot", callback_data="get_share_link")
+                InlineKeyboardButton("📦 Bulk Queue", callback_data="bulk_queue")
             ],
             [
                 InlineKeyboardButton("📜 History", callback_data="history:1"),
@@ -65,6 +66,37 @@ class Keyboards:
             ],
             [
                 InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
+            ]
+        ])
+    
+    @staticmethod
+    def bulk_queue_menu(queue_count: int, is_bulk_mode: bool):
+        """Menu for managing bulk download queue"""
+        # Status indicator
+        mode_text = "🟢 Enabled" if is_bulk_mode else "🔴 Disabled"
+        mode_action = "disable" if is_bulk_mode else "enable"
+        
+        # Process button only active if items in queue
+        if queue_count > 0:
+            process_text = f"🚀 Process Queue ({queue_count})"
+            process_data = "process_queue"
+        else:
+            process_text = "Process Queue (Empty)"
+            process_data = "ignore"
+        
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"Bulk Mode: {mode_text}", callback_data=f"toggle_bulk:{mode_action}")
+            ],
+            [
+                InlineKeyboardButton(process_text, callback_data=process_data)
+            ],
+            [
+                InlineKeyboardButton("🗑️ Clear Queue", callback_data="clear_queue"),
+                InlineKeyboardButton("🔃 Refresh", callback_data="bulk_queue")
+            ],
+            [
+                InlineKeyboardButton("🔙 Back to Home", callback_data="main_menu")
             ]
         ])
     

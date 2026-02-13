@@ -1,265 +1,83 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XVideo Gallery - Premium Collection</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AfterDark Vault</title>
+  <meta name="theme-color" content="#111111">
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-play-circle"></i>
-                </div>
-                <span class="logo-text">X<span class="logo-accent">VIDEO</span></span>
-            </div>
-            
-            <div class="search-bar">
-                <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search videos..." autocomplete="off">
-                <button class="search-clear" id="searchClear" style="display: none;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="nav-actions">
-                <button class="icon-btn" id="refreshBtn" title="Refresh videos">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-                <button class="icon-btn" id="gridToggle" title="Toggle grid view">
-                    <i class="fas fa-th-large"></i>
-                </button>
-            </div>
+  <div class="app">
+    <header class="app-header">
+      <div class="title-wrap">
+        <span class="title-badge">18+</span>
+        <div>
+          <h1>AfterDark Vault</h1>
+          <p id="sessionText">Connecting Telegram Mini App...</p>
         </div>
-    </nav>
+      </div>
+      <button id="syncBtn" class="btn btn-ghost" type="button">Sync</button>
+    </header>
 
-    <!-- Stats Bar -->
-    <section class="stats-bar">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="totalVideos">0</div>
-                        <div class="stat-label">Total Videos</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-hdd"></i>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="totalSize">0 GB</div>
-                        <div class="stat-label">Storage Used</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="recentVideos">0</div>
-                        <div class="stat-label">Recent (24h)</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <section class="toolbar">
+      <input id="searchInput" type="search" placeholder="Search caption or filename">
+      <div class="tabs">
+        <button class="tab active" data-filter="all" type="button">All</button>
+        <button class="tab" data-filter="video" type="button">Videos</button>
+        <button class="tab" data-filter="image" type="button">Images</button>
+      </div>
+      <div class="meta-row">
+        <span id="countText">0 items</span>
+        <span id="syncText">Not synced</span>
+      </div>
     </section>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="container">
-            <!-- Filter Bar -->
-            <section class="filter-section">
-                <div class="filter-bar">
-                    <div class="filter-tabs">
-                        <button class="filter-tab active" data-filter="all">
-                            <i class="fas fa-th"></i>
-                            <span>All</span>
-                        </button>
-                        <button class="filter-tab" data-filter="recent">
-                            <i class="fas fa-clock"></i>
-                            <span>Recent</span>
-                        </button>
-                        <button class="filter-tab" data-filter="hd">
-                            <i class="fas fa-hd-video"></i>
-                            <span>HD</span>
-                        </button>
-                        <button class="filter-tab" data-filter="popular">
-                            <i class="fas fa-fire"></i>
-                            <span>Popular</span>
-                        </button>
-                    </div>
-                    
-                    <div class="filter-sort">
-                        <select id="sortSelect" class="sort-select">
-                            <option value="date-desc">Newest First</option>
-                            <option value="date-asc">Oldest First</option>
-                            <option value="name-asc">Name (A-Z)</option>
-                            <option value="name-desc">Name (Z-A)</option>
-                            <option value="size-desc">Largest</option>
-                            <option value="size-asc">Smallest</option>
-                        </select>
-                        <div class="video-count" id="videoCount">Loading...</div>
-                    </div>
-                </div>
-            </section>
+    <section class="stats">
+      <article><small>Total</small><strong id="statTotal">0</strong></article>
+      <article><small>Videos</small><strong id="statVideos">0</strong></article>
+      <article><small>Images</small><strong id="statImages">0</strong></article>
+      <article><small>Storage</small><strong id="statSize">0 MB</strong></article>
+    </section>
 
-            <!-- Video Gallery -->
-            <section class="gallery-section">
-                <div class="video-grid" id="videoGrid">
-                    <!-- Loading State -->
-                    <div class="loading-container">
-                        <div class="loading-spinner">
-                            <div class="spinner-ring"></div>
-                            <div class="spinner-ring"></div>
-                            <div class="spinner-ring"></div>
-                        </div>
-                        <p class="loading-text">Loading your videos...</p>
-                    </div>
-                </div>
-                
-                <!-- Empty State -->
-                <div class="empty-state" id="emptyState" style="display: none;">
-                    <div class="empty-icon">
-                        <i class="fas fa-video-slash"></i>
-                    </div>
-                    <h3 class="empty-title">No Videos Found</h3>
-                    <p class="empty-text">Your collection is empty or no videos match your search.</p>
-                    <button class="btn-primary" onclick="location.reload()">
-                        <i class="fas fa-sync-alt"></i>
-                        Reload Page
-                    </button>
-                </div>
-            </section>
-        </div>
+    <main>
+      <div id="grid" class="grid"></div>
+      <div id="emptyState" class="empty hidden">
+        <p>No media found.</p>
+      </div>
     </main>
+  </div>
 
-    <!-- Video Modal -->
-    <div class="video-modal" id="videoModal">
-        <div class="modal-overlay" id="modalOverlay"></div>
-        
-        <button class="modal-close" id="modalClose">
-            <i class="fas fa-times"></i>
-        </button>
-        
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="video-player-wrapper">
-                    <video controls id="modalVideo" class="video-player">
-                        Your browser does not support HTML5 video.
-                    </video>
-                </div>
-                
-                <div class="video-info-panel">
-                    <div class="video-header">
-                        <h2 class="video-title" id="modalTitle">Video Title</h2>
-                        
-                        <div class="video-actions">
-                            <button class="action-btn" id="likeBtn" title="Add to favorites">
-                                <i class="far fa-heart"></i>
-                            </button>
-                            <button class="action-btn" id="shareBtn" title="Share video">
-                                <i class="fas fa-share-alt"></i>
-                            </button>
-                            <a href="#" class="action-btn" id="downloadBtn" download title="Download video">
-                                <i class="fas fa-download"></i>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <div class="video-metadata">
-                        <div class="metadata-item">
-                            <i class="fas fa-calendar-alt"></i>
-                            <span class="metadata-label">Date:</span>
-                            <span class="metadata-value" id="modalDate">Unknown</span>
-                        </div>
-                        <div class="metadata-item">
-                            <i class="fas fa-hdd"></i>
-                            <span class="metadata-label">Size:</span>
-                            <span class="metadata-value" id="modalSize">Unknown</span>
-                        </div>
-                        <div class="metadata-item">
-                            <i class="fas fa-film"></i>
-                            <span class="metadata-label">Quality:</span>
-                            <span class="metadata-value" id="modalResolution">Loading...</span>
-                        </div>
-                        <div class="metadata-item full-width">
-                            <i class="fas fa-file"></i>
-                            <span class="metadata-label">File:</span>
-                            <span class="metadata-value filename" id="modalFilename">Unknown</span>
-                        </div>
-                    </div>
-                    
-                    <div class="related-videos">
-                        <h3 class="related-title">RELATED VIDEOS</h3>
-                        <div class="related-grid" id="relatedGrid">
-                            <!-- Related videos will be inserted here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <aside id="viewer" class="viewer hidden" aria-hidden="true">
+    <div class="viewer-shell">
+      <button id="closeViewer" class="viewer-close" type="button">Close</button>
+      <div id="viewerMedia" class="viewer-media"></div>
+      <div class="viewer-info">
+        <h2 id="viewerTitle">Media</h2>
+        <p id="viewerCaption">No caption</p>
+        <div class="chips">
+          <span id="viewerType">-</span>
+          <span id="viewerSize">-</span>
+          <span id="viewerDate">-</span>
         </div>
+        <a id="viewerDownload" class="btn btn-primary" href="#" download>Download</a>
+      </div>
     </div>
+  </aside>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <div class="logo">
-                        <div class="logo-icon">
-                            <i class="fas fa-play-circle"></i>
-                        </div>
-                        <span class="logo-text">X<span class="logo-accent">VIDEO</span></span>
-                    </div>
-                    <p class="footer-desc">Your premium video collection platform. Stream and download high-quality content.</p>
-                </div>
-                
-                <div class="footer-section">
-                    <h4 class="footer-heading">QUICK LINKS</h4>
-                    <ul class="footer-links">
-                        <li><a href="#"><i class="fas fa-home"></i> Home</a></li>
-                        <li><a href="#"><i class="fas fa-video"></i> Videos</a></li>
-                        <li><a href="#"><i class="fas fa-star"></i> Favorites</a></li>
-                        <li><a href="#"><i class="fas fa-history"></i> History</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-section">
-                    <h4 class="footer-heading">SUPPORT</h4>
-                    <ul class="footer-links">
-                        <li><a href="#"><i class="fas fa-question-circle"></i> Help</a></li>
-                        <li><a href="#"><i class="fab fa-telegram"></i> Bot</a></li>
-                        <li><a href="#"><i class="fas fa-shield-alt"></i> Privacy</a></li>
-                        <li><a href="#"><i class="fas fa-info-circle"></i> About</a></li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="footer-bottom">
-                <p class="copyright">&copy; 2025 XVideo Gallery. All rights reserved.</p>
-                <div class="footer-info">
-                    <span><i class="fas fa-server"></i> <code id="serverPath">/videos</code></span>
-                    <span><i class="fas fa-clock"></i> Updated: <span id="lastUpdate">Just now</span></span>
-                </div>
-            </div>
+  <template id="cardTemplate">
+    <article class="card">
+      <button class="card-btn" type="button">
+        <div class="thumb"></div>
+        <div class="card-body">
+          <p class="card-title"></p>
+          <p class="card-subtitle"></p>
         </div>
-    </footer>
+      </button>
+    </article>
+  </template>
 
-    <!-- Toast Notification -->
-    <div class="toast" id="toast">
-        <i class="fas fa-check-circle"></i>
-        <span id="toastMessage">Action completed</span>
-    </div>
-
-    <script src="script.js"></script>
+  <script src="/script.js"></script>
 </body>
 </html>

@@ -251,6 +251,23 @@ def setup_command_handlers(app: Client):
             decoded_url = DeepLinkHelper.decode_url(param)
             
             if decoded_url:
+                # Check for bulk mode
+                from core.database import history_db
+                is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
+                
+                if is_bulk_mode:
+                    history_db.add_to_queue(user_id, decoded_url)
+                    queue_count = history_db.get_queue_count(user_id)
+                    
+                    await message.reply_text(
+                        f"📦 **Added to Bulk Queue**\n\n"
+                        f"🔗 Source: `{decoded_url[:50]}...`\n"
+                        f"📊 **Queue Size:** {queue_count}\n\n"
+                        f"__Link saved for later processing.__",
+                        reply_markup=Keyboards.bulk_queue_menu(queue_count, True)
+                    )
+                    return
+
                 # Auto-download from shared X link
                 await message.reply_text(
                     f"🎯 **Auto-Download Started!**\n\n"
@@ -348,8 +365,28 @@ def setup_command_handlers(app: Client):
             )
             await log_user_action(user_id, username, text, "invalid_input", "unknown")
             return
+            
+        # Check for Bulk Mode (Global Setting)
+        from core.database import history_db
+        is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
         
-        # Bulk download (multiple URLs)
+        if is_bulk_mode:
+            # Add all extracted URLs to queue
+            for url in urls:
+                history_db.add_to_queue(user_id, url)
+                
+            queue_count = history_db.get_queue_count(user_id)
+            
+            await message.reply_text(
+                f"📦 **Added to Bulk Queue**\n\n"
+                f"📊 **Added:** {len(urls)} links\n"
+                f"🔢 **Total in Queue:** {queue_count}\n\n"
+                f"__Links saved. Use /bulk_queue or menu to process.__",
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, True)
+            )
+            return
+        
+        # Bulk download (multiple URLs in one message)
         if len(urls) > 1:
             # Track download attempt
             metrics.increment_downloads()
