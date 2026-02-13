@@ -11,7 +11,9 @@ import sys
 import signal
 import asyncio
 import logging
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
 from pyrogram import Client, idle
 from pyrogram.types import BotCommand
@@ -33,6 +35,64 @@ from handlers.callback_handlers import setup_callback_handlers
 
 # Initialize Logger
 logger = setup_logger()
+
+# ==================== TWA BOOTSTRAP ====================
+
+_aux_processes = []
+
+
+def _is_true(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _start_twa_stack() -> None:
+    if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
+        return
+
+    root_dir = Path(__file__).resolve().parent
+    server_script = root_dir / "telegram-bot-websites" / "server.py"
+    if not server_script.exists():
+        logger.warning("TWA server script not found, skipping Mini App bootstrap")
+        return
+
+    server_env = os.environ.copy()
+    server_env.setdefault("TELEGRAM_GALLERY_AUTH", "user")
+
+    if os.name == "nt":
+        python_exe = sys.executable or "python"
+        server_proc = subprocess.Popen(
+            [python_exe, str(server_script)],
+            cwd=str(root_dir),
+            env=server_env,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        server_proc = subprocess.Popen(
+            [sys.executable, str(server_script)],
+            cwd=str(root_dir),
+            env=server_env,
+        )
+
+    _aux_processes.append(server_proc)
+    time.sleep(2)
+    if server_proc.poll() is not None:
+        logger.warning("Mini App backend exited early. Check server logs.")
+
+
+def _stop_aux_processes() -> None:
+    for proc in reversed(_aux_processes):
+        try:
+            if proc and proc.poll() is None:
+                proc.terminate()
+                proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
 # ==================== PYROGRAM CLIENT ====================
 
@@ -85,6 +145,7 @@ async def shutdown(signal_name, loop):
     logger.info(f"\n{metrics.get_summary()}")
     
     logger.info("Goodbye! 👋")
+    _stop_aux_processes()
     loop.stop()
 
 def handle_exception(loop, context):
@@ -130,6 +191,12 @@ async def main():
     setup_command_handlers(app)
     setup_callback_handlers(app)
     logger.info("✓ Handlers configured")
+    # Step 3.5: Start Mini App backend stack
+    try:
+        _start_twa_stack()
+    except Exception as e:
+        logger.warning(f"TWA bootstrap failed, continuing bot-only mode: {e}")
+
     
     # Step 4: Start bot with retry logic
     logger.info("Connecting to Telegram API...")
@@ -198,6 +265,7 @@ async def main():
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
     finally:
+        _stop_aux_processes()
         logger.info("Bot execution ended")
 
 if __name__ == "__main__":

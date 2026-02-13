@@ -5,6 +5,7 @@ Video download functionality - SUPPORTS MULTIPLE VIDEOS PER URL
 import os
 import time
 import asyncio
+import contextlib
 from typing import List, Tuple, Optional, Dict
 
 import yt_dlp
@@ -33,10 +34,152 @@ class VideoDownloader:
     
     # Class variable to store progress state
     _progress_data = {}
+
+    @staticmethod
+    def _format_bytes(num_bytes: int) -> str:
+        if not num_bytes:
+            return "0 B"
+        value = float(num_bytes)
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if value < 1024.0:
+                return f"{value:.1f} {unit}"
+            value /= 1024.0
+        return f"{value:.1f} PB"
+
+    @staticmethod
+    def _format_speed(speed: float) -> str:
+        if not speed:
+            return "0 B/s"
+        return f"{VideoDownloader._format_bytes(int(speed))}/s"
+
+    @staticmethod
+    def _progress_bar(percent: int, width: int = 14) -> str:
+        percent = max(0, min(100, int(percent)))
+        filled = int((percent / 100) * width)
+        return ("█" * filled) + ("░" * (width - filled))
+
+    @staticmethod
+    def _pretty_phase(phase: str) -> str:
+        phase_text = (phase or "").lower()
+        if "selecting format" in phase_text:
+            return f"🔎 {phase}"
+        if "downloading" in phase_text:
+            return "📥 Downloading media file"
+        if "finalizing" in phase_text:
+            return "🛠️ Finalizing file"
+        if "analyzing" in phase_text:
+            return "🔍 Analyzing link"
+        return f"⚙️ {phase}" if phase else "⚙️ Processing"
+
+    @staticmethod
+    async def _video_progress_poller(
+        status_msg: Message,
+        progress_state: Dict,
+        index: int,
+        total: int
+    ) -> None:
+        spinner = ["⠋", "⠙", "⠸", "⠴", "⠦", "⠇"]
+        spin_idx = 0
+        last_text = ""
+
+        while not progress_state.get("done", False):
+            downloaded = int(progress_state.get("downloaded", 0) or 0)
+            total_bytes = int(progress_state.get("total", 0) or 0)
+            speed = float(progress_state.get("speed", 0) or 0.0)
+            filename = progress_state.get("filename", "video")
+            phase = progress_state.get("phase", "Preparing download")
+            started_at = float(progress_state.get("started_at", time.time()))
+            elapsed = max(0, time.time() - started_at)
+
+            if total_bytes > 0:
+                pct = min(99, int((downloaded / total_bytes) * 100))
+                size_line = (
+                    f"{VideoDownloader._format_bytes(downloaded)} / "
+                    f"{VideoDownloader._format_bytes(total_bytes)}"
+                )
+            else:
+                pct = 0
+                size_line = f"{VideoDownloader._format_bytes(downloaded)} / estimating..."
+
+            text = (
+                "🎬 **Downloading Your Media**\n\n"
+                f"🔄 **Status:** {spinner[spin_idx % len(spinner)]} Working\n"
+                f"📌 **Item:** `{index}/{total}`\n"
+                f"🧩 **Stage:** {VideoDownloader._pretty_phase(phase)}\n"
+                f"📄 **File:** `{os.path.basename(str(filename))[:60]}`\n"
+                f"📊 **Progress:** `{VideoDownloader._progress_bar(pct)}` **{pct}%**\n"
+                f"💾 **Downloaded:** {size_line}\n"
+                f"⚡ **Speed:** {VideoDownloader._format_speed(speed)}\n"
+                f"⏱️ **Elapsed:** {Formatter.duration(elapsed)}"
+            )
+            spin_idx += 1
+
+            if text != last_text:
+                try:
+                    await status_msg.edit_text(text, disable_web_page_preview=True)
+                    last_text = text
+                except Exception:
+                    pass
+
+            await asyncio.sleep(1.0)
+
+        # Emit a final "downloaded" state for this URL before sender phase.
+        final_text = (
+            "✅ **Download Complete**\n\n"
+            f"📌 **Item:** `{index}/{total}`\n"
+            "📤 **Next:** Preparing files to send to you"
+        )
+        try:
+            await status_msg.edit_text(final_text, disable_web_page_preview=True)
+        except Exception:
+            pass
+
+    @staticmethod
+    async def download_with_progress(
+        url: str,
+        status_msg: Optional[Message],
+        index: int = 1,
+        total: int = 1
+    ) -> Tuple[Optional[List[str]], Optional[Dict]]:
+        progress_state: Dict = {
+            "downloaded": 0,
+            "total": 0,
+            "speed": 0.0,
+            "filename": "video",
+            "phase": "Analyzing URL",
+            "done": False,
+            "started_at": time.time(),
+        }
+
+        progress_task = None
+        if status_msg:
+            progress_task = asyncio.create_task(
+                VideoDownloader._video_progress_poller(status_msg, progress_state, index, total)
+            )
+
+        loop = asyncio.get_running_loop()
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: VideoDownloader.download(
+                    url=url,
+                    message=None,
+                    status_msg=None,
+                    index=index,
+                    total=total,
+                    progress_state=progress_state,
+                ),
+            )
+            return result
+        finally:
+            progress_state["done"] = True
+            if progress_task:
+                with contextlib.suppress(Exception):
+                    await progress_task
     
     @staticmethod
-    def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None, 
-                 index: int = 1, total: int = 1) -> Tuple[Optional[List[str]], Optional[Dict]]:
+    def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None,
+                 index: int = 1, total: int = 1, progress_state: Optional[Dict] = None) -> Tuple[Optional[List[str]], Optional[Dict]]:
         """
         Download video(s) from URL - SUPPORTS MULTIPLE VIDEOS
         Returns: (list_of_video_paths, info_dict) or (None, None)
@@ -63,9 +206,12 @@ class VideoDownloader:
         
         for profile in quality_profiles:
             try:
+                if progress_state is not None:
+                    progress_state["phase"] = f"Selecting format ({profile['name']})"
+
                 # Progress hook for yt-dlp
                 def progress_hook(d):
-                    if status_msg and d['status'] == 'downloading':
+                    if (status_msg or progress_state) and d['status'] == 'downloading':
                         try:
                             downloaded = d.get('downloaded_bytes', 0)
                             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
@@ -76,11 +222,25 @@ class VideoDownloader:
                             elif '\\' in filename:
                                 filename = filename.split('\\')[-1]
                             
-                            # Store for async update
-                            VideoDownloader._progress_data['downloaded'] = downloaded
-                            VideoDownloader._progress_data['total'] = total_bytes
-                            VideoDownloader._progress_data['speed'] = speed
-                            VideoDownloader._progress_data['filename'] = filename
+                            if progress_state is not None:
+                                progress_state['downloaded'] = downloaded
+                                progress_state['total'] = total_bytes
+                                progress_state['speed'] = speed
+                                progress_state['filename'] = filename
+                                progress_state['phase'] = 'Downloading media'
+                            else:
+                                # Backward compatibility for any legacy callers.
+                                VideoDownloader._progress_data['downloaded'] = downloaded
+                                VideoDownloader._progress_data['total'] = total_bytes
+                                VideoDownloader._progress_data['speed'] = speed
+                                VideoDownloader._progress_data['filename'] = filename
+                        except Exception:
+                            pass
+                    elif progress_state is not None and d.get('status') == 'finished':
+                        try:
+                            progress_state['phase'] = 'Finalizing file'
+                            progress_state['downloaded'] = d.get('downloaded_bytes', progress_state.get('downloaded', 0))
+                            progress_state['total'] = d.get('total_bytes', progress_state.get('total', 0))
                         except Exception:
                             pass
                 
@@ -96,7 +256,7 @@ class VideoDownloader:
                     'no_color': True,
                     'extract_flat': False,
                     'ignoreerrors': False,
-                    'progress_hooks': [progress_hook] if status_msg else [],
+                    'progress_hooks': [progress_hook] if (status_msg or progress_state is not None) else [],
                 }
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -175,10 +335,10 @@ class VideoDownloader:
         logger.info(f"Starting bulk download: {total} URLs (videos and images)")
         
         initial_text = (
-            f"📥 **Bulk Download Started**\n\n"
-            f"🔢 **Total URLs:** {total}\n"
-            f"⚙️ **Status:** Initializing...\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
+            "📦 **Bulk Download Started**\n\n"
+            f"🔢 **Total Links:** {total}\n"
+            "⚙️ **Status:** Preparing your download queue\n"
+            f"📊 **Progress:** `{VideoDownloader._progress_bar(0)}` **0%**"
         )
         
         if detection_msg:
@@ -200,21 +360,27 @@ class VideoDownloader:
                 if len(url_display) > 40:
                     url_display = url_display[:37] + '...'
                 
+                processed_pct = int(((idx - 1) / total) * 100) if total > 0 else 0
                 await status_msg.edit_text(
-                    f"📥 **Analyzing URL** ({idx}/{total})\n\n"
+                    "📦 **Bulk Download In Progress**\n\n"
+                    f"📌 **Current Link:** `{idx}/{total}`\n"
                     f"🔗 **Source:** `{url_display}`\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📊 **Statistics:**\n"
-                    f"• 🎬 Videos: {video_success_count}\n"
-                    f"• 📸 Images: {image_success_count}\n"
-                    f"• ❌ Failed: {failed_count}\n"
-                    f"• ⏳ Remaining: {remaining}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⚙️ Processing..."
+                    f"🔍 **Stage:** Checking available media\n"
+                    f"📊 **Progress:** `{VideoDownloader._progress_bar(processed_pct)}` **{processed_pct}%**\n\n"
+                    "📈 **Live Summary**\n"
+                    f"🎬 Videos completed: {video_success_count}\n"
+                    f"🖼️ Images completed: {image_success_count}\n"
+                    f"❌ Failed: {failed_count}\n"
+                    f"⏳ Remaining: {remaining}"
                 )
                 
-                # Try video download first with progress tracking
-                video_paths, video_info = VideoDownloader.download(url, message, status_msg, idx, total)
+                # Try video download first with live progress tracking
+                video_paths, video_info = await VideoDownloader.download_with_progress(
+                    url=url,
+                    status_msg=status_msg,
+                    index=idx,
+                    total=total,
+                )
                 
                 if video_paths and len(video_paths) > 0:
                     video_success_count += 1
@@ -248,23 +414,47 @@ class VideoDownloader:
                     logger.info(f"Downloaded {len(video_paths)} video(s) from URL {idx}/{total}")
                     
                     # Show success message briefly
+                    processed_pct = int((idx / total) * 100) if total > 0 else 100
                     success_msg = (
-                        f"✅ **Downloaded** ({idx}/{total})\n\n"
-                        f"📹 Found {len(video_paths)} video(s)\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📊 **Statistics:**\n"
-                        f"• 🎬 Videos: {video_success_count}\n"
-                        f"• 📸 Images: {image_success_count}\n"
-                        f"• ❌ Failed: {failed_count}\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n"
-                        f"⏳ Continuing..."
+                        "✅ **Link Processed Successfully**\n\n"
+                        f"📌 **Link:** `{idx}/{total}`\n"
+                        f"🎬 **Found:** {len(video_paths)} video file(s)\n"
+                        f"📊 **Progress:** `{VideoDownloader._progress_bar(processed_pct)}` **{processed_pct}%**\n\n"
+                        "📈 **Live Summary**\n"
+                        f"🎬 Videos completed: {video_success_count}\n"
+                        f"🖼️ Images completed: {image_success_count}\n"
+                        f"❌ Failed: {failed_count}\n\n"
+                        "⏭️ Continuing with the next link..."
                     )
                     await status_msg.edit_text(success_msg)
                     await asyncio.sleep(0.5)
                 else:
                     # Video download failed, try image download
                     logger.debug(f"No video found, attempting image download for URL {idx}/{total}")
-                    image_paths, image_info = await ImageDownloader.download(url, message)
+                    async def image_progress_callback(percent: int, stage: str) -> None:
+                        try:
+                            overall_pct = int((((idx - 1) + (percent / 100.0)) / total) * 100) if total > 0 else percent
+                            await status_msg.edit_text(
+                                "📦 **Bulk Download In Progress**\n\n"
+                                f"📌 **Current Link:** `{idx}/{total}`\n"
+                                f"🧩 **Stage:** {stage}\n"
+                                f"🖼️ **Current Link Progress:** `{VideoDownloader._progress_bar(percent)}` **{percent}%**\n"
+                                f"📊 **Overall Progress:** `{VideoDownloader._progress_bar(overall_pct)}` **{overall_pct}%**\n\n"
+                                "📈 **Live Summary**\n"
+                                f"🎬 Videos completed: {video_success_count}\n"
+                                f"🖼️ Images completed: {image_success_count}\n"
+                                f"❌ Failed: {failed_count}"
+                            )
+                        except Exception:
+                            pass
+
+                    image_paths, image_info = await ImageDownloader.download(
+                        url,
+                        message,
+                        status_callback=image_progress_callback,
+                        index=idx,
+                        total=total,
+                    )
                     
                     if image_paths and len(image_paths) > 0:
                         image_success_count += 1
@@ -297,13 +487,14 @@ class VideoDownloader:
                         logger.info(f"Downloaded {len(image_paths)} image(s) from URL {idx}/{total}")
                         
                         await status_msg.edit_text(
-                            f"📥 **Bulk Download Progress**\n\n"
-                            f"**URL {idx}/{total}**\n"
-                            f"🎬 Videos: {video_success_count}\n"
-                            f"🖼️ Images: {image_success_count}\n"
+                            f"✅ **Link Processed Successfully**\n\n"
+                            f"📌 **Link:** `{idx}/{total}`\n"
+                            f"🖼️ **Found:** {len(image_paths)} image file(s)\n\n"
+                            f"📈 **Live Summary**\n"
+                            f"🎬 Videos completed: {video_success_count}\n"
+                            f"🖼️ Images completed: {image_success_count}\n"
                             f"❌ Failed: {failed_count}\n\n"
-                            f"✅ **Image Success:** {len(image_paths)} images from URL\n\n"
-                            f"⏳ Continuing..."
+                            f"⏭️ Continuing with the next link..."
                         )
                         await asyncio.sleep(0.5)
                     else:

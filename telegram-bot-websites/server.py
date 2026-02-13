@@ -13,6 +13,7 @@ Telegram Mini App Gallery Server.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import hashlib
 import hmac
 import json
@@ -281,7 +282,27 @@ class TelegramGalleryService:
 
 
 service = TelegramGalleryService(cache_dir=WEB_DIR / "media_cache")
-app = FastAPI(title="Telegram Mini App Gallery", version="3.1.0")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        await service.start()
+        try:
+            await service.sync_group_media(limit=DEFAULT_SYNC_LIMIT, force_redownload=False)
+        except HTTPException:
+            # Keep web server alive even when Telegram sync fails.
+            pass
+    except Exception as exc:
+        # Keep app booting so UI and health endpoint stay reachable.
+        service.last_sync_error = f"Startup sync unavailable: {exc}"
+    try:
+        yield
+    finally:
+        await service.stop()
+
+
+app = FastAPI(title="Telegram Mini App Gallery", version="3.1.0", lifespan=lifespan)
 
 app.mount("/media", StaticFiles(directory=str(service.cache_dir)), name="media")
 app.mount("/assets", StaticFiles(directory=str(WEB_DIR)), name="assets")
@@ -316,20 +337,6 @@ def resolve_webapp_context(
         "chat_id": CHAT_ID,
         "user_agent": user_agent,
     }
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    await service.start()
-    try:
-        await service.sync_group_media(limit=DEFAULT_SYNC_LIMIT, force_redownload=False)
-    except HTTPException:
-        pass
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    await service.stop()
 
 
 @app.get("/")

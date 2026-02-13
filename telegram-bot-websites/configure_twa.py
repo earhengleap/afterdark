@@ -3,7 +3,7 @@
 Configure Telegram bot menu button for Mini App (WebApp).
 
 Usage:
-  python telegram-bot-websites/configure_twa.py --url https://xxxxx.ngrok-free.app
+  python telegram-bot-websites/configure_twa.py --url https://your-public-domain.example
 """
 
 import argparse

@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import logging
+import time
 from pyrogram import Client, filters
 from pyrogram.types import Message, InputMediaPhoto
 from datetime import datetime
@@ -61,6 +62,40 @@ def extract_x_username_and_url(url: str) -> tuple:
 def format_url_for_display(url: str) -> str:
     """Format URL in code blocks for easy copying"""
     return f"```\n{url}\n```"
+
+def build_status_callback(status_msg: Message, title: str):
+    """Build a throttled async status callback for dynamic progress updates."""
+    state = {"last_ts": 0.0, "last_pct": -1, "tick": 0}
+    spinner = ["⠋", "⠙", "⠸", "⠴", "⠦", "⠇"]
+
+    async def _callback(percent: int, stage: str):
+        now = time.time()
+        # Throttle frequent updates to avoid Telegram flood limits.
+        if percent < 100 and state["last_pct"] == percent and (now - state["last_ts"]) < 1.0:
+            return
+        if percent < 100 and (now - state["last_ts"]) < 0.8:
+            return
+        state["tick"] += 1
+
+        clamped = max(0, min(100, int(percent)))
+        filled = int((clamped / 100) * 12)
+        bar = ("█" * filled) + ("░" * (12 - filled))
+        spin = spinner[state["tick"] % len(spinner)] if clamped < 100 else "✓"
+        text = (
+            f"{title}\n\n"
+            f"🔄 **Status:** {spin} Working...\n"
+            f"🧩 **Step:** {stage}\n"
+            f"📊 **Progress:** `{bar}` **{clamped}%**\n"
+            "⏳ Please wait, your files are being prepared."
+        )
+        try:
+            await status_msg.edit_text(text, disable_web_page_preview=True)
+            state["last_ts"] = now
+            state["last_pct"] = clamped
+        except Exception:
+            pass
+
+    return _callback
 
 async def send_videos_to_user(video_paths: list, message: Message, user_id: int, x_username: str, url: str, username: str, app: Client):
     """Send multiple videos to user with proper formatting"""
@@ -178,7 +213,12 @@ async def process_shared_url(client: Client, message: Message, url: str, user_id
         # Extract X Username for caption
         x_username, profile_url = extract_x_username_and_url(url)
         
-        video_paths, video_info = VideoDownloader.download(url, message)
+        video_paths, video_info = await VideoDownloader.download_with_progress(
+            url=url,
+            status_msg=status_msg,
+            index=1,
+            total=1,
+        )
         
         if video_paths and len(video_paths) > 0:
             # Send videos to user
@@ -197,7 +237,14 @@ async def process_shared_url(client: Client, message: Message, url: str, user_id
         
         # Try image download
         await status_msg.edit_text("🖼️ **Trying image download...**")
-        image_paths, image_info = await ImageDownloader.download(url, message)
+        image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
+        image_paths, image_info = await ImageDownloader.download(
+            url,
+            message,
+            status_callback=image_cb,
+            index=1,
+            total=1,
+        )
         
         if image_paths and len(image_paths) > 0:
             await status_msg.edit_text(f"📤 **Sending {len(image_paths)} image(s)...**")
@@ -448,7 +495,12 @@ def setup_command_handlers(app: Client):
                 )
                 
                 # FIXED: download() now returns a LIST of video paths
-                video_paths, video_info = VideoDownloader.download(url, message)
+                video_paths, video_info = await VideoDownloader.download_with_progress(
+                    url=url,
+                    status_msg=status_msg,
+                    index=1,
+                    total=1,
+                )
                 
                 # FIXED: Check if video_paths is a list and has items
                 if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
@@ -515,7 +567,14 @@ def setup_command_handlers(app: Client):
                         f"⏳ Searching for images...",
                         disable_web_page_preview=False
                     )
-                    image_paths, image_info = await ImageDownloader.download(url, message)
+                    image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
+                    image_paths, image_info = await ImageDownloader.download(
+                        url,
+                        message,
+                        status_callback=image_cb,
+                        index=1,
+                        total=1,
+                    )
                     
                     if image_paths and len(image_paths) > 0:
                         # Image download successful
@@ -629,7 +688,14 @@ def setup_command_handlers(app: Client):
                     f"⏳ Checking for image content...",
                     disable_web_page_preview=False
                 )
-                image_paths, image_info = await ImageDownloader.download(url, message)
+                image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
+                image_paths, image_info = await ImageDownloader.download(
+                    url,
+                    message,
+                    status_callback=image_cb,
+                    index=1,
+                    total=1,
+                )
                 
                 if image_paths and len(image_paths) > 0:
                     try:
@@ -705,7 +771,12 @@ def setup_command_handlers(app: Client):
                         f"⏳ Searching for video...",
                         disable_web_page_preview=False
                     )
-                    video_paths, video_info = VideoDownloader.download(url, message)
+                    video_paths, video_info = await VideoDownloader.download_with_progress(
+                        url=url,
+                        status_msg=status_msg,
+                        index=1,
+                        total=1,
+                    )
                     
                     if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
                         total_videos = len(video_paths)
@@ -739,7 +810,12 @@ def setup_command_handlers(app: Client):
                 disable_web_page_preview=False
             )
             
-            video_paths, video_info = VideoDownloader.download(url, message)
+            video_paths, video_info = await VideoDownloader.download_with_progress(
+                url=url,
+                status_msg=status_msg,
+                index=1,
+                total=1,
+            )
             
             if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
                 await status_msg.delete()

@@ -16,23 +16,19 @@ $env:TELEGRAM_GALLERY_AUTH='user'
 python telegram-bot-websites/server.py
 ```
 
-## 3) Expose HTTPS with ngrok
+## 3) Expose HTTPS with any tunnel/reverse proxy
 ```powershell
-ngrok http 5000
+# Example only: expose local port 5000 with your preferred provider
+# and copy the resulting HTTPS URL.
 ```
-Copy the `https://...` URL.
+Copy the `https://...` URL from your provider.
 
 ## 4) Set bot menu button to Mini App URL
 ```powershell
-python telegram-bot-websites/configure_twa.py --url https://YOUR-NGROK-URL
+python telegram-bot-websites/configure_twa.py --url https://YOUR-PUBLIC-URL
 ```
 
 Now opening your bot menu button in Telegram launches this Mini App.
-
-## Optional: one-command helper
-```powershell
-powershell -ExecutionPolicy Bypass -File telegram-bot-websites/start_twa_ngrok.ps1 -ConfigureMenu
-```
 
 ## Security note
 `server.py` validates Telegram `initData` when provided.

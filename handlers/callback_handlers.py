@@ -1,4 +1,4 @@
-"""
+﻿"""
 Callback query handlers for the bot
 """
 import os
@@ -26,6 +26,20 @@ from core.image_uploader import ImageUploader
 def get_text(user_id: int, key: str) -> str:
     """Helper function to get localized text"""
     return language_manager.get_text(user_id, key)
+
+
+def _fallback_video_paths() -> list:
+    """Fallback video paths from filesystem, newest first."""
+    videos = FileManager.get_all_videos()
+    videos.sort(key=lambda x: os.path.getmtime(x.filepath), reverse=True)
+    return [v.filepath for v in videos if os.path.exists(v.filepath)]
+
+
+def _fallback_image_paths() -> list:
+    """Fallback image paths from filesystem, newest first."""
+    images = FileManager.get_all_images()
+    images.sort(key=lambda x: os.path.getmtime(x.filepath), reverse=True)
+    return [i.filepath for i in images if os.path.exists(i.filepath)]
 
 def setup_callback_handlers(app: Client):
     """Setup all callback handlers"""
@@ -381,6 +395,12 @@ def setup_callback_handlers(app: Client):
             
             # Handle both single video and multiple videos
             video_path = user_downloads.get(user_id)
+            if not video_path:
+                fallback_videos = _fallback_video_paths()
+                if fallback_videos:
+                    # Recover after bot restart when memory state is empty.
+                    video_path = fallback_videos[0]
+                    logger.info(f"Recovered single video upload for user {user_id} from disk")
             
             # Check if it's a single video path or multiple videos
             if isinstance(video_path, list) and len(video_path) > 0:
@@ -439,6 +459,9 @@ def setup_callback_handlers(app: Client):
             AutoScheduler.cancel_task(user_id, "image_bulk")
             
             image_paths = user_downloads.get(user_id, [])
+            if not image_paths:
+                # Recover after restart: use latest image files.
+                image_paths = _fallback_image_paths()[:20]
             
             if not image_paths or (isinstance(image_paths, str) and not os.path.exists(image_paths)):
                 await callback_query.answer("❌ Image files not found. Please download again.", show_alert=True)
@@ -486,6 +509,10 @@ def setup_callback_handlers(app: Client):
             # Also check for multiple videos from single URL
             if not downloaded_paths:
                 downloaded_paths = user_downloads.get(f"{user_id}_bulk_videos", [])
+
+            # Restart recovery fallback
+            if not downloaded_paths:
+                downloaded_paths = _fallback_video_paths()
             
             if not downloaded_paths:
                 await callback_query.answer("❌ No downloaded videos found!", show_alert=True)
@@ -515,6 +542,10 @@ def setup_callback_handlers(app: Client):
                 if all_paths:
                     # Filter only image files
                     downloaded_paths = [path for path in all_paths if path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+
+            # Restart recovery fallback
+            if not downloaded_paths:
+                downloaded_paths = _fallback_image_paths()
             
             if not downloaded_paths:
                 await callback_query.answer("❌ No downloaded images found!", show_alert=True)
@@ -548,6 +579,12 @@ def setup_callback_handlers(app: Client):
                     image_paths = [path for path in all_paths if path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
             
             all_paths = video_paths + image_paths
+
+            # Restart recovery fallback from disk
+            if not all_paths:
+                video_paths = _fallback_video_paths()
+                image_paths = _fallback_image_paths()
+                all_paths = video_paths + image_paths
             
             if not all_paths:
                 await callback_query.answer("❌ No downloaded content found!", show_alert=True)
@@ -581,6 +618,9 @@ def setup_callback_handlers(app: Client):
             if video_key == f"{user_id}_bulk_videos":
                 # Handle multiple videos from single URL
                 video_paths = user_downloads.get(video_key, [])
+                if not video_paths:
+                    # Recover bulk list after restart.
+                    video_paths = _fallback_video_paths()
                 if video_paths and len(video_paths) > 0:
                     await callback_query.answer(f"📤 Uploading {len(video_paths)} videos to group...", show_alert=False)
                     status_msg = await callback_query.message.reply_text(
@@ -590,7 +630,11 @@ def setup_callback_handlers(app: Client):
                     )
                     await VideoUploader.upload_multiple(video_paths, status_msg, user_id)
                     return
-            elif video_path and os.path.exists(video_path):
+            if not video_path:
+                fallback_videos = _fallback_video_paths()
+                if fallback_videos:
+                    video_path = fallback_videos[0]
+            if video_path and os.path.exists(video_path):
                 # Single video upload (original behavior)
                 await callback_query.answer("📤 Uploading to group...", show_alert=False)
                 
@@ -631,6 +675,10 @@ def setup_callback_handlers(app: Client):
         elif data.startswith("upload_single_image_"):
             image_key = data.replace("upload_single_image_", "")
             image_path = user_downloads.get(image_key)
+            if (not image_path or not os.path.exists(image_path)):
+                fallback_images = _fallback_image_paths()
+                if fallback_images:
+                    image_path = fallback_images[0]
             
             if not image_path or not os.path.exists(image_path):
                 await callback_query.answer("❌ Image file not found.", show_alert=True)
@@ -783,4 +831,5 @@ def setup_callback_handlers(app: Client):
             
             await callback_query.answer("✅ History exported!")
             logger.info(f"User {user_id} exported {len(all_history)} history entries as {format_type}")
+
 

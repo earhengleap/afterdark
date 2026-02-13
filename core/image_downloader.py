@@ -31,6 +31,17 @@ logger = setup_logger("ImageDownloader")
 
 class ImageDownloader:
     """Handle image downloads from X (Twitter) using gallery-dl - ENHANCED FIX"""
+
+    @staticmethod
+    async def _notify_status(status_callback, percent: int, stage: str) -> None:
+        if not status_callback:
+            return
+        try:
+            result = status_callback(percent, stage)
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception:
+            pass
     
     @staticmethod
     def normalize_twitter_url(url: str) -> str:
@@ -51,13 +62,26 @@ class ImageDownloader:
         return url
     
     @staticmethod
-    async def download(url: str, message: Optional[Message] = None) -> Tuple[Optional[List[str]], Optional[Dict]]:
+    async def download(
+        url: str,
+        message: Optional[Message] = None,
+        status_callback=None,
+        index: int = 1,
+        total: int = 1
+    ) -> Tuple[Optional[List[str]], Optional[Dict]]:
         """Download images from X URL - ENHANCED FIX with URL normalization"""
         try:
+            await ImageDownloader._notify_status(
+                status_callback, 5, f"📌 Link {index}/{total} - Preparing image scan"
+            )
+
             # NORMALIZE URL FIRST - This is critical!
             original_url = url
             url = ImageDownloader.normalize_twitter_url(url)
             logger.debug(f"Cleaned URL: {original_url} -> {url}")
+            await ImageDownloader._notify_status(
+                status_callback, 12, f"🔗 Link {index}/{total} - Link checked"
+            )
             
             # Use separate images folder (not inside videos)
             download_folder = IMAGES_FOLDER
@@ -82,10 +106,16 @@ class ImageDownloader:
             
             # Try Method 1: Syndication API first (most reliable for public tweets)
             logger.debug("Attempting Method 1: Syndication API")
+            await ImageDownloader._notify_status(
+                status_callback, 25, f"🛰️ Link {index}/{total} - Trying method 1/4"
+            )
             downloaded_files = await ImageDownloader._try_syndication_method(url, download_folder, existing_files)
             
             if downloaded_files:
                 logger.info(f"Method 1 success: Downloaded {len(downloaded_files)} images")
+                await ImageDownloader._notify_status(
+                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
+                )
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -95,10 +125,16 @@ class ImageDownloader:
             
             # Try Method 2: With detailed config
             print("🔄 Method 1 failed, trying Method 2 (detailed config)...")
+            await ImageDownloader._notify_status(
+                status_callback, 45, f"🔄 Link {index}/{total} - Trying method 2/4"
+            )
             downloaded_files = await ImageDownloader._try_config_method(url, download_folder, existing_files)
             
             if downloaded_files:
                 logger.info(f"Method 2 success: Downloaded {len(downloaded_files)} images")
+                await ImageDownloader._notify_status(
+                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
+                )
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -108,10 +144,16 @@ class ImageDownloader:
             
             # Try Method 3: Simple fallback
             print("🔄 Method 2 failed, trying Method 3 (simple method)...")
+            await ImageDownloader._notify_status(
+                status_callback, 65, f"🔄 Link {index}/{total} - Trying method 3/4"
+            )
             downloaded_files = await ImageDownloader._try_simple_method(url, download_folder, existing_files)
             
             if downloaded_files:
                 logger.info(f"Method 3 success: Downloaded {len(downloaded_files)} images")
+                await ImageDownloader._notify_status(
+                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
+                )
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -121,10 +163,16 @@ class ImageDownloader:
             
             # Try Method 4: Direct API method with aggressive settings
             print("🔄 Method 3 failed, trying Method 4 (aggressive mode)...")
+            await ImageDownloader._notify_status(
+                status_callback, 85, f"🔄 Link {index}/{total} - Trying method 4/4"
+            )
             downloaded_files = await ImageDownloader._try_aggressive_method(url, download_folder, existing_files)
             
             if downloaded_files:
                 logger.info(f"Method 4 success: Downloaded {len(downloaded_files)} images")
+                await ImageDownloader._notify_status(
+                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
+                )
                 info = {
                     'title': f"X Images - {len(downloaded_files)} files",
                     'uploader': 'X (Twitter)',
@@ -133,10 +181,16 @@ class ImageDownloader:
                 return downloaded_files, info
             
             logger.warning("All download methods failed - no images found")
+            await ImageDownloader._notify_status(
+                status_callback, 100, f"⚠️ Link {index}/{total} - No images found"
+            )
             return None, None
                 
         except Exception as e:
             logger.error(f"Image download error: {e}", exc_info=True)
+            await ImageDownloader._notify_status(
+                status_callback, 100, f"❌ Link {index}/{total} - Image download failed"
+            )
             return None, None
     
     @staticmethod
