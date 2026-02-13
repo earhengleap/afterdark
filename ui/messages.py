@@ -515,3 +515,26 @@ https://x.com/user/status/333
 
 ━━━━━━━━━━━━━━━━━━━━
 *Select the images you want to upload below:*"""
+
+    @staticmethod
+    def bulk_content_prompt(user_id=None):
+        """Prompt for bulk content detection"""
+        return f"""🔍 **Bulk Content Detection**
+
+This feature automatically detects and processes multiple URLs containing both **Videos** and **Images**.
+
+**How it works:**
+• Paste multiple X/Twitter URLs (space, pipe, or line-separated)
+• Bot automatically detects content type in each URL
+• Downloads all videos and images found
+• Organizes them for easy bulk upload
+
+**Supported formats:**
+📌 Space-separated: `url1 url2 url3`
+📌 Pipe-separated: `url1 | url2 | url3`
+📌 Line-separated (one per line)
+
+Please send your URLs now:
+
+━━━━━━━━━━━━━━━━━━━━
+*Waiting for your URL(s)...*"""
