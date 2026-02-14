@@ -16,12 +16,18 @@ $env:TELEGRAM_GALLERY_AUTH='user'
 python telegram-bot-websites/server.py
 ```
 
-## 3) Expose HTTPS with any tunnel/reverse proxy
+## 3) Expose HTTPS with free Serveo tunnel (recommended)
 ```powershell
-# Example only: expose local port 5000 with your preferred provider
-# and copy the resulting HTTPS URL.
+# OpenSSH client is included on most Windows installs.
+# Start free HTTPS tunnel to local port 5000:
+ssh -o StrictHostKeyChecking=accept-new -R 80:127.0.0.1:5000 serveo.net
 ```
-Copy the `https://...` URL from your provider.
+Copy the `https://....serveousercontent.com` URL.
+
+Fallback option:
+```powershell
+ssh -o StrictHostKeyChecking=accept-new -R 80:127.0.0.1:5000 nokey@localhost.run
+```
 
 ## 4) Set bot menu button to Mini App URL
 ```powershell
@@ -38,4 +44,19 @@ Now opening your bot menu button in Telegram launches this Mini App.
 Example:
 ```powershell
 $env:TWA_VERIFY_STRICT='1'; python telegram-bot-websites/server.py
+```
+
+## Optional orchestrator tunnel settings (`x_telegram.py`)
+```powershell
+# Auto-select provider
+$env:TWA_TUNNEL_PROVIDER='auto'
+
+# Force serveo tunnel
+$env:TWA_TUNNEL_PROVIDER='serveo'
+
+# Force localhost.run over SSH
+$env:TWA_TUNNEL_PROVIDER='localhostrun'
+
+# Disable tunnel autostart (local-only)
+$env:TWA_TUNNEL_PROVIDER='none'
 ```

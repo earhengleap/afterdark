@@ -12,6 +12,12 @@ import signal
 import asyncio
 import logging
 import subprocess
+import shutil
+import json
+import urllib.request
+import urllib.parse
+import socket
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -45,6 +51,470 @@ def _is_true(value: str) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _resolve_executable(preferred_env: str, candidates: list[str]) -> str | None:
+    preferred = os.getenv(preferred_env, "").strip()
+    if preferred:
+        return preferred
+
+    for candidate in candidates:
+        found = shutil.which(candidate)
+        if found:
+            return found
+    return None
+
+
+def _resolve_ssh_executable() -> str | None:
+    candidates = ["ssh.exe", "ssh"] if os.name == "nt" else ["ssh"]
+    return _resolve_executable("TWA_SSH_BIN", candidates)
+
+
+_LOCALHOSTRUN_URL_RE = re.compile(r"https://[A-Za-z0-9.-]+")
+_LOCALHOSTRUN_HINT_RE = re.compile(
+    r"tunneled with tls termination,\s*(https://[A-Za-z0-9.-]+)",
+    re.IGNORECASE,
+)
+_SERVEO_URL_RE = re.compile(r"https://[A-Za-z0-9.-]*serveousercontent\.com", re.IGNORECASE)
+
+
+def _localhostrun_target() -> str:
+    return os.getenv("TWA_LOCALHOSTRUN_TARGET", "nokey@localhost.run").strip() or "nokey@localhost.run"
+
+
+def _localhostrun_remote_port() -> str:
+    raw = os.getenv("TWA_LOCALHOSTRUN_REMOTE_PORT", "80").strip() or "80"
+    return raw if raw.isdigit() else "80"
+
+
+def _localhostrun_log_paths(root_dir: Path) -> tuple[Path, Path]:
+    stdout_custom = os.getenv("TWA_LOCALHOSTRUN_STDOUT_LOG", "").strip()
+    stderr_custom = os.getenv("TWA_LOCALHOSTRUN_STDERR_LOG", "").strip()
+
+    stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "localhostrun.stdout.log")
+    stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "localhostrun.stderr.log")
+    return stdout_path, stderr_path
+
+
+def _serveo_target() -> str:
+    return os.getenv("TWA_SERVEO_TARGET", "serveo.net").strip() or "serveo.net"
+
+
+def _serveo_remote_port() -> str:
+    raw = os.getenv("TWA_SERVEO_REMOTE_PORT", "80").strip() or "80"
+    return raw if raw.isdigit() else "80"
+
+
+def _serveo_log_paths(root_dir: Path) -> tuple[Path, Path]:
+    stdout_custom = os.getenv("TWA_SERVEO_STDOUT_LOG", "").strip()
+    stderr_custom = os.getenv("TWA_SERVEO_STDERR_LOG", "").strip()
+
+    stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "serveo.stdout.log")
+    stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "serveo.stderr.log")
+    return stdout_path, stderr_path
+
+
+def _read_localhostrun_public_url(root_dir: Path) -> str | None:
+    stdout_path, stderr_path = _localhostrun_log_paths(root_dir)
+    text_parts: list[str] = []
+
+    for path in (stdout_path, stderr_path):
+        try:
+            if path.exists():
+                text_parts.append(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+
+    if not text_parts:
+        return None
+
+    text = "\n".join(text_parts)
+    hinted = _LOCALHOSTRUN_HINT_RE.findall(text)
+    for url in reversed(hinted):
+        normalized = url.strip().rstrip("/")
+        if normalized.startswith("https://"):
+            return normalized
+
+    blocked_hosts = {"localhost.run", "admin.localhost.run", "twitter.com", "openssh.com"}
+    matches = _LOCALHOSTRUN_URL_RE.findall(text)
+    prioritized: list[str] = []
+    for url in reversed(matches):
+        normalized = url.strip().rstrip("/")
+        if not normalized.startswith("https://"):
+            continue
+        host = urllib.parse.urlparse(normalized).netloc.lower()
+        if not host or host in blocked_hosts:
+            continue
+        if host.endswith(".lhr.life") or host.endswith(".localhost.run"):
+            prioritized.append(normalized)
+
+    if prioritized:
+        return prioritized[0]
+    return None
+
+
+def _read_serveo_public_url(root_dir: Path) -> str | None:
+    stdout_path, stderr_path = _serveo_log_paths(root_dir)
+    text_parts: list[str] = []
+
+    for path in (stdout_path, stderr_path):
+        try:
+            if path.exists():
+                text_parts.append(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+
+    if not text_parts:
+        return None
+
+    text = "\n".join(text_parts)
+    matches = _SERVEO_URL_RE.findall(text)
+    if matches:
+        return matches[-1].strip().rstrip("/")
+
+    generic = _LOCALHOSTRUN_URL_RE.findall(text)
+    for url in reversed(generic):
+        normalized = url.strip().rstrip("/")
+        host = urllib.parse.urlparse(normalized).netloc.lower()
+        if "serveo" in host and normalized.startswith("https://"):
+            return normalized
+    return None
+
+
+def _wait_for_localhostrun_public_url(root_dir: Path, timeout_seconds: int) -> str | None:
+    deadline = time.time() + max(1, timeout_seconds)
+    while time.time() < deadline:
+        url = _read_localhostrun_public_url(root_dir)
+        if url:
+            return url
+        time.sleep(1)
+    return None
+
+
+def _wait_for_serveo_public_url(root_dir: Path, timeout_seconds: int) -> str | None:
+    deadline = time.time() + max(1, timeout_seconds)
+    while time.time() < deadline:
+        url = _read_serveo_public_url(root_dir)
+        if url:
+            return url
+        time.sleep(1)
+    return None
+
+
+def _is_port_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1.0)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _is_twa_http_healthy(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=4) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read().decode("utf-8"))
+        return bool(payload.get("ok"))
+    except Exception:
+        return False
+
+
+def _find_available_port(start_port: int, max_candidates: int = 20) -> int:
+    for candidate in range(start_port, start_port + max_candidates):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(("127.0.0.1", candidate))
+                return candidate
+            except OSError:
+                continue
+    return start_port
+
+
+def _telegram_api_post(method: str, payload: dict[str, str]) -> dict:
+    data = urllib.parse.urlencode(payload).encode("utf-8")
+    request = urllib.request.Request(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
+        data=data,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        body = response.read().decode("utf-8")
+    parsed = json.loads(body)
+    if not parsed.get("ok"):
+        raise RuntimeError(f"Telegram API {method} failed: {parsed}")
+    return parsed
+
+
+def _resolve_menu_chat_ids(root_dir: Path) -> list[str]:
+    max_ids_raw = os.getenv("TWA_MENU_MAX_CHATS", "25").strip()
+    try:
+        max_ids = max(0, int(max_ids_raw))
+    except ValueError:
+        max_ids = 25
+
+    result: list[str] = []
+    seen: set[str] = set()
+
+    raw_ids = os.getenv("TWA_MENU_CHAT_IDS", "")
+    for item in raw_ids.split(","):
+        candidate = item.strip()
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            result.append(candidate)
+
+    if max_ids and _is_true(os.getenv("TWA_MENU_USERS_AUTODETECT", "1")):
+        users_dir = root_dir / "users"
+        if users_dir.exists():
+            for entry in sorted(users_dir.glob("*.json")):
+                candidate = entry.stem.strip()
+                if not candidate or not candidate.lstrip("-").isdigit():
+                    continue
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                result.append(candidate)
+                if len(result) >= max_ids:
+                    break
+
+    return result[:max_ids] if max_ids else []
+
+
+def _sync_twa_menu_button(public_url: str, root_dir: Path) -> None:
+    if not _is_true(os.getenv("TWA_MENU_SYNC_AUTOSTART", "1")):
+        return
+
+    url = public_url.rstrip("/") + "/"
+    button_text = os.getenv("TWA_MENU_TEXT", "Open Vault").strip() or "Open Vault"
+    menu_button = {
+        "type": "web_app",
+        "text": button_text,
+        "web_app": {"url": url},
+    }
+    payload = {"menu_button": json.dumps(menu_button)}
+
+    try:
+        _telegram_api_post("setChatMenuButton", payload)
+    except Exception as e:
+        logger.warning(f"Failed to sync default Mini App menu URL: {e}")
+
+    chat_ids = _resolve_menu_chat_ids(root_dir)
+    if not chat_ids:
+        return
+
+    updated = 0
+    for chat_id in chat_ids:
+        try:
+            _telegram_api_post(
+                "setChatMenuButton",
+                {
+                    "chat_id": str(chat_id),
+                    "menu_button": json.dumps(menu_button),
+                },
+            )
+            updated += 1
+        except Exception as e:
+            logger.warning(f"Failed to sync Mini App menu URL for chat_id={chat_id}: {e}")
+
+    logger.info(f"Mini App menu URL synced for {updated}/{len(chat_ids)} chat(s).")
+
+
+def _persist_twa_public_url(root_dir: Path, public_url: str) -> None:
+    normalized = public_url.rstrip("/") + "/"
+    os.environ["TWA_PUBLIC_URL"] = normalized
+    target = root_dir / "data" / "twa_public_url.txt"
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(normalized + "\n", encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Failed to persist TWA public URL to {target}: {e}")
+
+
+def _is_public_url_healthy(public_url: str) -> bool:
+    normalized = public_url.strip().rstrip("/")
+    if not normalized.startswith("https://"):
+        return False
+
+    health_url = normalized + "/api/health"
+    try:
+        with urllib.request.urlopen(health_url, timeout=8) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read().decode("utf-8"))
+        return bool(payload.get("ok"))
+    except Exception:
+        return False
+
+
+def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
+    ssh_executable = _resolve_ssh_executable()
+    if not ssh_executable:
+        logger.warning(
+            "Mini App backend started, but ssh client was not found on PATH. "
+            "Install OpenSSH client or set TWA_SSH_BIN."
+        )
+        return False
+
+    stdout_log, stderr_log = _serveo_log_paths(root_dir)
+    try:
+        stdout_log.parent.mkdir(parents=True, exist_ok=True)
+        stderr_log.parent.mkdir(parents=True, exist_ok=True)
+        if _is_true(os.getenv("TWA_SERVEO_TRUNCATE_LOG", "1")):
+            stdout_log.write_text("", encoding="utf-8")
+            stderr_log.write_text("", encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Unable to initialize serveo log files: {e}")
+
+    remote_port = _serveo_remote_port()
+    tunnel_target = _serveo_target()
+    command = [
+        ssh_executable,
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ExitOnForwardFailure=yes",
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=3",
+        "-R",
+        f"{remote_port}:127.0.0.1:{twa_port}",
+        tunnel_target,
+    ]
+
+    stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
+    stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
+    try:
+        if os.name == "nt":
+            tunnel_proc = subprocess.Popen(
+                command,
+                cwd=str(root_dir),
+                env=os.environ.copy(),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+        else:
+            tunnel_proc = subprocess.Popen(
+                command,
+                cwd=str(root_dir),
+                env=os.environ.copy(),
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+    finally:
+        stdout_handle.close()
+        stderr_handle.close()
+
+    _aux_processes.append(tunnel_proc)
+    time.sleep(2)
+    if tunnel_proc.poll() is not None:
+        logger.warning("serveo tunnel exited early. Check serveo output terminal.")
+        return False
+
+    timeout_raw = os.getenv("TWA_SERVEO_URL_TIMEOUT", "30").strip()
+    try:
+        timeout_seconds = max(5, int(timeout_raw))
+    except ValueError:
+        timeout_seconds = 30
+
+    public_url = _wait_for_serveo_public_url(root_dir, timeout_seconds)
+    if public_url:
+        logger.info(f"TWA serveo tunnel active: {public_url}")
+        _persist_twa_public_url(root_dir, public_url)
+        _sync_twa_menu_button(public_url, root_dir)
+        return True
+    else:
+        logger.warning(
+            f"serveo started, but no public URL was found in {stdout_log} or {stderr_log}. "
+            "Set TWA_PUBLIC_URL manually if needed."
+        )
+        return False
+
+
+def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
+    ssh_executable = _resolve_ssh_executable()
+    if not ssh_executable:
+        logger.warning(
+            "Mini App backend started, but ssh client was not found on PATH. "
+            "Install OpenSSH client or set TWA_SSH_BIN."
+        )
+        return False
+
+    stdout_log, stderr_log = _localhostrun_log_paths(root_dir)
+    try:
+        stdout_log.parent.mkdir(parents=True, exist_ok=True)
+        stderr_log.parent.mkdir(parents=True, exist_ok=True)
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_TRUNCATE_LOG", "1")):
+            stdout_log.write_text("", encoding="utf-8")
+            stderr_log.write_text("", encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Unable to initialize localhost.run log files: {e}")
+
+    remote_port = _localhostrun_remote_port()
+    tunnel_target = _localhostrun_target()
+    command = [
+        ssh_executable,
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ExitOnForwardFailure=yes",
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=3",
+        "-R",
+        f"{remote_port}:127.0.0.1:{twa_port}",
+        tunnel_target,
+    ]
+
+    stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
+    stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
+    try:
+        if os.name == "nt":
+            tunnel_proc = subprocess.Popen(
+                command,
+                cwd=str(root_dir),
+                env=os.environ.copy(),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+        else:
+            tunnel_proc = subprocess.Popen(
+                command,
+                cwd=str(root_dir),
+                env=os.environ.copy(),
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+    finally:
+        stdout_handle.close()
+        stderr_handle.close()
+
+    _aux_processes.append(tunnel_proc)
+    time.sleep(2)
+    if tunnel_proc.poll() is not None:
+        logger.warning("localhost.run tunnel exited early. Check localhost.run output terminal.")
+        return False
+
+    timeout_raw = os.getenv("TWA_LOCALHOSTRUN_URL_TIMEOUT", "30").strip()
+    try:
+        timeout_seconds = max(5, int(timeout_raw))
+    except ValueError:
+        timeout_seconds = 30
+
+    public_url = _wait_for_localhostrun_public_url(root_dir, timeout_seconds)
+    if public_url:
+        logger.info(f"TWA localhost.run tunnel active: {public_url}")
+        _persist_twa_public_url(root_dir, public_url)
+        _sync_twa_menu_button(public_url, root_dir)
+        return True
+    else:
+        logger.warning(
+            f"localhost.run started, but no public URL was found in {stdout_log} or {stderr_log}. "
+            "Set TWA_PUBLIC_URL manually if needed."
+        )
+        return False
+
+
 def _start_twa_stack() -> None:
     if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
         return
@@ -55,31 +525,117 @@ def _start_twa_stack() -> None:
         logger.warning("TWA server script not found, skipping Mini App bootstrap")
         return
 
+    twa_port = os.getenv("TWA_PORT", "5000").strip() or "5000"
+    try:
+        twa_port_int = int(twa_port)
+    except ValueError:
+        logger.warning(f"Invalid TWA_PORT='{twa_port}', fallback to 5000")
+        twa_port = "5000"
+        twa_port_int = 5000
+
+    selected_port_int = twa_port_int
+    selected_port = str(selected_port_int)
+    reuse_existing_server = False
+    if _is_port_open("127.0.0.1", twa_port_int):
+        if _is_twa_http_healthy(twa_port_int):
+            reuse_existing_server = True
+            logger.info(f"TWA backend already running on port {twa_port}, reusing existing server.")
+        else:
+            fallback_port = _find_available_port(twa_port_int + 1)
+            selected_port_int = fallback_port
+            selected_port = str(fallback_port)
+            logger.warning(
+                f"TWA port {twa_port} is occupied but /api/health is not responding. "
+                f"Starting a fresh backend on port {selected_port}."
+            )
+
+    twa_port_int = selected_port_int
+    twa_port = selected_port
+    os.environ["TWA_PORT"] = twa_port
+
     server_env = os.environ.copy()
-    server_env.setdefault("TELEGRAM_GALLERY_AUTH", "user")
+    server_env.setdefault("TELEGRAM_GALLERY_AUTH", "auto")
+    server_env["TWA_PORT"] = twa_port
 
-    if os.name == "nt":
-        python_exe = sys.executable or "python"
-        server_proc = subprocess.Popen(
-            [python_exe, str(server_script)],
-            cwd=str(root_dir),
-            env=server_env,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    else:
-        server_proc = subprocess.Popen(
-            [sys.executable, str(server_script)],
-            cwd=str(root_dir),
-            env=server_env,
+    if not reuse_existing_server:
+        if os.name == "nt":
+            python_exe = sys.executable or "python"
+            server_proc = subprocess.Popen(
+                [python_exe, str(server_script)],
+                cwd=str(root_dir),
+                env=server_env,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+        else:
+            server_proc = subprocess.Popen(
+                [sys.executable, str(server_script)],
+                cwd=str(root_dir),
+                env=server_env,
+            )
+
+        _aux_processes.append(server_proc)
+        time.sleep(2)
+        if server_proc.poll() is not None:
+            logger.warning("Mini App backend exited early. Check server logs.")
+            return
+
+    explicit_public_url = os.getenv("TWA_PUBLIC_URL", "").strip()
+    if explicit_public_url.startswith("https://"):
+        if _is_public_url_healthy(explicit_public_url):
+            logger.info(f"Using explicit TWA_PUBLIC_URL: {explicit_public_url}")
+            _persist_twa_public_url(root_dir, explicit_public_url)
+            _sync_twa_menu_button(explicit_public_url, root_dir)
+            return
+        logger.warning(
+            "Ignoring explicit TWA_PUBLIC_URL because /api/health is unreachable. "
+            "Starting tunnel provider flow."
         )
 
-    _aux_processes.append(server_proc)
-    time.sleep(2)
-    if server_proc.poll() is not None:
-        logger.warning("Mini App backend exited early. Check server logs.")
+    provider_raw = os.getenv("TWA_TUNNEL_PROVIDER", "auto").strip().lower()
+    provider = provider_raw if provider_raw else "auto"
+
+    if provider == "auto":
+        if not _resolve_ssh_executable():
+            logger.info("TWA Mini App started without public tunnel (ssh client not found).")
+            return
+        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
+            return
+        logger.warning("serveo tunnel failed in auto mode, trying localhost.run...")
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return
+        logger.warning("No tunnel provider succeeded in auto mode.")
+        return
+
+    if provider in {"none", "off", "disabled"}:
+        logger.info("TWA Mini App started without public tunnel (TWA_TUNNEL_PROVIDER=none).")
+        return
+
+    if provider == "serveo":
+        if not _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. serveo autostart disabled by TWA_SERVEO_AUTOSTART.")
+            return
+        if _start_serveo_tunnel(root_dir, twa_port):
+            return
+        logger.warning("serveo failed, falling back to localhost.run...")
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return
+        return
+
+    if provider == "localhostrun":
+        if not _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. localhost.run autostart disabled by TWA_LOCALHOSTRUN_AUTOSTART.")
+            return
+        if _start_localhostrun_tunnel(root_dir, twa_port):
+            return
+        logger.warning("localhost.run failed, falling back to serveo...")
+        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
+            return
+        return
+
+    logger.warning(
+        f"Unknown TWA_TUNNEL_PROVIDER='{provider_raw}'. "
+        "Valid values: auto, serveo, localhostrun, none, off, disabled."
+    )
 
 
 def _stop_aux_processes() -> None:

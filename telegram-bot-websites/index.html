@@ -4,53 +4,82 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>AfterDark Vault</title>
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#12171c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+  <div class="bg-noise"></div>
+
   <div class="app">
-    <header class="app-header">
-      <div class="title-wrap">
-        <span class="title-badge">18+</span>
-        <div>
-          <h1>AfterDark Vault</h1>
-          <p id="sessionText">Connecting Telegram Mini App...</p>
+    <header class="hero surface">
+      <div class="hero-left">
+        <div class="hero-topline">
+          <span class="pill age-pill">18+</span>
+          <span class="pill live-pill">Private Collection</span>
         </div>
+        <p class="kicker">Telegram Media Gallery</p>
+        <h1>AfterDark Vault</h1>
+        <p id="sessionText" class="session-text">Connecting Telegram Mini App...</p>
       </div>
-      <button id="syncBtn" class="btn btn-ghost" type="button">Sync</button>
+      <div class="hero-right">
+        <button id="syncBtn" class="btn btn-primary" type="button">Sync Media</button>
+        <button id="toTopBtn" class="btn btn-ghost" type="button">Back to Top</button>
+      </div>
     </header>
 
-    <section class="toolbar">
-      <input id="searchInput" type="search" placeholder="Search caption or filename">
-      <div class="tabs">
-        <button class="tab active" data-filter="all" type="button">All</button>
-        <button class="tab" data-filter="video" type="button">Videos</button>
-        <button class="tab" data-filter="image" type="button">Images</button>
+    <section class="toolbar surface">
+      <label class="search-wrap" for="searchInput">
+        <span class="search-icon" aria-hidden="true">Search</span>
+        <input id="searchInput" type="search" placeholder="Search caption or filename">
+      </label>
+
+      <div class="tabs" role="tablist" aria-label="Media filter">
+        <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true">All</button>
+        <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false">Videos</button>
+        <button class="tab" data-filter="image" type="button" role="tab" aria-selected="false">Images</button>
       </div>
-      <div class="meta-row">
-        <span id="countText">0 items</span>
-        <span id="syncText">Not synced</span>
+
+      <div class="toolbar-meta">
+        <label class="sort-wrap" for="sortSelect">
+          <span>Sort</span>
+          <select id="sortSelect">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="largest">Largest files</option>
+          </select>
+        </label>
+        <div class="meta-row">
+          <span id="countText">0 items</span>
+          <span id="syncText">Not synced</span>
+        </div>
       </div>
     </section>
 
     <section class="stats">
-      <article><small>Total</small><strong id="statTotal">0</strong></article>
-      <article><small>Videos</small><strong id="statVideos">0</strong></article>
-      <article><small>Images</small><strong id="statImages">0</strong></article>
-      <article><small>Storage</small><strong id="statSize">0 MB</strong></article>
+      <article class="surface stat-card"><small>Total Items</small><strong id="statTotal">0</strong></article>
+      <article class="surface stat-card"><small>Videos</small><strong id="statVideos">0</strong></article>
+      <article class="surface stat-card"><small>Images</small><strong id="statImages">0</strong></article>
+      <article class="surface stat-card"><small>Total Size</small><strong id="statSize">0 MB</strong></article>
     </section>
 
     <main>
       <div id="grid" class="grid"></div>
       <div id="emptyState" class="empty hidden">
-        <p>No media found.</p>
+        <p>No media found for this filter.</p>
       </div>
+      <button id="loadMoreBtn" class="btn load-more hidden" type="button">Load More</button>
     </main>
   </div>
 
   <aside id="viewer" class="viewer hidden" aria-hidden="true">
-    <div class="viewer-shell">
+    <div class="viewer-backdrop"></div>
+    <div class="viewer-shell surface">
       <button id="closeViewer" class="viewer-close" type="button">Close</button>
       <div id="viewerMedia" class="viewer-media"></div>
       <div class="viewer-info">
@@ -61,7 +90,7 @@
           <span id="viewerSize">-</span>
           <span id="viewerDate">-</span>
         </div>
-        <a id="viewerDownload" class="btn btn-primary" href="#" download>Download</a>
+        <a id="viewerDownload" class="btn btn-primary" href="#" download>Download Original</a>
       </div>
     </div>
   </aside>
@@ -69,7 +98,14 @@
   <template id="cardTemplate">
     <article class="card">
       <button class="card-btn" type="button">
-        <div class="thumb"></div>
+        <div class="thumb">
+          <div class="thumb-skeleton"></div>
+          <div class="media-slot"></div>
+          <div class="thumb-overlay">
+            <span class="badge badge-kind"></span>
+            <span class="badge badge-cache"></span>
+          </div>
+        </div>
         <div class="card-body">
           <p class="card-title"></p>
           <p class="card-subtitle"></p>

@@ -3,11 +3,15 @@ import re
 import asyncio
 import logging
 import time
+import json
+import urllib.request
+import urllib.parse
+from pathlib import Path
 from pyrogram import Client, filters
-from pyrogram.types import Message, InputMediaPhoto
+from pyrogram.types import Message, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from datetime import datetime
 
-from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME
+from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME, BOT_TOKEN
 from core.log_manager import LogManager
 from core.file_manager import FileManager
 from core.metrics import metrics
@@ -21,6 +25,106 @@ from users.users import log_user_action
 
 # Get logger
 logger = logging.getLogger("XVideoBot")
+
+
+def _read_cached_twa_public_url() -> str | None:
+    custom_path = os.getenv("TWA_PUBLIC_URL_FILE", "").strip()
+    if custom_path:
+        target = Path(custom_path).expanduser()
+    else:
+        target = Path(__file__).resolve().parent.parent / "data" / "twa_public_url.txt"
+
+    try:
+        if not target.exists():
+            return None
+        url = target.read_text(encoding="utf-8", errors="ignore").strip()
+    except Exception:
+        return None
+
+    if url.startswith("https://"):
+        return url.rstrip("/") + "/"
+    return None
+
+
+def _is_twa_public_url_healthy(url: str) -> bool:
+    normalized = url.strip().rstrip("/")
+    if not normalized.startswith("https://"):
+        return False
+
+    health_url = normalized + "/api/health"
+    try:
+        with urllib.request.urlopen(health_url, timeout=8) as response:
+            if response.status != 200:
+                return False
+            body = json.loads(response.read().decode("utf-8"))
+        return bool(body.get("ok"))
+    except Exception:
+        return False
+
+
+def _discover_twa_public_url() -> str | None:
+    explicit_url = os.getenv("TWA_PUBLIC_URL", "").strip()
+    if explicit_url.startswith("https://") and _is_twa_public_url_healthy(explicit_url):
+        return explicit_url.rstrip("/") + "/"
+
+    cached_url = _read_cached_twa_public_url()
+    if cached_url and _is_twa_public_url_healthy(cached_url):
+        return cached_url
+
+    return None
+
+
+def _set_chat_menu_button(chat_id: int, web_app_url: str, text: str = "Open Vault") -> None:
+    menu_button = {
+        "type": "web_app",
+        "text": text,
+        "web_app": {"url": web_app_url.rstrip("/") + "/"},
+    }
+    payload = urllib.parse.urlencode(
+        {
+            "chat_id": str(chat_id),
+            "menu_button": json.dumps(menu_button),
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/setChatMenuButton",
+        data=payload,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=8) as response:
+        body = json.loads(response.read().decode("utf-8"))
+
+    if not body.get("ok"):
+        raise RuntimeError(f"setChatMenuButton failed: {body}")
+
+
+async def _refresh_menu_for_chat(chat_id: int) -> None:
+    if not str(chat_id).strip():
+        return
+
+    web_app_url = await asyncio.to_thread(_discover_twa_public_url)
+    if not web_app_url:
+        return
+
+    try:
+        await asyncio.to_thread(_set_chat_menu_button, chat_id, web_app_url)
+        logger.info(f"Mini App menu refreshed for chat {chat_id}: {web_app_url}")
+    except Exception as exc:
+        logger.warning(f"Mini App menu refresh failed for chat {chat_id}: {exc}")
+
+
+def _mini_app_inline_keyboard(web_app_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "Open Vault (Mini App)",
+                    web_app=WebAppInfo(url=web_app_url.rstrip("/") + "/"),
+                )
+            ]
+        ]
+    )
 
 def get_version_info() -> str:
     """Get formatted version information"""
@@ -282,6 +386,9 @@ def setup_command_handlers(app: Client):
         """Handle /start command with deep link support"""
         user_id = message.from_user.id
         user_name = message.from_user.first_name
+
+        # Refresh per-chat Mini App URL to prevent stale tunnel links.
+        await _refresh_menu_for_chat(user_id)
         
         # Track metrics
         metrics.increment_commands("start")
@@ -332,6 +439,17 @@ def setup_command_handlers(app: Client):
         welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"
         await message.reply_text(welcome_text + version_footer, reply_markup=keyboard)
+
+        # Fallback launcher: helps when Telegram still caches an old menu button URL.
+        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
+        if web_app_url:
+            try:
+                await message.reply_text(
+                    "Open the Mini App directly:",
+                    reply_markup=_mini_app_inline_keyboard(web_app_url),
+                )
+            except Exception as exc:
+                logger.warning(f"Mini App direct button send failed for chat {user_id}: {exc}")
 
     @app.on_message(filters.private & filters.command("help"))
     async def help_handler(client: Client, message: Message) -> None:
