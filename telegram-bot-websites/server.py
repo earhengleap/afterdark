@@ -56,6 +56,18 @@ DOWNLOAD_TIMEOUT_SECONDS = max(10, int(os.getenv("TWA_DOWNLOAD_TIMEOUT_SECONDS",
 SERVICE_START_TIMEOUT_SECONDS = max(5, int(os.getenv("TWA_SERVICE_START_TIMEOUT_SECONDS", "20")))
 EAGER_DOWNLOAD_MEDIA = os.getenv("TWA_EAGER_DOWNLOAD_MEDIA", "0").strip() == "1"
 EAGER_VIDEO_THUMBS = os.getenv("TWA_EAGER_VIDEO_THUMBS", "0").strip() == "1"
+LIVE_SYNC_ENABLED = os.getenv("TWA_LIVE_SYNC", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
+try:
+    LIVE_SYNC_SECONDS = max(5, int(os.getenv("TWA_LIVE_SYNC_SECONDS", "8").strip() or "8"))
+except ValueError:
+    LIVE_SYNC_SECONDS = 8
+try:
+    _live_limit_raw = int(os.getenv("TWA_LIVE_SYNC_LIMIT", "120").strip() or "120")
+except ValueError:
+    _live_limit_raw = 120
+if _live_limit_raw <= 0:
+    _live_limit_raw = 120
+LIVE_SYNC_LIMIT = max(20, min(_live_limit_raw, 500))
 
 GALLERY_AUTH_MODE = os.getenv("TELEGRAM_GALLERY_AUTH", "auto").strip().lower()
 if GALLERY_AUTH_MODE not in {"auto", "bot", "user"}:
@@ -84,6 +96,15 @@ def apply_limit(items: List[Dict[str, Any]], limit: Optional[int]) -> List[Dict[
     if limit is None:
         return items
     return items[:limit]
+
+
+def latest_message_id(items: List[Dict[str, Any]]) -> int:
+    if not items:
+        return 0
+    try:
+        return int(items[0].get("message_id", 0))
+    except (TypeError, ValueError, AttributeError):
+        return 0
 
 
 class TelegramMiniAppAuth:
@@ -545,6 +566,7 @@ service = TelegramGalleryService(cache_dir=WEB_DIR / "media_cache")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     startup_sync_task: Optional[asyncio.Task] = None
+    live_sync_task: Optional[asyncio.Task] = None
 
     async def run_startup_sync() -> None:
         startup_raw = os.getenv("TWA_STARTUP_SYNC_LIMIT", "all").strip().lower()
@@ -559,10 +581,27 @@ async def lifespan(_: FastAPI):
         except HTTPException:
             pass
 
+    async def run_live_sync() -> None:
+        if not LIVE_SYNC_ENABLED:
+            return
+
+        # Let startup sync warm cache first, then keep recent messages updated.
+        await asyncio.sleep(3)
+        while True:
+            try:
+                await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False)
+            except HTTPException:
+                pass
+            except Exception:
+                pass
+            await asyncio.sleep(LIVE_SYNC_SECONDS)
+
     try:
         await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
         # Start background sync at boot, defaulting to full-history collection.
         startup_sync_task = asyncio.create_task(run_startup_sync())
+        # Keep recent group posts synced so Mini App can update in near real-time.
+        live_sync_task = asyncio.create_task(run_live_sync())
     except Exception as exc:
         # Keep app booting so UI and health endpoint stay reachable.
         service.last_sync_error = f"Startup sync unavailable: {exc}"
@@ -573,10 +612,14 @@ async def lifespan(_: FastAPI):
             startup_sync_task.cancel()
             with suppress(asyncio.CancelledError):
                 await startup_sync_task
+        if live_sync_task and not live_sync_task.done():
+            live_sync_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await live_sync_task
         await service.stop()
 
 
-app = FastAPI(title="Telegram Mini App Gallery", version="3.1.0", lifespan=lifespan)
+app = FastAPI(title="Telegram Mini App Gallery", version="3.2.0", lifespan=lifespan)
 
 app.mount("/media", StaticFiles(directory=str(service.cache_dir)), name="media")
 app.mount("/assets", StaticFiles(directory=str(WEB_DIR)), name="assets")
@@ -781,10 +824,53 @@ async def api_media(
         "items": apply_limit(items, limit_value),
         "total": len(items),
         "requested_limit": "all" if limit_value is None else limit_value,
+        "latest_message_id": latest_message_id(items),
         "synced_at": service.last_sync_at,
         "chat_id": CHAT_ID,
         "webapp": context,
         "sync_error": effective_sync_error,
+        "session_mode": service.session_mode,
+    }
+
+
+@app.get("/api/media/recent")
+async def api_media_recent(
+    limit: str = Query("120"),
+    refresh: bool = Query(False),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+
+    try:
+        parsed_limit = parse_limit_value(limit, default=120)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid limit '{limit}': {exc}") from exc
+
+    if parsed_limit is None:
+        limit_value = 120
+    else:
+        limit_value = max(1, min(int(parsed_limit), 500))
+
+    sync_error: Optional[str] = None
+    if refresh or not service.media_index:
+        try:
+            items = await service.sync_group_media(limit=limit_value, force_redownload=False)
+        except HTTPException as exc:
+            items = service.media_index
+            sync_error = str(exc.detail)
+    else:
+        items = service.media_index
+
+    return {
+        "items": apply_limit(items, limit_value),
+        "total": len(items),
+        "requested_limit": limit_value,
+        "latest_message_id": latest_message_id(items),
+        "synced_at": service.last_sync_at,
+        "chat_id": CHAT_ID,
+        "webapp": context,
+        "sync_error": sync_error,
         "session_mode": service.session_mode,
     }
 
@@ -813,6 +899,7 @@ async def api_sync(
         "items": apply_limit(items, limit_value),
         "total": len(items),
         "requested_limit": "all" if limit_value is None else limit_value,
+        "latest_message_id": latest_message_id(items),
         "synced_at": service.last_sync_at,
         "chat_id": CHAT_ID,
         "webapp": context,
@@ -831,6 +918,9 @@ async def api_health() -> Dict[str, Any]:
         "strict_twa_verify": STRICT_TWA_VERIFY,
         "session_mode": service.session_mode,
         "last_sync_error": service.last_sync_error,
+        "live_sync_enabled": LIVE_SYNC_ENABLED,
+        "live_sync_seconds": LIVE_SYNC_SECONDS,
+        "live_sync_limit": LIVE_SYNC_LIMIT,
     }
 
 

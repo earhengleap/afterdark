@@ -15,6 +15,11 @@ const state = {
   pageSize: 36,
   thumbObserver: null,
   syncing: false,
+  livePollTimer: null,
+  livePolling: false,
+  livePollSeconds: 8,
+  liveRecentLimit: 120,
+  latestMessageId: 0,
 };
 
 const elements = {
@@ -370,6 +375,7 @@ function applyApiPayload(data, resetVisible = true) {
   state.syncAt = data.synced_at || null;
   state.syncError = data.sync_error || null;
   state.sessionMode = data.session_mode || null;
+  state.latestMessageId = Number(data.latest_message_id) || (state.items.length ? Number(state.items[0].message_id) || 0 : 0);
 
   renderStats();
   applyFilter(resetVisible);
@@ -393,6 +399,113 @@ async function loadMedia(refresh = false) {
 
   const data = await res.json();
   applyApiPayload(data, true);
+}
+
+function mergeRecentPayload(data) {
+  const incoming = Array.isArray(data.items) ? normalizeItems(data.items) : [];
+  if (!incoming.length) {
+    state.syncAt = data.synced_at || state.syncAt;
+    updateMetaRow();
+    return;
+  }
+
+  const map = new Map();
+  state.items.forEach((item) => {
+    const id = Number(item.message_id) || 0;
+    if (id > 0) {
+      map.set(id, item);
+    }
+  });
+
+  incoming.forEach((item) => {
+    const id = Number(item.message_id) || 0;
+    if (id <= 0) return;
+    const prev = map.get(id);
+    map.set(id, prev ? { ...prev, ...item } : item);
+  });
+
+  state.items = Array.from(map.values());
+  state.items.sort((a, b) => {
+    const byDate = asTime(b.date) - asTime(a.date);
+    if (byDate !== 0) return byDate;
+    return (Number(b.message_id) || 0) - (Number(a.message_id) || 0);
+  });
+
+  const incomingLatest = Number(data.latest_message_id) || 0;
+  const localLatest = state.items.length ? Number(state.items[0].message_id) || 0 : 0;
+  state.latestMessageId = Math.max(state.latestMessageId, incomingLatest, localLatest);
+  state.syncAt = data.synced_at || state.syncAt;
+  state.sessionMode = data.session_mode || state.sessionMode;
+  state.syncError = data.sync_error || null;
+
+  renderStats();
+  applyFilter(false);
+}
+
+async function pollRecentMedia() {
+  if (state.livePolling || state.syncing) return;
+  state.livePolling = true;
+
+  try {
+    const res = await fetch(`/api/media/recent?limit=${state.liveRecentLimit}`, {
+      headers: requestHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return;
+    }
+
+    const data = await res.json();
+    const incomingLatest = Number(data.latest_message_id) || 0;
+    const shouldMerge = incomingLatest > state.latestMessageId || (Number(data.total) || 0) > state.items.length;
+
+    if (shouldMerge) {
+      mergeRecentPayload(data);
+    } else {
+      state.syncAt = data.synced_at || state.syncAt;
+      updateMetaRow();
+    }
+  } catch (error) {
+    console.error("Live update poll failed", error);
+  } finally {
+    state.livePolling = false;
+  }
+}
+
+async function startLiveUpdates() {
+  try {
+    const res = await fetch("/api/health", {
+      headers: requestHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const health = await res.json();
+      const sec = Number(health.live_sync_seconds);
+      const lim = Number(health.live_sync_limit);
+      if (Number.isFinite(sec) && sec > 0) {
+        state.livePollSeconds = Math.max(5, Math.floor(sec));
+      }
+      if (Number.isFinite(lim) && lim > 0) {
+        state.liveRecentLimit = Math.max(20, Math.min(500, Math.floor(lim)));
+      }
+    }
+  } catch (_) {
+    // Keep defaults when health metadata is unavailable.
+  }
+
+  if (state.livePollTimer) {
+    clearInterval(state.livePollTimer);
+  }
+
+  state.livePollTimer = window.setInterval(() => {
+    void pollRecentMedia();
+  }, state.livePollSeconds * 1000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void pollRecentMedia();
+    }
+  });
 }
 
 function setSyncButtonLoading(isLoading) {
@@ -528,6 +641,7 @@ async function bootstrap() {
   try {
     await fetchContext();
     await loadMedia(false);
+    await startLiveUpdates();
   } catch (error) {
     console.error(error);
     setSessionText("Failed to initialize Mini App");

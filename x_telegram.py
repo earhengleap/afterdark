@@ -343,6 +343,15 @@ def _is_public_url_healthy(public_url: str) -> bool:
         return False
 
 
+def _wait_for_public_url_health(public_url: str, timeout_seconds: int) -> bool:
+    deadline = time.time() + max(1, timeout_seconds)
+    while time.time() < deadline:
+        if _is_public_url_healthy(public_url):
+            return True
+        time.sleep(1)
+    return False
+
+
 def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
     ssh_executable = _resolve_ssh_executable()
     if not ssh_executable:
@@ -417,6 +426,24 @@ def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
 
     public_url = _wait_for_serveo_public_url(root_dir, timeout_seconds)
     if public_url:
+        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+        try:
+            health_timeout = max(3, int(health_timeout_raw))
+        except ValueError:
+            health_timeout = 18
+
+        if not _wait_for_public_url_health(public_url, health_timeout):
+            logger.warning(
+                f"serveo URL is not healthy after {health_timeout}s: {public_url}. "
+                "Trying fallback provider."
+            )
+            try:
+                if tunnel_proc.poll() is None:
+                    tunnel_proc.terminate()
+            except Exception:
+                pass
+            return False
+
         logger.info(f"TWA serveo tunnel active: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
@@ -503,6 +530,24 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
 
     public_url = _wait_for_localhostrun_public_url(root_dir, timeout_seconds)
     if public_url:
+        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+        try:
+            health_timeout = max(3, int(health_timeout_raw))
+        except ValueError:
+            health_timeout = 18
+
+        if not _wait_for_public_url_health(public_url, health_timeout):
+            logger.warning(
+                f"localhost.run URL is not healthy after {health_timeout}s: {public_url}. "
+                "Trying fallback provider."
+            )
+            try:
+                if tunnel_proc.poll() is None:
+                    tunnel_proc.terminate()
+            except Exception:
+                pass
+            return False
+
         logger.info(f"TWA localhost.run tunnel active: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
