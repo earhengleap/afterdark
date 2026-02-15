@@ -50,6 +50,7 @@ const elements = {
   viewer: document.getElementById("viewer"),
   viewerMedia: document.getElementById("viewerMedia"),
   viewerTitle: document.getElementById("viewerTitle"),
+  viewerDescription: document.getElementById("viewerDescription"),
   viewerCaption: document.getElementById("viewerCaption"),
   viewerType: document.getElementById("viewerType"),
   viewerSize: document.getElementById("viewerSize"),
@@ -239,7 +240,7 @@ function applyFilter(resetVisible = true) {
 
   if (q) {
     items = items.filter((item) => {
-      const hay = `${item.ai_title || ""} ${item.caption || ""} ${item.file_name || ""}`.toLowerCase();
+      const hay = `${item.ai_title || ""} ${item.ai_description || ""} ${item.caption || ""} ${item.file_name || ""}`.toLowerCase();
       return hay.includes(q);
     });
   }
@@ -395,6 +396,9 @@ function openViewer(item) {
   }
 
   elements.viewerTitle.textContent = titleFor(item);
+  if (elements.viewerDescription) {
+    elements.viewerDescription.textContent = (item.ai_description || "").trim() || "No AI description yet";
+  }
   elements.viewerCaption.textContent = item.caption || "No caption";
   elements.viewerType.textContent = item.media_kind;
   elements.viewerSize.textContent = fmtBytes(item.size);

@@ -573,6 +573,7 @@ class TelegramGalleryService:
                     "duration": None,
                     "caption": "",
                     "ai_title": "",
+                    "ai_description": "",
                     "date": modified_at,
                 }
             )
@@ -606,17 +607,28 @@ class TelegramGalleryService:
         changed = False
         for entry in self.media_index:
             title = str(entry.get("ai_title", "")).strip()
-            if not title:
-                continue
-            if not self._contains_blocked_title_terms(title):
+            description = str(entry.get("ai_description", "")).strip()
+            if not title and not description:
                 continue
 
-            # Remove unsafe title and re-enqueue for adult-only re-analysis.
+            blocked = False
+            if title and self._contains_blocked_title_terms(title):
+                blocked = True
+            if description and self._contains_blocked_title_terms(description):
+                blocked = True
+
+            if not blocked:
+                continue
+
+            # Remove unsafe AI fields and re-enqueue for re-analysis.
             entry["ai_title"] = ""
+            entry["ai_description"] = ""
             entry["ai_title_style"] = ""
             entry["ai_title_model"] = ""
             entry["ai_title_generated_at"] = None
             entry["ai_title_is_fallback"] = False
+            entry["ai_description_model"] = ""
+            entry["ai_description_generated_at"] = None
             try:
                 msg_id = int(entry.get("message_id", 0))
             except (TypeError, ValueError):
@@ -644,10 +656,21 @@ class TelegramGalleryService:
                     merged_item["ai_title_generated_at"] = None
                     merged_item["ai_title_is_fallback"] = False
 
+                incoming_description = str(merged_item.get("ai_description", "")).strip()
+                if incoming_description and self._contains_blocked_title_terms(incoming_description):
+                    merged_item["ai_description"] = ""
+                    merged_item["ai_description_model"] = ""
+                    merged_item["ai_description_generated_at"] = None
+
                 if not str(merged_item.get("ai_title", "")).strip():
                     old_ai_title = str(old_item.get("ai_title", "")).strip()
                     if old_ai_title and not self._contains_blocked_title_terms(old_ai_title):
                         merged_item["ai_title"] = old_ai_title
+
+                if not str(merged_item.get("ai_description", "")).strip():
+                    old_ai_desc = str(old_item.get("ai_description", "")).strip()
+                    if old_ai_desc and not self._contains_blocked_title_terms(old_ai_desc):
+                        merged_item["ai_description"] = old_ai_desc
                 merged_map[msg_id] = merged_item
             else:
                 merged_map[msg_id] = old_item
@@ -749,6 +772,43 @@ class TelegramGalleryService:
         if max_chars > 0 and len(cleaned) > max_chars:
             cleaned = cleaned[:max_chars].rstrip()
         return cleaned.strip()
+
+    @staticmethod
+    def _sanitize_ai_description(value: str, max_chars: int = 900) -> str:
+        cleaned = " ".join((value or "").replace("\r", " ").replace("\n", " ").split()).strip()
+        if not cleaned:
+            return ""
+        if cleaned.startswith("\"") and cleaned.endswith("\"") and len(cleaned) > 1:
+            cleaned = cleaned[1:-1].strip()
+        if max_chars > 0 and len(cleaned) > max_chars:
+            cleaned = cleaned[:max_chars].rstrip()
+        return cleaned.strip()
+
+    @staticmethod
+    def _extract_json_object(value: str) -> Optional[Dict[str, Any]]:
+        """Parse a JSON object from a model response, best-effort."""
+        raw = (value or "").strip()
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        snippet = raw[start : end + 1]
+        try:
+            parsed = json.loads(snippet)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            return None
+        return None
 
     @staticmethod
     def _normalize_title_key(value: str) -> str:
@@ -987,10 +1047,15 @@ class TelegramGalleryService:
     def _ai_title_needs_generation(entry: Dict[str, Any], mode: str) -> bool:
         """Return True if this entry should be (re)analyzed according to retitle mode."""
         current_title = str(entry.get("ai_title", "")).strip()
+        current_description = str(entry.get("ai_description", "")).strip()
         if not current_title:
+            return True
+        if not current_description:
             return True
         # If a previously-generated title contains blocked terms, always retitle.
         if TelegramGalleryService._contains_blocked_title_terms(current_title):
+            return True
+        if TelegramGalleryService._contains_blocked_title_terms(current_description):
             return True
 
         mode_norm = (mode or "missing").strip().lower() or "missing"
@@ -1260,6 +1325,93 @@ class TelegramGalleryService:
             return None
         title, _model = result
         return title
+
+    def _ollama_analyze_image_path(
+        self,
+        image_path: Path,
+        media_kind: str,
+        caption: str,
+        message_id: int,
+    ) -> Optional[Tuple[str, str, str]]:
+        """Analyze an image (or extracted video frame) and return (title, description, model)."""
+        if not image_path.exists():
+            return None
+
+        image_bytes = self._prepare_ai_image_bytes(image_path)
+        if not image_bytes:
+            return None
+
+        # User requested analysis driven by the media itself. Captions are accepted but not used by default.
+        _ = caption
+
+        prompt_suffix = ""
+        if media_kind == "video":
+            prompt_suffix = " The image is a preview frame from an adult video."
+
+        prompt = (
+            "Analyze this adult-only media image and output ONLY valid JSON.\n"
+            'Keys: "title", "description".\n'
+            'title: 4-10 words, plain text, no emojis, no hashtags, no quotes. Tasteful, non-explicit.\n'
+            "description: 1-3 sentences describing what is visible. Avoid graphic anatomical terms or explicit sex-act detail. "
+            "Do not guess age, ethnicity, or anything not visible. Avoid violence or coercion.\n"
+            f"Unique seed: {int(message_id)}.\n"
+            "Return JSON only."
+            f"{prompt_suffix}"
+        ).strip()
+
+        encoded_image = base64.b64encode(image_bytes).decode("ascii")
+        models_to_try = [AI_TITLE_MODEL] + list(AI_TITLE_FALLBACK_MODELS)
+
+        for model_name in models_to_try:
+            if not model_name:
+                continue
+
+            payload = {
+                "model": model_name,
+                "prompt": prompt,
+                "images": [encoded_image],
+                "stream": False,
+                "options": {"temperature": 0.25, "num_predict": 220},
+            }
+
+            data = json.dumps(payload).encode("utf-8")
+            request = urllib.request.Request(
+                AI_TITLE_OLLAMA_URL,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            try:
+                with urllib.request.urlopen(request, timeout=AI_TITLE_TIMEOUT_SECONDS) as response:
+                    body = response.read().decode("utf-8", errors="ignore")
+                parsed = json.loads(body)
+                if parsed.get("error"):
+                    break
+
+                raw = self._sanitize_ai_vision_text(str(parsed.get("response", "")), max_chars=1600)
+                if self._looks_like_refusal_text(raw):
+                    continue
+
+                obj = self._extract_json_object(raw)
+                if not obj:
+                    continue
+
+                title = self._sanitize_ai_title(str(obj.get("title", "")))
+                # Enforce a compact title even if the model is chatty.
+                title = self._clamp_title_words(title, min_words=3, max_words=10)
+                description = self._sanitize_ai_description(str(obj.get("description", "")), max_chars=900)
+
+                if not title or not description:
+                    continue
+                if self._contains_blocked_title_terms(title) or self._contains_blocked_title_terms(description):
+                    continue
+
+                return title, description, model_name
+            except Exception:
+                continue
+
+        return None
 
     def _ollama_title_from_image_path(
         self,
@@ -1609,12 +1761,12 @@ class TelegramGalleryService:
             return None
 
         caption_text = str(item.get("caption") or message.caption or "").strip()
-        result: Optional[Tuple[str, str, bool]]
+        result: Optional[Tuple[str, str, str]]
         if AI_TITLE_PER_ITEM_TIMEOUT_SECONDS > 0:
             try:
                 result = await asyncio.wait_for(
                     asyncio.to_thread(
-                        self._ollama_title_from_image_path,
+                        self._ollama_analyze_image_path,
                         source_image,
                         media_kind,
                         caption_text,
@@ -1626,38 +1778,32 @@ class TelegramGalleryService:
                 return None
         else:
             result = await asyncio.to_thread(
-                self._ollama_title_from_image_path,
+                self._ollama_analyze_image_path,
                 source_image,
                 media_kind,
                 caption_text,
                 message_id,
             )
-        if not result:
-            return None
-        title, used_model, is_fallback = result
-        # If we only had a low-res Telegram thumb for an image and it yielded a fallback title,
+
+        # If we only had a low-res Telegram thumb for an image and analysis failed,
         # download the full image once and retry for better analysis.
-        if (
-            media_kind == "image"
-            and bool(is_fallback)
-            and source_image.name.endswith("_image_ai_thumb.jpg")
-        ):
+        if not result and media_kind == "image" and source_image.name.endswith("_image_ai_thumb.jpg"):
             full_image = await self._ensure_image_cached_for_ai(item, message)
             if full_image and full_image.exists():
                 try:
-                    retry_result = await asyncio.to_thread(
-                        self._ollama_title_from_image_path,
+                    result = await asyncio.to_thread(
+                        self._ollama_analyze_image_path,
                         full_image,
                         media_kind,
                         caption_text,
                         message_id,
                     )
                 except Exception:
-                    retry_result = None
-                if retry_result:
-                    retry_title, retry_model, retry_is_fallback = retry_result
-                    if retry_title and not retry_is_fallback:
-                        title, used_model, is_fallback = retry_title, retry_model, retry_is_fallback
+                    result = None
+
+        if not result:
+            return None
+        title, description, used_model = result
         if not title:
             return None
 
@@ -1665,7 +1811,10 @@ class TelegramGalleryService:
         item["ai_title_style"] = AI_TITLE_STYLE
         item["ai_title_model"] = used_model
         item["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
-        item["ai_title_is_fallback"] = bool(is_fallback)
+        item["ai_title_is_fallback"] = False
+        item["ai_description"] = description
+        item["ai_description_model"] = used_model
+        item["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
         return title
 
     async def generate_missing_ai_titles(self, batch_size: int, recent_limit: int, mode: str = "missing") -> int:
@@ -1742,13 +1891,6 @@ class TelegramGalleryService:
                 non_image_candidates.sort(key=_candidate_key)
                 candidates = image_candidates + non_image_candidates
 
-            async with self._lock:
-                used_title_keys = {
-                    self._normalize_title_key(str(x.get("ai_title", "")))
-                    for x in self.media_index
-                    if str(x.get("ai_title", "")).strip()
-                }
-
             generated = 0
             changed = False
             attempts = 0
@@ -1786,6 +1928,9 @@ class TelegramGalleryService:
                         "is_cached",
                         "size",
                         "thumb_url",
+                        "ai_description",
+                        "ai_description_model",
+                        "ai_description_generated_at",
                         "ai_title_style",
                         "ai_title_model",
                         "ai_title_generated_at",
@@ -1795,12 +1940,7 @@ class TelegramGalleryService:
                         if value not in (None, ""):
                             current[field] = value
 
-                    old_key = self._normalize_title_key(str(current.get("ai_title", "")))
-                    if old_key:
-                        used_title_keys.discard(old_key)
-
-                    title = self._ensure_unique_ai_title(title, message_id=message_id, used_keys=used_title_keys)
-                    current["ai_title"] = title
+                    current["ai_title"] = self._sanitize_ai_title(title)
                     generated += 1
                     changed = True
                     if message_id in self._ai_queue_ids:
@@ -1909,6 +2049,9 @@ class TelegramGalleryService:
                     if existing_ai_title and self._contains_blocked_title_terms(existing_ai_title):
                         # Never surface unsafe prior titles; re-analyze instead.
                         existing_ai_title = ""
+                    existing_ai_description = str(existing_item.get("ai_description", "")).strip()
+                    if existing_ai_description and self._contains_blocked_title_terms(existing_ai_description):
+                        existing_ai_description = ""
 
                     thumb_url: Optional[str]
                     if media_kind == "image":
@@ -1938,14 +2081,17 @@ class TelegramGalleryService:
                         "duration": getattr(media_obj, "duration", None),
                         "caption": (message.caption or "").strip(),
                         "ai_title": existing_ai_title,
+                        "ai_description": existing_ai_description,
                         "ai_title_style": str(existing_item.get("ai_title_style", "")).strip(),
                         "ai_title_model": str(existing_item.get("ai_title_model", "")).strip(),
                         "ai_title_generated_at": existing_item.get("ai_title_generated_at"),
                         "ai_title_is_fallback": bool(existing_item.get("ai_title_is_fallback")),
+                        "ai_description_model": str(existing_item.get("ai_description_model", "")).strip(),
+                        "ai_description_generated_at": existing_item.get("ai_description_generated_at"),
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
                     }
                     items.append(item)
-                    if limit is not None and not existing_ai_title:
+                    if limit is not None and (not existing_ai_title or not existing_ai_description):
                         # Prefer near real-time titles for recent media (live sync + UI polls).
                         self._enqueue_ai_title(int(message.id))
 
@@ -2327,7 +2473,7 @@ async def api_media(
                 continue
             if msg_id <= 0:
                 continue
-            if str(entry.get("ai_title", "")).strip():
+            if str(entry.get("ai_title", "")).strip() and str(entry.get("ai_description", "")).strip():
                 continue
             service._enqueue_ai_title(msg_id)
 
@@ -2416,7 +2562,7 @@ async def api_media_page(
                 continue
             if msg_id <= 0:
                 continue
-            if str(entry.get("ai_title", "")).strip():
+            if str(entry.get("ai_title", "")).strip() and str(entry.get("ai_description", "")).strip():
                 continue
             service._enqueue_ai_title(msg_id)
 
@@ -2486,7 +2632,7 @@ async def api_media_recent(
                 continue
             if msg_id <= 0:
                 continue
-            if str(entry.get("ai_title", "")).strip():
+            if str(entry.get("ai_title", "")).strip() and str(entry.get("ai_description", "")).strip():
                 continue
             service._enqueue_ai_title(msg_id)
 
