@@ -62,6 +62,10 @@ tests/_tmp/
 Thumbs.db
 desktop.ini
 
+# Local git worktrees
+.worktrees/
+worktrees/
+
 # Replit
 # .replit
 replit.nix
