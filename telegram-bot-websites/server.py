@@ -2091,9 +2091,16 @@ class TelegramGalleryService:
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
                     }
                     items.append(item)
-                    if limit is not None and (not existing_ai_title or not existing_ai_description):
-                        # Prefer near real-time titles for recent media (live sync + UI polls).
+                    # Always enqueue items without AI titles for real-time processing
+                    if not existing_ai_title or not existing_ai_description:
                         self._enqueue_ai_title(int(message.id))
+                        # If this is a new item (no existing entry), prioritize it
+                        if not existing_item:
+                            # Move to front of queue for immediate processing
+                            msg_id = int(message.id)
+                            if msg_id in self._ai_queue_ids and msg_id in self._ai_queue:
+                                self._ai_queue.remove(msg_id)
+                                self._ai_queue.appendleft(msg_id)
 
             try:
                 if limit is None:
@@ -2213,17 +2220,53 @@ async def lifespan(_: FastAPI):
 
         # Wait a bit so cache and live sync can warm first.
         await asyncio.sleep(6)
+        
+        consecutive_empty = 0
         while True:
             try:
                 # Prefer quick, real-time titling for newly fetched media.
                 queue_len = len(service._ai_queue)  # noqa: SLF001 - internal queue for real-time prioritization
                 batch = AI_TITLE_BATCH_SIZE
+                
+                # Dynamic batch sizing based on queue length
                 if queue_len > 0:
-                    batch = max(batch, min(12, max(4, queue_len)))
-                await service.generate_missing_ai_titles(batch_size=batch, recent_limit=AI_TITLE_RECENT_SCAN_LIMIT, mode=AI_TITLE_RETITLE_MODE)
+                    # Process more items when queue is growing
+                    batch = max(batch, min(20, max(4, queue_len)))
+                    # If queue is large, process faster
+                    if queue_len > 10:
+                        batch = min(25, queue_len)
+                
+                generated = await service.generate_missing_ai_titles(
+                    batch_size=batch, 
+                    recent_limit=AI_TITLE_RECENT_SCAN_LIMIT, 
+                    mode=AI_TITLE_RETITLE_MODE
+                )
+                
+                # Adaptive polling: if we generated titles, keep going fast
+                if generated > 0:
+                    consecutive_empty = 0
+                    # Short sleep if we made progress and queue still has items
+                    if len(service._ai_queue) > 0:
+                        await asyncio.sleep(2)
+                        continue
+                else:
+                    consecutive_empty += 1
+                    
             except Exception:
                 pass
-            await asyncio.sleep(AI_TITLE_POLL_SECONDS)
+            
+            # Adaptive sleep: shorter when queue is building up
+            queue_len = len(service._ai_queue)
+            if queue_len > 20:
+                sleep_time = 3  # Very fast when lots queued
+            elif queue_len > 5:
+                sleep_time = 5  # Fast when some queued
+            elif consecutive_empty > 5:
+                sleep_time = AI_TITLE_POLL_SECONDS  # Normal when idle
+            else:
+                sleep_time = 8  # Moderate when active but empty
+                
+            await asyncio.sleep(sleep_time)
 
     try:
         async def connect_gallery() -> None:
@@ -2771,6 +2814,134 @@ async def api_ai_titles(
     }
 
 
+@app.get("/api/media/{message_id}/ai-status")
+async def api_media_ai_status(
+    message_id: int,
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Get AI title/description generation status for a specific media item."""
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    async with service._lock:
+        item = next(
+            (x for x in service.media_index if int(x.get("message_id", 0)) == message_id),
+            None,
+        )
+    
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Media item {message_id} not found")
+    
+    has_title = bool(str(item.get("ai_title", "")).strip())
+    has_description = bool(str(item.get("ai_description", "")).strip())
+    is_queued = message_id in service._ai_queue_ids
+    
+    # If missing AI content and not queued, enqueue it
+    if AI_TITLE_ENABLED and not (has_title and has_description) and not is_queued:
+        service._enqueue_ai_title(message_id)
+        is_queued = True
+        # Trigger immediate processing
+        if not service._ai_title_lock.locked():
+            asyncio.create_task(
+                service.generate_missing_ai_titles(
+                    batch_size=min(3, AI_TITLE_BATCH_SIZE),
+                    recent_limit=50,
+                    mode="missing",
+                )
+            )
+    
+    return {
+        "ok": True,
+        "message_id": message_id,
+        "has_ai_title": has_title,
+        "has_ai_description": has_description,
+        "ai_title": item.get("ai_title", ""),
+        "ai_description": item.get("ai_description", ""),
+        "ai_title_model": item.get("ai_title_model", ""),
+        "ai_description_model": item.get("ai_description_model", ""),
+        "ai_title_generated_at": item.get("ai_title_generated_at"),
+        "ai_description_generated_at": item.get("ai_description_generated_at"),
+        "is_queued": is_queued,
+        "queue_position": list(service._ai_queue).index(message_id) if is_queued and message_id in service._ai_queue else None,
+        "queue_length": len(service._ai_queue),
+        "webapp": context,
+    }
+
+
+@app.post("/api/media/{message_id}/generate-ai")
+async def api_generate_ai_for_item(
+    message_id: int,
+    priority: bool = Query(True),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Force immediate AI title/description generation for a specific item."""
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not AI_TITLE_ENABLED:
+        raise HTTPException(status_code=503, detail="AI titles are disabled")
+    
+    async with service._lock:
+        item = next(
+            (x for x in service.media_index if int(x.get("message_id", 0)) == message_id),
+            None,
+        )
+    
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Media item {message_id} not found")
+    
+    # Remove from queue if already there (will be re-added at front)
+    if message_id in service._ai_queue_ids:
+        service._ai_queue_ids.discard(message_id)
+        with suppress(ValueError):
+            service._ai_queue.remove(message_id)
+    
+    # Add to front of queue for priority processing
+    service._ai_queue.appendleft(message_id)
+    service._ai_queue_ids.add(message_id)
+    
+    # Generate immediately
+    try:
+        title = await asyncio.wait_for(
+            service._generate_ai_title_for_item(item, mode="force"),
+            timeout=30,
+        )
+        
+        async with service._lock:
+            current = next(
+                (x for x in service.media_index if int(x.get("message_id", 0)) == message_id),
+                None,
+            )
+            if current and title:
+                current["ai_title"] = title
+                current["ai_title_model"] = item.get("ai_title_model", "")
+                current["ai_title_generated_at"] = item.get("ai_title_generated_at")
+                current["ai_description"] = item.get("ai_description", "")
+                current["ai_description_model"] = item.get("ai_description_model", "")
+                current["ai_description_generated_at"] = item.get("ai_description_generated_at")
+                service._save_index()
+        
+        return {
+            "ok": True,
+            "message_id": message_id,
+            "generated": True,
+            "ai_title": title,
+            "ai_description": item.get("ai_description", ""),
+            "webapp": context,
+        }
+    except asyncio.TimeoutError:
+        return {
+            "ok": True,
+            "message_id": message_id,
+            "generated": False,
+            "queued": True,
+            "message": "AI generation is taking longer than expected, queued for background processing",
+            "webapp": context,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
+
+
 @app.get("/api/health")
 async def api_health() -> Dict[str, Any]:
     return {
@@ -2802,6 +2973,8 @@ async def api_health() -> Dict[str, Any]:
         "ai_title_image_priority": AI_TITLE_IMAGE_PRIORITY,
         "ai_title_max_image_side": AI_TITLE_MAX_IMAGE_SIDE,
         "ai_title_image_quality": AI_TITLE_IMAGE_QUALITY,
+        "ai_queue_length": len(service._ai_queue),
+        "ai_titled_count": count_ai_titled_items(service.media_index),
     }
 
 

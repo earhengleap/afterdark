@@ -884,6 +884,139 @@ function mergeRecentPayload(data) {
   applyFilter(false);
 }
 
+// Real-time AI title checking
+const aiCheckState = {
+  checking: new Set(),
+  checkTimer: null,
+  checkInterval: 3000, // Check every 3 seconds
+};
+
+async function checkAIStatusForItem(messageId) {
+  if (aiCheckState.checking.has(messageId)) return;
+  aiCheckState.checking.add(messageId);
+  
+  try {
+    const res = await fetch(`/api/media/${messageId}/ai-status`, {
+      headers: requestHeaders(),
+      cache: "no-store",
+    });
+    
+    if (!res.ok) return;
+    
+    const data = await res.json();
+    if (!data.ok) return;
+    
+    // Find item in state and update
+    const item = state.items.find(x => Number(x.message_id) === messageId);
+    if (!item) return;
+    
+    const hadAI = hasAIEnhancement(item);
+    const hasAI = data.has_ai_title || data.has_ai_description;
+    
+    // Update item with AI data
+    if (data.ai_title) item.ai_title = data.ai_title;
+    if (data.ai_description) item.ai_description = data.ai_description;
+    if (data.ai_title_model) item.ai_title_model = data.ai_title_model;
+    if (data.ai_description_model) item.ai_description_model = data.ai_description_model;
+    if (data.ai_title_generated_at) item.ai_title_generated_at = data.ai_title_generated_at;
+    if (data.ai_description_generated_at) item.ai_description_generated_at = data.ai_description_generated_at;
+    
+    // If AI content was just added, refresh UI
+    if (!hadAI && hasAI) {
+      renderGrid();
+      showToast("✨ AI title ready!", "ai", 2000);
+    }
+    
+    // Stop checking if both title and description are ready
+    if (data.has_ai_title && data.has_ai_description) {
+      aiCheckState.checking.delete(messageId);
+      return true;
+    }
+    
+    // Continue checking if still queued or processing
+    return false;
+  } catch (err) {
+    console.error("AI status check failed:", err);
+    return false;
+  } finally {
+    aiCheckState.checking.delete(messageId);
+  }
+}
+
+async function checkPendingAIItems() {
+  // Find items without AI titles
+  const pendingItems = state.items.filter(item => {
+    const hasTitle = item.ai_title || item.ai_description;
+    return !hasTitle && !aiCheckState.checking.has(Number(item.message_id));
+  }).slice(0, 10); // Check up to 10 items at a time
+  
+  if (pendingItems.length === 0) return;
+  
+  // Check each pending item
+  await Promise.all(
+    pendingItems.map(item => checkAIStatusForItem(Number(item.message_id)))
+  );
+}
+
+function startAIChecks() {
+  if (aiCheckState.checkTimer) {
+    clearInterval(aiCheckState.checkTimer);
+  }
+  
+  // Check immediately
+  void checkPendingAIItems();
+  
+  // Then check periodically
+  aiCheckState.checkTimer = setInterval(() => {
+    void checkPendingAIItems();
+  }, aiCheckState.checkInterval);
+}
+
+function stopAIChecks() {
+  if (aiCheckState.checkTimer) {
+    clearInterval(aiCheckState.checkTimer);
+    aiCheckState.checkTimer = null;
+  }
+}
+
+// Trigger immediate AI generation for a specific item
+async function generateAIForItem(messageId) {
+  try {
+    const res = await fetch(`/api/media/${messageId}/generate-ai?priority=true`, {
+      method: "POST",
+      headers: requestHeaders(),
+    });
+    
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error);
+    }
+    
+    const data = await res.json();
+    
+    if (data.generated) {
+      // Update item immediately
+      const item = state.items.find(x => Number(x.message_id) === messageId);
+      if (item) {
+        if (data.ai_title) item.ai_title = data.ai_title;
+        if (data.ai_description) item.ai_description = data.ai_description;
+        renderGrid();
+        showToast("✨ AI analysis complete!", "success");
+      }
+    } else if (data.queued) {
+      showToast("AI processing queued...", "info");
+      // Start checking for this item
+      void checkAIStatusForItem(messageId);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("AI generation failed:", error);
+    showToast("AI generation failed", "error");
+    throw error;
+  }
+}
+
 function mergePagePayload(data) {
   const incoming = Array.isArray(data.items) ? normalizeItems(data.items) : [];
   if (!incoming.length) {
@@ -980,9 +1113,13 @@ async function pollRecentMedia() {
       if (incomingLatest > state.latestMessageId) {
         showToast("New media available!", "success");
       }
+      // Start checking for AI titles on new/updated items
+      startAIChecks();
     } else {
       state.syncAt = data.synced_at || state.syncAt;
       updateMetaRow();
+      // Still check AI status periodically
+      void checkPendingAIItems();
     }
   } catch (error) {
     console.error("Live update poll failed", error);
@@ -1013,7 +1150,14 @@ async function startLiveUpdates() {
   }, state.livePollSeconds * 1000);
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void pollRecentMedia();
+    if (document.visibilityState === "visible") {
+      void pollRecentMedia();
+      // Resume AI checks when page becomes visible
+      startAIChecks();
+    } else {
+      // Pause AI checks when page is hidden to save resources
+      stopAIChecks();
+    }
   });
 }
 
@@ -1315,6 +1459,11 @@ function bindUI() {
     if (document.visibilityState === "visible") {
       // Refresh data when returning to app
       void pollRecentMedia();
+      // Resume AI checks
+      startAIChecks();
+    } else {
+      // Pause AI checks to save resources
+      stopAIChecks();
     }
   });
 
@@ -1340,7 +1489,19 @@ async function bootstrap() {
     await fetchContext();
     await loadMedia();
     await startLiveUpdates();
+    
+    // Start AI title checks for items without AI content
+    startAIChecks();
+    
     showToast("Welcome to AfterDark Vault!", "info", 2000);
+    
+    // Check if there are items needing AI titles
+    const pendingCount = state.items.filter(item => !hasAIEnhancement(item)).length;
+    if (pendingCount > 0) {
+      setTimeout(() => {
+        showToast(`Analyzing ${pendingCount} items with AI...`, "ai", 3000);
+      }, 2500);
+    }
   } catch (error) {
     console.error(error);
     setSessionText("Connection failed");
