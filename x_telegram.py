@@ -216,6 +216,17 @@ def _is_twa_http_healthy(port: int) -> bool:
         return False
 
 
+def _supports_ai_title_api(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/media/recent?limit=1", timeout=6) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read().decode("utf-8"))
+        return isinstance(payload, dict) and "ai_titled_count" in payload
+    except Exception:
+        return False
+
+
 def _find_available_port(start_port: int, max_candidates: int = 20) -> int:
     for candidate in range(start_port, start_port + max_candidates):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -581,10 +592,20 @@ def _start_twa_stack() -> None:
     selected_port_int = twa_port_int
     selected_port = str(selected_port_int)
     reuse_existing_server = False
+    require_ai_ready = _is_true(os.getenv("TWA_REUSE_REQUIRE_AI_TITLE_API", "1"))
     if _is_port_open("127.0.0.1", twa_port_int):
         if _is_twa_http_healthy(twa_port_int):
-            reuse_existing_server = True
-            logger.info(f"TWA backend already running on port {twa_port}, reusing existing server.")
+            if require_ai_ready and not _supports_ai_title_api(twa_port_int):
+                fallback_port = _find_available_port(twa_port_int + 1)
+                selected_port_int = fallback_port
+                selected_port = str(fallback_port)
+                logger.warning(
+                    f"TWA backend on port {twa_port} is healthy but missing AI title API fields. "
+                    f"Starting updated backend on port {selected_port}."
+                )
+            else:
+                reuse_existing_server = True
+                logger.info(f"TWA backend already running on port {twa_port}, reusing existing server.")
         else:
             fallback_port = _find_available_port(twa_port_int + 1)
             selected_port_int = fallback_port
@@ -697,12 +718,29 @@ def _stop_aux_processes() -> None:
 
 # ==================== PYROGRAM CLIENT ====================
 
-app = Client(
-    "x_video_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
+def _build_bot_client() -> Client:
+    session_name = os.getenv("BOT_SESSION_NAME", "x_video_bot").strip() or "x_video_bot"
+    session_in_memory = _is_true(os.getenv("BOT_SESSION_IN_MEMORY", "1"))
+    session_workdir = os.getenv("BOT_SESSION_WORKDIR", "").strip()
+
+    client_kwargs = {
+        "api_id": API_ID,
+        "api_hash": API_HASH,
+        "bot_token": BOT_TOKEN,
+        "in_memory": session_in_memory,
+    }
+    if session_workdir:
+        client_kwargs["workdir"] = session_workdir
+
+    if session_in_memory:
+        logger.info("Using in-memory bot session (BOT_SESSION_IN_MEMORY=1).")
+    else:
+        logger.info(f"Using file bot session '{session_name}'.")
+
+    return Client(session_name, **client_kwargs)
+
+
+app = _build_bot_client()
 
 # ==================== SHUTDOWN HANDLER ====================
 
@@ -853,7 +891,23 @@ async def main():
                 return
                 
         except Exception as e:
-            logger.critical(f"❌ Critical system failure: {e}", exc_info=True)
+            if "database is locked" in str(e).lower():
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = 2 ** retry_count
+                    logger.warning(
+                        f"Pyrogram session database is locked (attempt {retry_count}/{max_retries}). "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                logger.critical(
+                    "Failed to start bot because session database remained locked. "
+                    "If another bot instance is running, stop it and retry. "
+                    "Tip: keep BOT_SESSION_IN_MEMORY=1 to avoid file lock issues."
+                )
+                return
+            logger.critical(f"Critical system failure: {e}", exc_info=True)
             metrics.increment_errors("critical_startup_error")
             return
             

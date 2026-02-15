@@ -20,6 +20,7 @@ const state = {
   livePollSeconds: 8,
   liveRecentLimit: 120,
   latestMessageId: 0,
+  aiTitledCount: 0,
 };
 
 const elements = {
@@ -80,6 +81,8 @@ function fmtDate(iso) {
 }
 
 function titleFor(item) {
+  const aiTitle = (item.ai_title || "").trim();
+  if (aiTitle) return aiTitle;
   const caption = (item.caption || "").trim();
   if (caption) return caption.split("\n")[0];
   return item.file_name || `message-${item.message_id}`;
@@ -187,7 +190,7 @@ function applyFilter(resetVisible = true) {
 
   if (q) {
     items = items.filter((item) => {
-      const hay = `${item.caption || ""} ${item.file_name || ""}`.toLowerCase();
+      const hay = `${item.ai_title || ""} ${item.caption || ""} ${item.file_name || ""}`.toLowerCase();
       return hay.includes(q);
     });
   }
@@ -362,10 +365,12 @@ function normalizeItems(items) {
   return items.map((item) => {
     const isCached = typeof item.is_cached === "boolean" ? item.is_cached : String(item.url || "").startsWith("/media/");
     const thumbUrl = item.thumb_url || (item.media_kind === "image" ? item.url : "/assets/video-placeholder.svg");
+    const aiTitle = typeof item.ai_title === "string" ? item.ai_title : "";
     return {
       ...item,
       is_cached: isCached,
       thumb_url: thumbUrl,
+      ai_title: aiTitle,
     };
   });
 }
@@ -376,6 +381,7 @@ function applyApiPayload(data, resetVisible = true) {
   state.syncError = data.sync_error || null;
   state.sessionMode = data.session_mode || null;
   state.latestMessageId = Number(data.latest_message_id) || (state.items.length ? Number(state.items[0].message_id) || 0 : 0);
+  state.aiTitledCount = Number(data.ai_titled_count) || 0;
 
   renderStats();
   applyFilter(resetVisible);
@@ -434,6 +440,7 @@ function mergeRecentPayload(data) {
   const incomingLatest = Number(data.latest_message_id) || 0;
   const localLatest = state.items.length ? Number(state.items[0].message_id) || 0 : 0;
   state.latestMessageId = Math.max(state.latestMessageId, incomingLatest, localLatest);
+  state.aiTitledCount = Number(data.ai_titled_count) || state.aiTitledCount;
   state.syncAt = data.synced_at || state.syncAt;
   state.sessionMode = data.session_mode || state.sessionMode;
   state.syncError = data.sync_error || null;
@@ -457,7 +464,12 @@ async function pollRecentMedia() {
 
     const data = await res.json();
     const incomingLatest = Number(data.latest_message_id) || 0;
-    const shouldMerge = incomingLatest > state.latestMessageId || (Number(data.total) || 0) > state.items.length;
+    const incomingTotal = Number(data.total) || 0;
+    const incomingAiCount = Number(data.ai_titled_count) || 0;
+    const shouldMerge =
+      incomingLatest > state.latestMessageId ||
+      incomingTotal > state.items.length ||
+      incomingAiCount !== state.aiTitledCount;
 
     if (shouldMerge) {
       mergeRecentPayload(data);
