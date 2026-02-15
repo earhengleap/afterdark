@@ -1,5 +1,6 @@
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 
+// Application state
 const state = {
   items: [],
   filtered: [],
@@ -16,7 +17,7 @@ const state = {
   visibleCount: 0,
   pageSize: 36,
   pageFetchSize: 240,
-  pageCursor: null, // message_id cursor for loading older pages
+  pageCursor: null,
   hasMorePages: false,
   loadingPage: false,
   thumbObserver: null,
@@ -29,74 +30,105 @@ const state = {
   latestMessageId: 0,
   aiTitledCount: 0,
   viewerIndex: -1,
+  touchStartX: 0,
+  touchStartY: 0,
+  searchDebounceTimer: null,
+  isMobile: window.matchMedia("(max-width: 768px)").matches,
+  isTouch: "ontouchstart" in window || navigator.maxTouchPoints > 0,
 };
 
-const elements = {
-  sessionText: document.getElementById("sessionText"),
-  syncBtn: document.getElementById("syncBtn"),
-  retitleBtn: document.getElementById("retitleBtn"),
-  toTopBtn: document.getElementById("toTopBtn"),
-  loadMoreBtn: document.getElementById("loadMoreBtn"),
-  searchInput: document.getElementById("searchInput"),
-  tabs: Array.from(document.querySelectorAll(".tab")),
-  sortSelect: document.getElementById("sortSelect"),
-  layoutDenseBtn: document.getElementById("layoutDenseBtn"),
-  layoutComfortBtn: document.getElementById("layoutComfortBtn"),
-  countText: document.getElementById("countText"),
-  syncText: document.getElementById("syncText"),
-  statTotal: document.getElementById("statTotal"),
-  statVideos: document.getElementById("statVideos"),
-  statImages: document.getElementById("statImages"),
-  statSize: document.getElementById("statSize"),
-  grid: document.getElementById("grid"),
-  emptyState: document.getElementById("emptyState"),
-  cardTemplate: document.getElementById("cardTemplate"),
-  viewer: document.getElementById("viewer"),
-  viewerMedia: document.getElementById("viewerMedia"),
-  viewerInfo: document.querySelector(".viewer-info"),
-  sheetGrip: document.querySelector(".sheet-grip"),
-  viewerTitle: document.getElementById("viewerTitle"),
-  viewerDescription: document.getElementById("viewerDescription"),
-  viewerCaption: document.getElementById("viewerCaption"),
-  viewerType: document.getElementById("viewerType"),
-  viewerSize: document.getElementById("viewerSize"),
-  viewerDate: document.getElementById("viewerDate"),
-  viewerDownload: document.getElementById("viewerDownload"),
-  viewerCopyLink: document.getElementById("viewerCopyLink"),
-  viewerCopyEmbed: document.getElementById("viewerCopyEmbed"),
-  viewerPrev: document.getElementById("viewerPrev"),
-  viewerNext: document.getElementById("viewerNext"),
-  closeViewer: document.getElementById("closeViewer"),
-};
+// DOM elements cache
+const elements = {};
 
+// Initialize element references
+function initElements() {
+  const ids = [
+    "sessionText", "syncBtn", "retitleBtn", "toTopBtn", "loadMoreBtn",
+    "searchInput", "sortSelect", "layoutDenseBtn", "layoutComfortBtn",
+    "countText", "syncText", "aiStatusText", "statTotal", "statVideos",
+    "statImages", "statSize", "grid", "emptyState", "cardTemplate",
+    "viewer", "viewerMedia", "viewerInfo", "viewerInfoPanel", "sheetGrip",
+    "viewerTitle", "viewerDescription", "viewerCaption", "aiInsightsPanel",
+    "aiInsightsContent", "viewerType", "viewerSize", "viewerDate", "viewerResolution",
+    "viewerDownload", "viewerCopyLink", "viewerCopyEmbed", "viewerPrev",
+    "viewerNext", "closeViewer", "toastContainer"
+  ];
+  
+  ids.forEach(id => {
+    elements[id] = document.getElementById(id);
+  });
+  
+  elements.tabs = Array.from(document.querySelectorAll(".tab"));
+}
+
+// Utility: Copy to clipboard with visual feedback
 async function copyToClipboard(text) {
   const value = String(text || "");
   if (!value) return false;
+  
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(value);
+      showToast("Copied to clipboard!", "success");
       return true;
     }
-  } catch (_) {
-    // fall through
-  }
+  } catch (_) {}
 
   try {
     const ta = document.createElement("textarea");
     ta.value = value;
     ta.setAttribute("readonly", "true");
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
+    ta.style.cssText = "position:fixed;left:-9999px;opacity:0;";
     document.body.appendChild(ta);
     ta.select();
     const ok = document.execCommand("copy");
     document.body.removeChild(ta);
+    if (ok) showToast("Copied to clipboard!", "success");
     return Boolean(ok);
   } catch (_) {
+    showToast("Copy failed", "error");
     return false;
   }
 }
 
+// Toast notification system
+function showToast(message, type = "info", duration = 3000) {
+  const container = elements.toastContainer;
+  if (!container) return;
+  
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.setAttribute("role", "status");
+  toast.setAttribute("aria-live", "polite");
+  
+  const icons = {
+    success: "✓",
+    error: "✕",
+    info: "ℹ",
+    ai: "✨"
+  };
+  
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-message">${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Trigger animation
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+  
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+  
+  callHaptic("light");
+}
+
+// Format utilities
 function fmtBytes(value) {
   const bytes = Number(value) || 0;
   if (bytes <= 0) return "0 MB";
@@ -117,19 +149,25 @@ function fmtRelative(iso) {
   if (delta < 60) return "just now";
   if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
   if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
-  return `${Math.floor(delta / 86400)}d ago`;
+  if (delta < 604800) return `${Math.floor(delta / 86400)}d ago`;
+  return d.toLocaleDateString();
 }
 
 function fmtDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Unknown";
-  return d.toLocaleString();
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function fmtDuration(seconds) {
   const raw = Number(seconds) || 0;
   if (!Number.isFinite(raw) || raw <= 0) return "";
-
   const sec = Math.max(0, Math.floor(raw));
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -145,21 +183,80 @@ function resBadgeFor(item) {
   const h = Number(item.height) || 0;
   const maxSide = Math.max(w, h);
   if (maxSide >= 2160 || w >= 3840 || h >= 2160) return "4K";
+  if (maxSide >= 1440) return "2K";
   if (maxSide >= 1080 || w >= 1920 || h >= 1080) return "HD";
   if (maxSide >= 720 || w >= 1280 || h >= 720) return "HD";
   return "";
 }
 
+function getResolutionText(item) {
+  const w = Number(item.width) || 0;
+  const h = Number(item.height) || 0;
+  if (w && h) return `${w}×${h}`;
+  return "";
+}
+
+// AI-powered title generation
 function titleFor(item) {
   const aiTitle = (item.ai_title || "").trim();
   if (aiTitle) return aiTitle;
   const caption = (item.caption || "").trim();
-  if (caption) return caption.split("\n")[0];
-  // Avoid showing raw extensions like ".mp4/.jpg" when AI titles are still generating.
+  if (caption) return caption.split("\n")[0].substring(0, 60);
   const mid = item.message_id ? ` #${item.message_id}` : "";
-  if (item.media_kind === "video") return `Analyzing video${mid}...`;
-  if (item.media_kind === "image") return `Analyzing image${mid}...`;
-  return item.file_name || `message-${item.message_id}`;
+  if (item.media_kind === "video") return `Video${mid}`;
+  if (item.media_kind === "image") return `Image${mid}`;
+  return item.file_name || `Media${mid}`;
+}
+
+// Check if item has AI enhancements
+function hasAIEnhancement(item) {
+  return !!(item.ai_title || item.ai_description);
+}
+
+// Generate AI insights for viewer
+function generateAIInsights(item) {
+  const insights = [];
+  
+  if (item.ai_title) {
+    insights.push(`AI-generated title: "${item.ai_title}"`);
+  }
+  
+  if (item.ai_description) {
+    const desc = item.ai_description;
+    const keywords = extractKeywords(desc);
+    if (keywords.length > 0) {
+      insights.push(`Detected themes: ${keywords.join(", ")}`);
+    }
+  }
+  
+  if (item.media_kind === "video" && item.duration) {
+    const duration = Number(item.duration);
+    if (duration < 30) insights.push("Short-form content");
+    else if (duration > 300) insights.push("Long-form content");
+  }
+  
+  const size = Number(item.size) || 0;
+  if (size > 100 * 1024 * 1024) insights.push("High-quality file");
+  
+  const w = Number(item.width) || 0;
+  if (w >= 1920) insights.push("High resolution");
+  
+  return insights;
+}
+
+// Simple keyword extraction for AI insights
+function extractKeywords(text) {
+  if (!text) return [];
+  const commonWords = new Set(["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by"]);
+  const words = text.toLowerCase().match(/\b\w{4,}\b/g) || [];
+  const freq = {};
+  words.forEach(w => {
+    if (!commonWords.has(w)) freq[w] = (freq[w] || 0) + 1;
+  });
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([w]) => w.charAt(0).toUpperCase() + w.slice(1));
 }
 
 function asTime(iso) {
@@ -167,15 +264,22 @@ function asTime(iso) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+// Haptic feedback
 function callHaptic(kind = "light") {
   if (!tg || !tg.HapticFeedback) return;
   try {
     tg.HapticFeedback.impactOccurred(kind);
-  } catch (_) {
-    // no-op
-  }
+  } catch (_) {}
 }
 
+function callNotification(type = "success") {
+  if (!tg || !tg.HapticFeedback) return;
+  try {
+    tg.HapticFeedback.notificationOccurred(type);
+  } catch (_) {}
+}
+
+// API helpers
 function requestHeaders() {
   const headers = {
     "Content-Type": "application/json",
@@ -187,93 +291,141 @@ function requestHeaders() {
 }
 
 function setSessionText(message) {
-  elements.sessionText.textContent = message;
-}
-
-function showSyncNotice(message) {
-  if (!message) return;
-  setSessionText(message);
-}
-
-function showSyncError(errorText) {
-  if (!errorText) return;
-  setSessionText(errorText);
-  if (tg && tg.showAlert) {
-    tg.showAlert(errorText);
+  if (elements.sessionText) {
+    elements.sessionText.textContent = message;
   }
 }
 
-async function fetchContext() {
-  const res = await fetch("/api/webapp/context", {
-    headers: requestHeaders(),
-    cache: "no-store",
-  });
+// Context fetching with retry
+async function fetchContext(retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch("/api/webapp/context", {
+        headers: requestHeaders(),
+        cache: "no-store",
+      });
 
-  if (!res.ok) {
-    throw new Error("Failed to get webapp context");
-  }
+      if (!res.ok) throw new Error("Failed to get webapp context");
 
-  state.context = await res.json();
+      state.context = await res.json();
 
-  if (state.context.is_telegram_webapp) {
-    const user = state.context.payload && state.context.payload.user ? state.context.payload.user : null;
-    const uname = user ? (user.username ? `@${user.username}` : user.first_name || "Telegram user") : "Telegram user";
-    const verify = state.context.verified ? "verified" : "not verified";
-    setSessionText(`${uname} . ${verify} . Mini App mode`);
-  } else {
-    setSessionText("Browser mode (outside Telegram Mini App)");
+      if (state.context.is_telegram_webapp) {
+        const user = state.context.payload?.user;
+        const uname = user ? (user.username ? `@${user.username}` : user.first_name || "User") : "User";
+        const verify = state.context.verified ? "✓" : "○";
+        setSessionText(`${uname} ${verify} Telegram Mini App`);
+      } else {
+        setSessionText("Browser Mode");
+      }
+      return;
+    } catch (err) {
+      if (i === retries) throw err;
+      await new Promise(r => setTimeout(r, 500 * (i + 1)));
+    }
   }
 }
 
+// Statistics rendering with animation
 function renderStats() {
   const s = state.stats && Number(state.stats.total) ? state.stats : null;
   const total = s ? Number(s.total) || 0 : state.items.length;
-  const videos = s ? Number(s.videos) || 0 : state.items.filter((x) => x.media_kind === "video").length;
+  const videos = s ? Number(s.videos) || 0 : state.items.filter(x => x.media_kind === "video").length;
   const images = s ? Number(s.images) || 0 : total - videos;
   const size = s ? Number(s.bytes) || 0 : state.items.reduce((sum, x) => sum + (Number(x.size) || 0), 0);
 
-  elements.statTotal.textContent = String(total);
-  elements.statVideos.textContent = String(videos);
-  elements.statImages.textContent = String(images);
-  elements.statSize.textContent = fmtBytes(size);
+  animateValue(elements.statTotal, total);
+  animateValue(elements.statVideos, videos);
+  animateValue(elements.statImages, images);
+  if (elements.statSize) elements.statSize.textContent = fmtBytes(size);
+}
+
+function animateValue(element, target) {
+  if (!element) return;
+  const start = parseInt(element.textContent) || 0;
+  if (start === target) return;
+  
+  const duration = 600;
+  const startTime = performance.now();
+  
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+    const current = Math.floor(start + (target - start) * easeProgress);
+    element.textContent = current.toLocaleString();
+    
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    }
+  }
+  
+  requestAnimationFrame(update);
 }
 
 function updateMetaRow() {
   const showing = Math.min(state.visibleCount, state.filtered.length);
   let status = state.syncAt ? `Synced ${fmtRelative(state.syncAt)}` : "Not synced";
-  if (state.sessionMode) {
-    status += ` . ${state.sessionMode} mode`;
+  if (state.sessionMode) status += ` · ${state.sessionMode}`;
+  
+  const total = Number(state.stats?.total) || 0;
+  const totalText = total > 0 ? ` · Total ${total.toLocaleString()}` : "";
+  
+  if (elements.countText) {
+    elements.countText.textContent = `Showing ${showing.toLocaleString()} of ${state.filtered.length.toLocaleString()}${totalText}`;
   }
-  const total = Number(state.stats && state.stats.total) || 0;
-  const totalText = total > 0 ? ` . Total ${total}` : "";
-  elements.countText.textContent = `Showing ${showing} of ${state.filtered.length}${totalText}`;
-  elements.syncText.textContent = status;
+  if (elements.syncText) elements.syncText.textContent = status;
+  
+  // Update AI status
+  if (elements.aiStatusText) {
+    const aiCount = state.items.filter(hasAIEnhancement).length;
+    if (aiCount > 0) {
+      elements.aiStatusText.textContent = `✨ ${aiCount} AI enhanced`;
+      elements.aiStatusText.classList.remove("hidden");
+    } else {
+      elements.aiStatusText.classList.add("hidden");
+    }
+  }
 }
 
+// Enhanced sorting with AI option
 function applySort(items) {
   const list = [...items];
   if (state.sort === "oldest") {
     list.sort((a, b) => asTime(a.date) - asTime(b.date));
   } else if (state.sort === "largest") {
     list.sort((a, b) => (Number(b.size) || 0) - (Number(a.size) || 0));
+  } else if (state.sort === "ai") {
+    list.sort((a, b) => {
+      const aHasAI = hasAIEnhancement(a) ? 1 : 0;
+      const bHasAI = hasAIEnhancement(b) ? 1 : 0;
+      if (aHasAI !== bHasAI) return bHasAI - aHasAI;
+      return asTime(b.date) - asTime(a.date);
+    });
   } else {
     list.sort((a, b) => asTime(b.date) - asTime(a.date));
   }
   return list;
 }
 
+// Enhanced filtering with AI search
 function applyFilter(resetVisible = true) {
   const q = state.search.trim().toLowerCase();
   let items = state.items;
 
   if (state.filter !== "all") {
-    items = items.filter((item) => item.media_kind === state.filter);
+    items = items.filter(item => item.media_kind === state.filter);
   }
 
   if (q) {
-    items = items.filter((item) => {
-      const hay = `${item.ai_title || ""} ${item.ai_description || ""} ${item.caption || ""} ${item.file_name || ""}`.toLowerCase();
-      return hay.includes(q);
+    items = items.filter(item => {
+      const searchFields = [
+        item.ai_title,
+        item.ai_description,
+        item.caption,
+        item.file_name,
+        item.media_kind,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return searchFields.includes(q);
     });
   }
 
@@ -286,13 +438,14 @@ function applyFilter(resetVisible = true) {
   renderGrid();
 }
 
+// Intersection Observer for lazy loading
 function ensureObserver() {
   if (state.thumbObserver) {
     state.thumbObserver.disconnect();
   }
   state.thumbObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
+    entries => {
+      entries.forEach(entry => {
         if (!entry.isIntersecting) return;
         const el = entry.target;
         const src = el.dataset.src;
@@ -306,9 +459,9 @@ function ensureObserver() {
     },
     {
       root: null,
-      rootMargin: "240px 0px",
-      threshold: 0.05,
-    },
+      rootMargin: "300px 0px",
+      threshold: 0.01,
+    }
   );
 }
 
@@ -323,9 +476,7 @@ function wireThumbMedia(item, thumb, mediaSlot) {
   media.loading = "lazy";
   media.decoding = "async";
 
-  const finish = () => {
-    thumb.classList.add("loaded");
-  };
+  const finish = () => thumb.classList.add("loaded");
   media.addEventListener("load", finish, { once: true });
   media.addEventListener(
     "error",
@@ -336,43 +487,42 @@ function wireThumbMedia(item, thumb, mediaSlot) {
       }
       finish();
     },
-    { once: true },
+    { once: true }
   );
 
   mediaSlot.appendChild(media);
-  if (state.thumbObserver) {
-    state.thumbObserver.observe(media);
-  }
+  if (state.thumbObserver) state.thumbObserver.observe(media);
 }
 
 function updateLoadMoreButton() {
   const canReveal = state.visibleCount < state.filtered.length;
   const canFetch = !canReveal && state.hasMorePages;
   const shouldShow = canReveal || canFetch;
-  elements.loadMoreBtn.classList.toggle("hidden", !shouldShow);
-  elements.loadMoreBtn.disabled = state.loadingPage || state.syncing;
-  if (state.loadingPage) {
-    elements.loadMoreBtn.textContent = "Loading...";
-  } else if (canReveal) {
-    elements.loadMoreBtn.textContent = "Load More";
-  } else if (canFetch) {
-    elements.loadMoreBtn.textContent = "Load Older";
-  } else {
-    elements.loadMoreBtn.textContent = "Load More";
+  
+  if (elements.loadMoreBtn) {
+    elements.loadMoreBtn.classList.toggle("hidden", !shouldShow);
+    elements.loadMoreBtn.disabled = state.loadingPage || state.syncing;
+    elements.loadMoreBtn.textContent = state.loadingPage 
+      ? "Loading..." 
+      : canFetch 
+        ? "Load Older" 
+        : "Load More";
   }
 }
 
+// Grid rendering with AI indicators
 function renderGrid() {
+  if (!elements.grid) return;
   elements.grid.innerHTML = "";
 
   if (!state.filtered.length) {
-    elements.emptyState.classList.remove("hidden");
+    if (elements.emptyState) elements.emptyState.classList.remove("hidden");
     updateMetaRow();
     updateLoadMoreButton();
     return;
   }
 
-  elements.emptyState.classList.add("hidden");
+  if (elements.emptyState) elements.emptyState.classList.add("hidden");
   ensureObserver();
 
   const visibleItems = state.filtered.slice(0, state.visibleCount);
@@ -380,9 +530,12 @@ function renderGrid() {
 
   visibleItems.forEach((item, idx) => {
     const node = elements.cardTemplate.content.firstElementChild.cloneNode(true);
-    node.style.setProperty("--delay", `${(idx % 24) * 16}ms`);
+    const isAI = hasAIEnhancement(item);
+    
+    node.style.setProperty("--delay", `${Math.min((idx % 20) * 25, 400)}ms`);
     node.classList.toggle("kind-video", item.media_kind === "video");
     node.classList.toggle("kind-image", item.media_kind !== "video");
+    node.classList.toggle("ai-enhanced", isAI);
 
     const button = node.querySelector(".card-btn");
     const thumb = node.querySelector(".thumb");
@@ -396,20 +549,18 @@ function renderGrid() {
 
     wireThumbMedia(item, thumb, mediaSlot);
 
-    kindBadge.textContent = item.media_kind === "video" ? "video" : "image";
-    cacheBadge.textContent = item.is_cached ? "cached" : "stream";
+    kindBadge.textContent = item.media_kind === "video" ? "VIDEO" : "IMAGE";
+    cacheBadge.textContent = item.is_cached ? "CACHED" : "STREAM";
     cacheBadge.classList.add(item.is_cached ? "cached" : "stream");
 
-    if (resBadge) {
-      resBadge.textContent = item.media_kind === "video" ? resBadgeFor(item) : "";
-    }
+    if (resBadge) resBadge.textContent = item.media_kind === "video" ? resBadgeFor(item) : "";
     if (durationBadge) {
       durationBadge.textContent = item.media_kind === "video" ? fmtDuration(item.duration) : "";
     }
 
     title.textContent = titleFor(item);
     const desc = String(item.ai_description || "").trim();
-    subtitle.textContent = desc || `${fmtBytes(item.size)} . ${fmtRelative(item.date)}${item.is_cached ? "" : " . on demand"}`;
+    subtitle.textContent = desc || `${fmtBytes(item.size)} · ${fmtRelative(item.date)}${item.is_cached ? "" : " · stream"}`;
 
     button.addEventListener("click", () => openViewer(item));
     fragment.appendChild(node);
@@ -420,13 +571,14 @@ function renderGrid() {
   updateLoadMoreButton();
 }
 
+// Viewer functionality with touch support
 function setViewerIndexForItem(item) {
-  const id = Number(item && item.message_id) || 0;
+  const id = Number(item?.message_id) || 0;
   if (!id || !Array.isArray(state.filtered) || !state.filtered.length) {
     state.viewerIndex = -1;
     return;
   }
-  const idx = state.filtered.findIndex((x) => Number(x.message_id) === id);
+  const idx = state.filtered.findIndex(x => Number(x.message_id) === id);
   state.viewerIndex = idx >= 0 ? idx : -1;
 }
 
@@ -434,10 +586,8 @@ function updateViewerNav() {
   if (!elements.viewerPrev || !elements.viewerNext) return;
   const idx = Number(state.viewerIndex);
   const has = Array.isArray(state.filtered) && state.filtered.length > 0 && idx >= 0;
-  const prevOk = has && idx > 0;
-  const nextOk = has && idx < state.filtered.length - 1;
-  elements.viewerPrev.disabled = !prevOk;
-  elements.viewerNext.disabled = !nextOk;
+  elements.viewerPrev.disabled = !(has && idx > 0);
+  elements.viewerNext.disabled = !(has && idx < state.filtered.length - 1);
 }
 
 function openViewerByIndex(index) {
@@ -448,12 +598,12 @@ function openViewerByIndex(index) {
 }
 
 function openViewer(item, recomputeIndex = true) {
+  if (!elements.viewerMedia) return;
+  
   elements.viewerMedia.innerHTML = "";
   const fullUrl = new URL(item.url, window.location.origin).toString();
 
-  if (recomputeIndex) {
-    setViewerIndexForItem(item);
-  }
+  if (recomputeIndex) setViewerIndexForItem(item);
   updateViewerNav();
 
   if (item.media_kind === "video") {
@@ -463,94 +613,173 @@ function openViewer(item, recomputeIndex = true) {
     video.autoplay = true;
     video.playsInline = true;
     video.preload = "metadata";
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
     elements.viewerMedia.appendChild(video);
   } else {
     const img = document.createElement("img");
     img.src = item.url;
     img.alt = titleFor(item);
+    img.loading = "eager";
     elements.viewerMedia.appendChild(img);
   }
 
   if (elements.viewerInfo) {
     elements.viewerInfo.classList.remove("expanded");
   }
-  elements.viewerTitle.textContent = titleFor(item);
+  
+  if (elements.viewerTitle) elements.viewerTitle.textContent = titleFor(item);
   if (elements.viewerDescription) {
-    elements.viewerDescription.textContent = (item.ai_description || "").trim() || "No AI description yet";
+    elements.viewerDescription.textContent = (item.ai_description || "").trim() || "No AI description available";
   }
-  elements.viewerCaption.textContent = item.caption || "No caption";
-  elements.viewerType.textContent = item.media_kind;
-  elements.viewerSize.textContent = fmtBytes(item.size);
-  elements.viewerDate.textContent = fmtDate(item.date);
-  elements.viewerDownload.href = item.url;
-  elements.viewerDownload.setAttribute("download", item.file_name || "media");
+  if (elements.viewerCaption) {
+    elements.viewerCaption.textContent = item.caption || "No caption";
+  }
+  if (elements.viewerType) elements.viewerType.textContent = item.media_kind.toUpperCase();
+  if (elements.viewerSize) elements.viewerSize.textContent = fmtBytes(item.size);
+  if (elements.viewerDate) elements.viewerDate.textContent = fmtDate(item.date);
+  
+  if (elements.viewerResolution) {
+    const res = getResolutionText(item);
+    elements.viewerResolution.textContent = res || "";
+    elements.viewerResolution.classList.toggle("hidden", !res);
+  }
+
+  // Update AI insights
+  if (elements.aiInsightsPanel && elements.aiInsightsContent) {
+    const insights = generateAIInsights(item);
+    if (insights.length > 0) {
+      elements.aiInsightsContent.innerHTML = insights.map(i => `<p>• ${i}</p>`).join("");
+      elements.aiInsightsPanel.classList.remove("hidden");
+    } else {
+      elements.aiInsightsPanel.classList.add("hidden");
+    }
+  }
+
+  if (elements.viewerDownload) {
+    elements.viewerDownload.href = item.url;
+    elements.viewerDownload.setAttribute("download", item.file_name || "media");
+  }
 
   if (elements.viewerCopyLink) {
     elements.viewerCopyLink.onclick = async () => {
-      const ok = await copyToClipboard(fullUrl);
-      if (ok) {
-        if (tg && tg.showToast) tg.showToast("Link copied");
-      } else if (tg && tg.showAlert) {
-        tg.showAlert("Copy failed");
-      }
+      await copyToClipboard(fullUrl);
       callHaptic("light");
     };
   }
 
   if (elements.viewerCopyEmbed) {
     elements.viewerCopyEmbed.onclick = async () => {
-      const title = titleFor(item).replace(/\"/g, "");
-      const snippet =
-        item.media_kind === "video"
-          ? `<video src="${fullUrl}" controls playsinline></video>`
-          : `<img src="${fullUrl}" alt="${title}">`;
-      const ok = await copyToClipboard(snippet);
-      if (ok) {
-        if (tg && tg.showToast) tg.showToast("Embed copied");
-      } else if (tg && tg.showAlert) {
-        tg.showAlert("Copy failed");
-      }
+      const title = titleFor(item).replace(/"/g, "");
+      const snippet = item.media_kind === "video"
+        ? `<video src="${fullUrl}" controls playsinline></video>`
+        : `<img src="${fullUrl}" alt="${title}" loading="lazy">`;
+      await copyToClipboard(snippet);
       callHaptic("light");
     };
   }
 
-  elements.viewer.classList.remove("hidden");
-  elements.viewer.setAttribute("aria-hidden", "false");
+  if (elements.viewer) {
+    elements.viewer.classList.remove("hidden");
+    elements.viewer.setAttribute("aria-hidden", "false");
+  }
   document.body.style.overflow = "hidden";
 
-  if (tg && tg.BackButton) {
-    tg.BackButton.show();
-  }
+  if (tg && tg.BackButton) tg.BackButton.show();
   callHaptic("medium");
 }
 
 function closeViewer() {
-  elements.viewer.classList.add("hidden");
-  elements.viewer.setAttribute("aria-hidden", "true");
-  elements.viewerMedia.innerHTML = "";
+  if (elements.viewer) {
+    elements.viewer.classList.add("hidden");
+    elements.viewer.setAttribute("aria-hidden", "true");
+  }
+  if (elements.viewerMedia) elements.viewerMedia.innerHTML = "";
   document.body.style.overflow = "";
   state.viewerIndex = -1;
-  if (elements.viewerInfo) {
-    elements.viewerInfo.classList.remove("expanded");
-  }
+  if (elements.viewerInfo) elements.viewerInfo.classList.remove("expanded");
+  if (tg && tg.BackButton) tg.BackButton.hide();
+}
 
-  if (tg && tg.BackButton) {
-    tg.BackButton.hide();
+function navigateViewer(direction) {
+  if (state.viewerIndex < 0) return;
+  const newIndex = state.viewerIndex + direction;
+  if (newIndex >= 0 && newIndex < state.filtered.length) {
+    openViewerByIndex(newIndex);
+    callHaptic("light");
   }
 }
 
+// Touch gesture handling
+function initTouchGestures() {
+  if (!state.isTouch || !elements.viewer) return;
+  
+  let startX = 0;
+  let startY = 0;
+  let startTime = 0;
+  
+  elements.viewer.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, { passive: true });
+  
+  elements.viewer.addEventListener("touchend", (e) => {
+    if (!startX || !startY) return;
+    
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const diffX = startX - endX;
+    const diffY = startY - endY;
+    const duration = Date.now() - startTime;
+    
+    // Swipe threshold
+    const threshold = 50;
+    const velocity = Math.abs(diffX) / duration;
+    
+    // Horizontal swipe for navigation
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold && velocity > 0.3) {
+      if (diffX > 0) {
+        navigateViewer(1); // Swipe left -> next
+      } else {
+        navigateViewer(-1); // Swipe right -> prev
+      }
+    }
+    
+    // Vertical swipe to close on mobile
+    if (state.isMobile && Math.abs(diffY) > Math.abs(diffX) && diffY > threshold * 2) {
+      closeViewer();
+    }
+    
+    startX = 0;
+    startY = 0;
+  }, { passive: true });
+  
+  // Double tap to zoom (simplified - just logs for now)
+  let lastTap = 0;
+  elements.viewerMedia?.addEventListener("touchend", (e) => {
+    const currentTime = Date.now();
+    if (currentTime - lastTap < 300) {
+      // Double tap detected
+      callHaptic("medium");
+    }
+    lastTap = currentTime;
+  });
+}
+
+// Data normalization
 function normalizeItems(items) {
-  return items.map((item) => {
-    const isCached = typeof item.is_cached === "boolean" ? item.is_cached : String(item.url || "").startsWith("/media/");
+  return items.map(item => {
+    const isCached = typeof item.is_cached === "boolean" 
+      ? item.is_cached 
+      : String(item.url || "").startsWith("/media/");
     const thumbUrl = item.thumb_url || (item.media_kind === "image" ? item.url : "/assets/video-placeholder.svg");
-    const aiTitle = typeof item.ai_title === "string" ? item.ai_title : "";
-    const aiDescription = typeof item.ai_description === "string" ? item.ai_description : "";
     return {
       ...item,
       is_cached: isCached,
       thumb_url: thumbUrl,
-      ai_title: aiTitle,
-      ai_description: aiDescription,
+      ai_title: item.ai_title || "",
+      ai_description: item.ai_description || "",
     };
   });
 }
@@ -560,7 +789,8 @@ function applyApiPayload(data, resetVisible = true) {
   state.syncAt = data.synced_at || null;
   state.syncError = data.sync_error || null;
   state.sessionMode = data.session_mode || null;
-  if (data && typeof data.stats === "object" && data.stats) {
+  
+  if (data?.stats && typeof data.stats === "object") {
     state.stats = {
       total: Number(data.stats.total) || 0,
       videos: Number(data.stats.videos) || 0,
@@ -568,24 +798,28 @@ function applyApiPayload(data, resetVisible = true) {
       bytes: Number(data.stats.bytes) || 0,
     };
   }
-  state.latestMessageId = Number(data.latest_message_id) || (state.items.length ? Number(state.items[0].message_id) || 0 : 0);
+  
+  state.latestMessageId = Number(data.latest_message_id) || 
+    (state.items.length ? Number(state.items[0].message_id) || 0 : 0);
   state.aiTitledCount = Number(data.ai_titled_count) || 0;
-  state.pageCursor = data && data.next_before ? Number(data.next_before) || null : (state.items.length ? Number(state.items[state.items.length - 1].message_id) || null : null);
-  state.hasMorePages = Boolean(data && data.has_more);
+  state.pageCursor = data?.next_before 
+    ? Number(data.next_before) || null 
+    : (state.items.length ? Number(state.items[state.items.length - 1].message_id) || null : null);
+  state.hasMorePages = Boolean(data?.has_more);
   state.loadingPage = false;
 
   renderStats();
   applyFilter(resetVisible);
 
   if (state.syncError) {
-    showSyncError(state.syncError);
-  } else if (data && data.sync_notice) {
-    showSyncNotice(data.sync_notice);
+    showToast(state.syncError, "error");
+  } else if (data?.sync_notice) {
+    showToast(data.sync_notice, "info");
   }
 }
 
-async function loadMedia(refresh = false) {
-  // Use paging to avoid huge payloads over tunnels.
+// API calls
+async function loadMedia() {
   const url = `/api/media/page?limit=${state.pageFetchSize}`;
   const res = await fetch(url, {
     headers: requestHeaders(),
@@ -610,14 +844,12 @@ function mergeRecentPayload(data) {
   }
 
   const map = new Map();
-  state.items.forEach((item) => {
+  state.items.forEach(item => {
     const id = Number(item.message_id) || 0;
-    if (id > 0) {
-      map.set(id, item);
-    }
+    if (id > 0) map.set(id, item);
   });
 
-  incoming.forEach((item) => {
+  incoming.forEach(item => {
     const id = Number(item.message_id) || 0;
     if (id <= 0) return;
     const prev = map.get(id);
@@ -638,7 +870,8 @@ function mergeRecentPayload(data) {
   state.syncAt = data.synced_at || state.syncAt;
   state.sessionMode = data.session_mode || state.sessionMode;
   state.syncError = data.sync_error || null;
-  if (data && typeof data.stats === "object" && data.stats) {
+  
+  if (data?.stats && typeof data.stats === "object") {
     state.stats = {
       total: Number(data.stats.total) || 0,
       videos: Number(data.stats.videos) || 0,
@@ -656,7 +889,7 @@ function mergePagePayload(data) {
   if (!incoming.length) {
     state.syncAt = data.synced_at || state.syncAt;
     state.sessionMode = data.session_mode || state.sessionMode;
-    if (data && typeof data.stats === "object" && data.stats) {
+    if (data?.stats && typeof data.stats === "object") {
       state.stats = {
         total: Number(data.stats.total) || 0,
         videos: Number(data.stats.videos) || 0,
@@ -664,8 +897,8 @@ function mergePagePayload(data) {
         bytes: Number(data.stats.bytes) || 0,
       };
     }
-    state.hasMorePages = Boolean(data && data.has_more);
-    state.pageCursor = data && data.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
+    state.hasMorePages = Boolean(data?.has_more);
+    state.pageCursor = data?.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
     renderStats();
     updateMetaRow();
     updateLoadMoreButton();
@@ -673,11 +906,11 @@ function mergePagePayload(data) {
   }
 
   const map = new Map();
-  state.items.forEach((item) => {
+  state.items.forEach(item => {
     const id = Number(item.message_id) || 0;
     if (id > 0) map.set(id, item);
   });
-  incoming.forEach((item) => {
+  incoming.forEach(item => {
     const id = Number(item.message_id) || 0;
     if (id > 0) map.set(id, item);
   });
@@ -694,7 +927,8 @@ function mergePagePayload(data) {
   state.syncError = data.sync_error || null;
   state.latestMessageId = Math.max(state.latestMessageId, Number(data.latest_message_id) || 0);
   state.aiTitledCount = Number(data.ai_titled_count) || state.aiTitledCount;
-  if (data && typeof data.stats === "object" && data.stats) {
+  
+  if (data?.stats && typeof data.stats === "object") {
     state.stats = {
       total: Number(data.stats.total) || 0,
       videos: Number(data.stats.videos) || 0,
@@ -702,8 +936,8 @@ function mergePagePayload(data) {
       bytes: Number(data.stats.bytes) || 0,
     };
   }
-  state.pageCursor = data && data.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
-  state.hasMorePages = Boolean(data && data.has_more);
+  state.pageCursor = data?.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
+  state.hasMorePages = Boolean(data?.has_more);
 
   renderStats();
   applyFilter(false);
@@ -729,22 +963,23 @@ async function pollRecentMedia() {
       headers: requestHeaders(),
       cache: "no-store",
     });
-    if (!res.ok) {
-      return;
-    }
+    if (!res.ok) return;
 
     const data = await res.json();
     const incomingLatest = Number(data.latest_message_id) || 0;
     const incomingTotal = Number(data.total) || 0;
     const incomingAiCount = Number(data.ai_titled_count) || 0;
-    const localTotal = Number(state.stats && state.stats.total) || state.items.length;
-    const shouldMerge =
-      incomingLatest > state.latestMessageId ||
+    const localTotal = Number(state.stats?.total) || state.items.length;
+    
+    const shouldMerge = incomingLatest > state.latestMessageId ||
       incomingTotal > localTotal ||
       incomingAiCount !== state.aiTitledCount;
 
     if (shouldMerge) {
       mergeRecentPayload(data);
+      if (incomingLatest > state.latestMessageId) {
+        showToast("New media available!", "success");
+      }
     } else {
       state.syncAt = data.synced_at || state.syncAt;
       updateMetaRow();
@@ -766,48 +1001,44 @@ async function startLiveUpdates() {
       const health = await res.json();
       const sec = Number(health.live_sync_seconds);
       const lim = Number(health.live_sync_limit);
-      if (Number.isFinite(sec) && sec > 0) {
-        state.livePollSeconds = Math.max(5, Math.floor(sec));
-      }
-      if (Number.isFinite(lim) && lim > 0) {
-        state.liveRecentLimit = Math.max(20, Math.min(500, Math.floor(lim)));
-      }
+      if (Number.isFinite(sec) && sec > 0) state.livePollSeconds = Math.max(5, Math.floor(sec));
+      if (Number.isFinite(lim) && lim > 0) state.liveRecentLimit = Math.max(20, Math.min(500, Math.floor(lim)));
     }
-  } catch (_) {
-    // Keep defaults when health metadata is unavailable.
-  }
+  } catch (_) {}
 
-  if (state.livePollTimer) {
-    clearInterval(state.livePollTimer);
-  }
+  if (state.livePollTimer) clearInterval(state.livePollTimer);
 
   state.livePollTimer = window.setInterval(() => {
     void pollRecentMedia();
   }, state.livePollSeconds * 1000);
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      void pollRecentMedia();
-    }
+    if (document.visibilityState === "visible") void pollRecentMedia();
   });
 }
 
+// UI state helpers
 function setSyncButtonLoading(isLoading) {
   state.syncing = isLoading;
-  elements.syncBtn.disabled = isLoading;
-  elements.syncBtn.textContent = isLoading ? "Syncing..." : "Sync Media";
+  if (elements.syncBtn) {
+    elements.syncBtn.disabled = isLoading;
+    elements.syncBtn.innerHTML = isLoading ? `<span>Syncing...</span>` : `<span>Sync</span>`;
+  }
 }
 
 function setRetitleButtonLoading(isLoading) {
   state.retitling = isLoading;
-  if (!elements.retitleBtn) return;
-  elements.retitleBtn.disabled = isLoading;
-  elements.retitleBtn.textContent = isLoading ? "Improving..." : "Improve Titles";
+  if (elements.retitleBtn) {
+    elements.retitleBtn.disabled = isLoading;
+    elements.retitleBtn.innerHTML = isLoading ? `<span>Processing...</span>` : `<span>AI</span>`;
+  }
 }
 
+// Actions
 async function syncNow() {
   setSyncButtonLoading(true);
   try {
+    showToast("Syncing media from Telegram...", "info");
     const res = await fetch(`/api/sync?limit=all&response_limit=${state.pageFetchSize}&wait_seconds=3`, {
       method: "POST",
       headers: requestHeaders(),
@@ -818,7 +1049,12 @@ async function syncNow() {
     }
     const data = await res.json();
     applyApiPayload(data, true);
-    callHaptic("light");
+    showToast(`Synced ${data.items?.length || 0} items!`, "success");
+    callNotification("success");
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "Sync failed", "error");
+    callNotification("error");
   } finally {
     setSyncButtonLoading(false);
   }
@@ -827,26 +1063,32 @@ async function syncNow() {
 async function improveTitles() {
   setRetitleButtonLoading(true);
   try {
+    showToast("AI is analyzing content...", "ai");
     const res = await fetch(`/api/ai-titles?mode=style&recent_limit=0&batch_size=25`, {
       method: "POST",
       headers: requestHeaders(),
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(text || "Improve titles failed");
+      throw new Error(text || "AI enhancement failed");
     }
     const data = await res.json();
-    // Titles may keep generating in the background; pollRecentMedia will merge as they appear.
-    if (data && typeof data.ai_titled_count !== "undefined") {
+    if (data?.ai_titled_count !== undefined) {
       state.aiTitledCount = Number(data.ai_titled_count) || state.aiTitledCount;
     }
-    if (data && data.timed_out) {
-      showSyncNotice("Title improvement queued. AI is working in background.");
-    } else if (data && Number.isFinite(Number(data.generated)) && Number(data.generated) > 0) {
-      showSyncNotice(`Improved ${Number(data.generated)} titles.`);
+    if (data?.timed_out) {
+      showToast("AI processing in background...", "info");
+    } else if (data?.generated > 0) {
+      showToast(`AI enhanced ${data.generated} items!`, "success");
+    } else {
+      showToast("AI analysis complete", "success");
     }
     void pollRecentMedia();
-    callHaptic("light");
+    callNotification("success");
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "AI enhancement failed", "error");
+    callNotification("error");
   } finally {
     setRetitleButtonLoading(false);
   }
@@ -872,20 +1114,25 @@ async function loadMore() {
   }
 }
 
+// Mini App integration
 function setupMiniAppChrome() {
   if (!tg) return;
+  
   try {
     tg.ready();
     tg.expand();
-    tg.setHeaderColor("#12171c");
-    tg.setBackgroundColor("#0d1117");
-  } catch (_) {
-    // no-op
-  }
+    tg.setHeaderColor("#0a0f14");
+    tg.setBackgroundColor("#0a0f14");
+    
+    // Enable swipe to close if supported
+    if (tg.enableClosingConfirmation) {
+      tg.enableClosingConfirmation();
+    }
+  } catch (_) {}
 
   if (tg.BackButton) {
     tg.BackButton.onClick(() => {
-      if (!elements.viewer.classList.contains("hidden")) {
+      if (!elements.viewer?.classList.contains("hidden")) {
         closeViewer();
       }
     });
@@ -893,6 +1140,7 @@ function setupMiniAppChrome() {
 
   if (tg.MainButton) {
     tg.MainButton.setText("SYNC MEDIA");
+    tg.MainButton.setParams({ color: "#ff3b30", text_color: "#ffffff" });
     tg.MainButton.onClick(async () => {
       try {
         await syncNow();
@@ -904,6 +1152,7 @@ function setupMiniAppChrome() {
   }
 }
 
+// Layout management
 function getStoredDensity() {
   try {
     const v = localStorage.getItem("twa_density");
@@ -927,145 +1176,190 @@ function setDensity(next) {
 
   try {
     localStorage.setItem("twa_density", density);
-  } catch (_) {
-    // no-op
-  }
+  } catch (_) {}
 
   renderGrid();
 }
 
-function bindUI() {
-  elements.searchInput.addEventListener("input", (ev) => {
-    state.search = ev.target.value;
+// Debounced search
+function debouncedSearch(value) {
+  if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
+  state.searchDebounceTimer = setTimeout(() => {
+    state.search = value;
     applyFilter(true);
+  }, 200);
+}
+
+// Event binding
+function bindUI() {
+  // Search with debouncing
+  elements.searchInput?.addEventListener("input", (ev) => {
+    debouncedSearch(ev.target.value);
   });
 
-  if (elements.layoutDenseBtn) {
-    elements.layoutDenseBtn.addEventListener("click", () => {
-      setDensity("dense");
-      callHaptic("light");
-    });
-  }
-  if (elements.layoutComfortBtn) {
-    elements.layoutComfortBtn.addEventListener("click", () => {
-      setDensity("comfort");
-      callHaptic("light");
-    });
-  }
+  // Layout toggles
+  elements.layoutDenseBtn?.addEventListener("click", () => {
+    setDensity("dense");
+    callHaptic("light");
+  });
+  elements.layoutComfortBtn?.addEventListener("click", () => {
+    setDensity("comfort");
+    callHaptic("light");
+  });
 
-  elements.tabs.forEach((tab) => {
+  // Filter tabs with keyboard navigation
+  elements.tabs?.forEach((tab, index) => {
     tab.addEventListener("click", () => {
-      elements.tabs.forEach((x) => {
-        x.classList.remove("active");
-        x.setAttribute("aria-selected", "false");
+      elements.tabs.forEach(t => {
+        t.classList.remove("active");
+        t.setAttribute("aria-selected", "false");
+        t.setAttribute("tabindex", "-1");
       });
       tab.classList.add("active");
       tab.setAttribute("aria-selected", "true");
+      tab.setAttribute("tabindex", "0");
       state.filter = tab.dataset.filter;
       applyFilter(true);
       callHaptic("light");
     });
+    
+    // Keyboard navigation
+    tab.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        const next = elements.tabs[index + 1] || elements.tabs[0];
+        next.focus();
+        next.click();
+      } else if (e.key === "ArrowLeft") {
+        const prev = elements.tabs[index - 1] || elements.tabs[elements.tabs.length - 1];
+        prev.focus();
+        prev.click();
+      }
+    });
   });
 
-  elements.sortSelect.addEventListener("change", (ev) => {
+  // Sort
+  elements.sortSelect?.addEventListener("change", (ev) => {
     state.sort = ev.target.value;
     applyFilter(true);
   });
 
-  elements.syncBtn.addEventListener("click", async () => {
+  // Actions
+  elements.syncBtn?.addEventListener("click", async () => {
     try {
       await syncNow();
     } catch (error) {
       console.error(error);
-      alert("Sync failed. Check server logs.");
     }
   });
 
-  if (elements.retitleBtn) {
-    elements.retitleBtn.addEventListener("click", async () => {
-      try {
-        await improveTitles();
-      } catch (error) {
-        console.error(error);
-        alert("Improve titles failed. Check server logs.");
-      }
-    });
-  }
+  elements.retitleBtn?.addEventListener("click", async () => {
+    try {
+      await improveTitles();
+    } catch (error) {
+      console.error(error);
+    }
+  });
 
-  elements.loadMoreBtn.addEventListener("click", () => {
+  elements.loadMoreBtn?.addEventListener("click", () => {
     void loadMore();
   });
 
-  elements.toTopBtn.addEventListener("click", () => {
+  elements.toTopBtn?.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    callHaptic("light");
   });
 
+  // Infinite scroll
+  let scrollTimeout;
   window.addEventListener("scroll", () => {
-    const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
-    if (nearBottom && !state.syncing) {
-      void loadMore();
-    }
-  });
+    if (scrollTimeout) return;
+    scrollTimeout = setTimeout(() => {
+      scrollTimeout = null;
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 400;
+      if (nearBottom && !state.syncing && !state.loadingPage) {
+        void loadMore();
+      }
+    }, 100);
+  }, { passive: true });
 
-  elements.closeViewer.addEventListener("click", closeViewer);
-  elements.viewer.addEventListener("click", (event) => {
+  // Viewer controls
+  elements.closeViewer?.addEventListener("click", closeViewer);
+  elements.viewer?.addEventListener("click", (event) => {
     if (event.target === elements.viewer || event.target.classList.contains("viewer-backdrop")) {
       closeViewer();
     }
   });
 
-  if (elements.viewerPrev) {
-    elements.viewerPrev.addEventListener("click", () => {
-      if (state.viewerIndex > 0) {
-        openViewerByIndex(state.viewerIndex - 1);
-        callHaptic("light");
-      }
-    });
-  }
-  if (elements.viewerNext) {
-    elements.viewerNext.addEventListener("click", () => {
-      if (state.viewerIndex >= 0 && state.viewerIndex < state.filtered.length - 1) {
-        openViewerByIndex(state.viewerIndex + 1);
-        callHaptic("light");
-      }
-    });
-  }
-  if (elements.sheetGrip && elements.viewerInfo) {
-    elements.sheetGrip.addEventListener("click", () => {
-      elements.viewerInfo.classList.toggle("expanded");
-      callHaptic("light");
-    });
-  }
+  elements.viewerPrev?.addEventListener("click", () => navigateViewer(-1));
+  elements.viewerNext?.addEventListener("click", () => navigateViewer(1));
 
+  // Sheet grip for mobile
+  elements.sheetGrip?.addEventListener("click", () => {
+    elements.viewerInfo?.classList.toggle("expanded");
+    callHaptic("light");
+  });
+
+  // Keyboard navigation
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !elements.viewer.classList.contains("hidden")) {
+    if (event.key === "Escape" && !elements.viewer?.classList.contains("hidden")) {
       closeViewer();
     }
-    if (!elements.viewer.classList.contains("hidden")) {
-      if (event.key === "ArrowLeft" && state.viewerIndex > 0) {
-        openViewerByIndex(state.viewerIndex - 1);
-      } else if (event.key === "ArrowRight" && state.viewerIndex >= 0 && state.viewerIndex < state.filtered.length - 1) {
-        openViewerByIndex(state.viewerIndex + 1);
-      }
+    if (!elements.viewer?.classList.contains("hidden")) {
+      if (event.key === "ArrowLeft") navigateViewer(-1);
+      else if (event.key === "ArrowRight") navigateViewer(1);
     }
+  });
+
+  // Handle visibility change
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      // Refresh data when returning to app
+      void pollRecentMedia();
+    }
+  });
+
+  // Resize handler for responsive adjustments
+  let resizeTimeout;
+  window.addEventListener("resize", () => {
+    if (resizeTimeout) clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      state.isMobile = window.matchMedia("(max-width: 768px)").matches;
+    }, 250);
   });
 }
 
+// Bootstrap
 async function bootstrap() {
+  initElements();
   bindUI();
   setupMiniAppChrome();
   setDensity(getStoredDensity());
+  initTouchGestures();
 
   try {
     await fetchContext();
-    await loadMedia(false);
+    await loadMedia();
     await startLiveUpdates();
+    showToast("Welcome to AfterDark Vault!", "info", 2000);
   } catch (error) {
     console.error(error);
-    setSessionText("Failed to initialize Mini App");
-    elements.emptyState.classList.remove("hidden");
-    elements.emptyState.innerHTML = "<p>Failed to load media. Check bot access and server logs.</p>";
+    setSessionText("Connection failed");
+    if (elements.emptyState) {
+      elements.emptyState.classList.remove("hidden");
+      elements.emptyState.innerHTML = `
+        <div class="empty-icon">⚠️</div>
+        <p>Failed to load media</p>
+        <p style="font-size: 12px; margin-top: 8px;">Check your connection and try again</p>
+        <button class="btn btn-primary" style="margin-top: 16px;" onclick="location.reload()">Retry</button>
+      `;
+    }
+    showToast("Failed to initialize. Please refresh.", "error");
   }
 }
 
-bootstrap();
+// Start the app
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootstrap);
+} else {
+  bootstrap();
+}
