@@ -11,10 +11,16 @@ const state = {
   context: null,
   syncError: null,
   sessionMode: null,
+  stats: { total: 0, videos: 0, images: 0, bytes: 0 },
   visibleCount: 0,
   pageSize: 36,
+  pageFetchSize: 240,
+  pageCursor: null, // message_id cursor for loading older pages
+  hasMorePages: false,
+  loadingPage: false,
   thumbObserver: null,
   syncing: false,
+  retitling: false,
   livePollTimer: null,
   livePolling: false,
   livePollSeconds: 8,
@@ -26,6 +32,7 @@ const state = {
 const elements = {
   sessionText: document.getElementById("sessionText"),
   syncBtn: document.getElementById("syncBtn"),
+  retitleBtn: document.getElementById("retitleBtn"),
   toTopBtn: document.getElementById("toTopBtn"),
   loadMoreBtn: document.getElementById("loadMoreBtn"),
   searchInput: document.getElementById("searchInput"),
@@ -48,8 +55,38 @@ const elements = {
   viewerSize: document.getElementById("viewerSize"),
   viewerDate: document.getElementById("viewerDate"),
   viewerDownload: document.getElementById("viewerDownload"),
+  viewerCopyLink: document.getElementById("viewerCopyLink"),
+  viewerCopyEmbed: document.getElementById("viewerCopyEmbed"),
   closeViewer: document.getElementById("closeViewer"),
 };
+
+async function copyToClipboard(text) {
+  const value = String(text || "");
+  if (!value) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (_) {
+    // fall through
+  }
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.setAttribute("readonly", "true");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return Boolean(ok);
+  } catch (_) {
+    return false;
+  }
+}
 
 function fmtBytes(value) {
   const bytes = Number(value) || 0;
@@ -85,6 +122,10 @@ function titleFor(item) {
   if (aiTitle) return aiTitle;
   const caption = (item.caption || "").trim();
   if (caption) return caption.split("\n")[0];
+  // Avoid showing raw extensions like ".mp4/.jpg" when AI titles are still generating.
+  const mid = item.message_id ? ` #${item.message_id}` : "";
+  if (item.media_kind === "video") return `Analyzing video${mid}...`;
+  if (item.media_kind === "image") return `Analyzing image${mid}...`;
   return item.file_name || `message-${item.message_id}`;
 }
 
@@ -114,6 +155,11 @@ function requestHeaders() {
 
 function setSessionText(message) {
   elements.sessionText.textContent = message;
+}
+
+function showSyncNotice(message) {
+  if (!message) return;
+  setSessionText(message);
 }
 
 function showSyncError(errorText) {
@@ -147,10 +193,11 @@ async function fetchContext() {
 }
 
 function renderStats() {
-  const total = state.items.length;
-  const videos = state.items.filter((x) => x.media_kind === "video").length;
-  const images = total - videos;
-  const size = state.items.reduce((sum, x) => sum + (Number(x.size) || 0), 0);
+  const s = state.stats && Number(state.stats.total) ? state.stats : null;
+  const total = s ? Number(s.total) || 0 : state.items.length;
+  const videos = s ? Number(s.videos) || 0 : state.items.filter((x) => x.media_kind === "video").length;
+  const images = s ? Number(s.images) || 0 : total - videos;
+  const size = s ? Number(s.bytes) || 0 : state.items.reduce((sum, x) => sum + (Number(x.size) || 0), 0);
 
   elements.statTotal.textContent = String(total);
   elements.statVideos.textContent = String(videos);
@@ -164,7 +211,9 @@ function updateMetaRow() {
   if (state.sessionMode) {
     status += ` . ${state.sessionMode} mode`;
   }
-  elements.countText.textContent = `Showing ${showing} of ${state.filtered.length}`;
+  const total = Number(state.stats && state.stats.total) || 0;
+  const totalText = total > 0 ? ` . Total ${total}` : "";
+  elements.countText.textContent = `Showing ${showing} of ${state.filtered.length}${totalText}`;
   elements.syncText.textContent = status;
 }
 
@@ -264,8 +313,20 @@ function wireThumbMedia(item, thumb, mediaSlot) {
 }
 
 function updateLoadMoreButton() {
-  const hasMore = state.visibleCount < state.filtered.length;
-  elements.loadMoreBtn.classList.toggle("hidden", !hasMore);
+  const canReveal = state.visibleCount < state.filtered.length;
+  const canFetch = !canReveal && state.hasMorePages;
+  const shouldShow = canReveal || canFetch;
+  elements.loadMoreBtn.classList.toggle("hidden", !shouldShow);
+  elements.loadMoreBtn.disabled = state.loadingPage || state.syncing;
+  if (state.loadingPage) {
+    elements.loadMoreBtn.textContent = "Loading...";
+  } else if (canReveal) {
+    elements.loadMoreBtn.textContent = "Load More";
+  } else if (canFetch) {
+    elements.loadMoreBtn.textContent = "Load Older";
+  } else {
+    elements.loadMoreBtn.textContent = "Load More";
+  }
 }
 
 function renderGrid() {
@@ -316,6 +377,7 @@ function renderGrid() {
 
 function openViewer(item) {
   elements.viewerMedia.innerHTML = "";
+  const fullUrl = new URL(item.url, window.location.origin).toString();
 
   if (item.media_kind === "video") {
     const video = document.createElement("video");
@@ -339,6 +401,35 @@ function openViewer(item) {
   elements.viewerDate.textContent = fmtDate(item.date);
   elements.viewerDownload.href = item.url;
   elements.viewerDownload.setAttribute("download", item.file_name || "media");
+
+  if (elements.viewerCopyLink) {
+    elements.viewerCopyLink.onclick = async () => {
+      const ok = await copyToClipboard(fullUrl);
+      if (ok) {
+        if (tg && tg.showToast) tg.showToast("Link copied");
+      } else if (tg && tg.showAlert) {
+        tg.showAlert("Copy failed");
+      }
+      callHaptic("light");
+    };
+  }
+
+  if (elements.viewerCopyEmbed) {
+    elements.viewerCopyEmbed.onclick = async () => {
+      const title = titleFor(item).replace(/\"/g, "");
+      const snippet =
+        item.media_kind === "video"
+          ? `<video src="${fullUrl}" controls playsinline></video>`
+          : `<img src="${fullUrl}" alt="${title}">`;
+      const ok = await copyToClipboard(snippet);
+      if (ok) {
+        if (tg && tg.showToast) tg.showToast("Embed copied");
+      } else if (tg && tg.showAlert) {
+        tg.showAlert("Copy failed");
+      }
+      callHaptic("light");
+    };
+  }
 
   elements.viewer.classList.remove("hidden");
   elements.viewer.setAttribute("aria-hidden", "false");
@@ -380,19 +471,33 @@ function applyApiPayload(data, resetVisible = true) {
   state.syncAt = data.synced_at || null;
   state.syncError = data.sync_error || null;
   state.sessionMode = data.session_mode || null;
+  if (data && typeof data.stats === "object" && data.stats) {
+    state.stats = {
+      total: Number(data.stats.total) || 0,
+      videos: Number(data.stats.videos) || 0,
+      images: Number(data.stats.images) || 0,
+      bytes: Number(data.stats.bytes) || 0,
+    };
+  }
   state.latestMessageId = Number(data.latest_message_id) || (state.items.length ? Number(state.items[0].message_id) || 0 : 0);
   state.aiTitledCount = Number(data.ai_titled_count) || 0;
+  state.pageCursor = data && data.next_before ? Number(data.next_before) || null : (state.items.length ? Number(state.items[state.items.length - 1].message_id) || null : null);
+  state.hasMorePages = Boolean(data && data.has_more);
+  state.loadingPage = false;
 
   renderStats();
   applyFilter(resetVisible);
 
   if (state.syncError) {
     showSyncError(state.syncError);
+  } else if (data && data.sync_notice) {
+    showSyncNotice(data.sync_notice);
   }
 }
 
 async function loadMedia(refresh = false) {
-  const url = `/api/media?limit=all${refresh ? "&refresh=true" : ""}`;
+  // Use paging to avoid huge payloads over tunnels.
+  const url = `/api/media/page?limit=${state.pageFetchSize}`;
   const res = await fetch(url, {
     headers: requestHeaders(),
     cache: "no-store",
@@ -444,9 +549,86 @@ function mergeRecentPayload(data) {
   state.syncAt = data.synced_at || state.syncAt;
   state.sessionMode = data.session_mode || state.sessionMode;
   state.syncError = data.sync_error || null;
+  if (data && typeof data.stats === "object" && data.stats) {
+    state.stats = {
+      total: Number(data.stats.total) || 0,
+      videos: Number(data.stats.videos) || 0,
+      images: Number(data.stats.images) || 0,
+      bytes: Number(data.stats.bytes) || 0,
+    };
+  }
 
   renderStats();
   applyFilter(false);
+}
+
+function mergePagePayload(data) {
+  const incoming = Array.isArray(data.items) ? normalizeItems(data.items) : [];
+  if (!incoming.length) {
+    state.syncAt = data.synced_at || state.syncAt;
+    state.sessionMode = data.session_mode || state.sessionMode;
+    if (data && typeof data.stats === "object" && data.stats) {
+      state.stats = {
+        total: Number(data.stats.total) || 0,
+        videos: Number(data.stats.videos) || 0,
+        images: Number(data.stats.images) || 0,
+        bytes: Number(data.stats.bytes) || 0,
+      };
+    }
+    state.hasMorePages = Boolean(data && data.has_more);
+    state.pageCursor = data && data.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
+    renderStats();
+    updateMetaRow();
+    updateLoadMoreButton();
+    return;
+  }
+
+  const map = new Map();
+  state.items.forEach((item) => {
+    const id = Number(item.message_id) || 0;
+    if (id > 0) map.set(id, item);
+  });
+  incoming.forEach((item) => {
+    const id = Number(item.message_id) || 0;
+    if (id > 0) map.set(id, item);
+  });
+
+  state.items = Array.from(map.values());
+  state.items.sort((a, b) => {
+    const byDate = asTime(b.date) - asTime(a.date);
+    if (byDate !== 0) return byDate;
+    return (Number(b.message_id) || 0) - (Number(a.message_id) || 0);
+  });
+
+  state.syncAt = data.synced_at || state.syncAt;
+  state.sessionMode = data.session_mode || state.sessionMode;
+  state.syncError = data.sync_error || null;
+  state.latestMessageId = Math.max(state.latestMessageId, Number(data.latest_message_id) || 0);
+  state.aiTitledCount = Number(data.ai_titled_count) || state.aiTitledCount;
+  if (data && typeof data.stats === "object" && data.stats) {
+    state.stats = {
+      total: Number(data.stats.total) || 0,
+      videos: Number(data.stats.videos) || 0,
+      images: Number(data.stats.images) || 0,
+      bytes: Number(data.stats.bytes) || 0,
+    };
+  }
+  state.pageCursor = data && data.next_before ? Number(data.next_before) || state.pageCursor : state.pageCursor;
+  state.hasMorePages = Boolean(data && data.has_more);
+
+  renderStats();
+  applyFilter(false);
+}
+
+async function fetchNextPage() {
+  if (!state.pageCursor) return;
+  const res = await fetch(`/api/media/page?limit=${state.pageFetchSize}&before=${state.pageCursor}`, {
+    headers: requestHeaders(),
+    cache: "no-store",
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  mergePagePayload(data);
 }
 
 async function pollRecentMedia() {
@@ -466,9 +648,10 @@ async function pollRecentMedia() {
     const incomingLatest = Number(data.latest_message_id) || 0;
     const incomingTotal = Number(data.total) || 0;
     const incomingAiCount = Number(data.ai_titled_count) || 0;
+    const localTotal = Number(state.stats && state.stats.total) || state.items.length;
     const shouldMerge =
       incomingLatest > state.latestMessageId ||
-      incomingTotal > state.items.length ||
+      incomingTotal > localTotal ||
       incomingAiCount !== state.aiTitledCount;
 
     if (shouldMerge) {
@@ -526,10 +709,17 @@ function setSyncButtonLoading(isLoading) {
   elements.syncBtn.textContent = isLoading ? "Syncing..." : "Sync Media";
 }
 
+function setRetitleButtonLoading(isLoading) {
+  state.retitling = isLoading;
+  if (!elements.retitleBtn) return;
+  elements.retitleBtn.disabled = isLoading;
+  elements.retitleBtn.textContent = isLoading ? "Improving..." : "Improve Titles";
+}
+
 async function syncNow() {
   setSyncButtonLoading(true);
   try {
-    const res = await fetch("/api/sync?limit=all", {
+    const res = await fetch(`/api/sync?limit=all&response_limit=${state.pageFetchSize}&wait_seconds=3`, {
       method: "POST",
       headers: requestHeaders(),
     });
@@ -545,10 +735,52 @@ async function syncNow() {
   }
 }
 
-function loadMore() {
-  if (state.visibleCount >= state.filtered.length) return;
-  state.visibleCount = Math.min(state.visibleCount + state.pageSize, state.filtered.length);
-  renderGrid();
+async function improveTitles() {
+  setRetitleButtonLoading(true);
+  try {
+    const res = await fetch(`/api/ai-titles?mode=style&recent_limit=0&batch_size=25`, {
+      method: "POST",
+      headers: requestHeaders(),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Improve titles failed");
+    }
+    const data = await res.json();
+    // Titles may keep generating in the background; pollRecentMedia will merge as they appear.
+    if (data && typeof data.ai_titled_count !== "undefined") {
+      state.aiTitledCount = Number(data.ai_titled_count) || state.aiTitledCount;
+    }
+    if (data && data.timed_out) {
+      showSyncNotice("Title improvement queued. AI is working in background.");
+    } else if (data && Number.isFinite(Number(data.generated)) && Number(data.generated) > 0) {
+      showSyncNotice(`Improved ${Number(data.generated)} titles.`);
+    }
+    void pollRecentMedia();
+    callHaptic("light");
+  } finally {
+    setRetitleButtonLoading(false);
+  }
+}
+
+async function loadMore() {
+  if (state.visibleCount < state.filtered.length) {
+    state.visibleCount = Math.min(state.visibleCount + state.pageSize, state.filtered.length);
+    renderGrid();
+    return;
+  }
+
+  if (!state.hasMorePages || state.loadingPage || state.syncing) return;
+  if (!state.pageCursor) return;
+
+  state.loadingPage = true;
+  updateLoadMoreButton();
+  try {
+    await fetchNextPage();
+  } finally {
+    state.loadingPage = false;
+    updateLoadMoreButton();
+  }
 }
 
 function setupMiniAppChrome() {
@@ -617,8 +849,19 @@ function bindUI() {
     }
   });
 
+  if (elements.retitleBtn) {
+    elements.retitleBtn.addEventListener("click", async () => {
+      try {
+        await improveTitles();
+      } catch (error) {
+        console.error(error);
+        alert("Improve titles failed. Check server logs.");
+      }
+    });
+  }
+
   elements.loadMoreBtn.addEventListener("click", () => {
-    loadMore();
+    void loadMore();
   });
 
   elements.toTopBtn.addEventListener("click", () => {
@@ -628,7 +871,7 @@ function bindUI() {
   window.addEventListener("scroll", () => {
     const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
     if (nearBottom && !state.syncing) {
-      loadMore();
+      void loadMore();
     }
   });
 

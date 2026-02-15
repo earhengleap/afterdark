@@ -517,7 +517,10 @@ class ImageDownloader:
             return original_path
         directory = os.path.dirname(original_path)
         filename = os.path.basename(original_path)
-        if filename[:3].isdigit() and filename[3] == '-':
+        # Prevent double-prefixing when a previous scan already renamed the file.
+        # Accept any leading digits + "-" prefix (e.g. "01-", "24-", "100-").
+        prefix, sep, _rest = filename.partition("-")
+        if sep == "-" and prefix.isdigit():
             return original_path
         try:
             next_num = ImageDownloader._get_next_image_number()

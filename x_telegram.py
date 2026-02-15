@@ -622,6 +622,12 @@ def _start_twa_stack() -> None:
     server_env = os.environ.copy()
     server_env.setdefault("TELEGRAM_GALLERY_AUTH", "auto")
     server_env["TWA_PORT"] = twa_port
+    # Prefer Dolphin as the local text polisher for porn-site style titles when the user didn't override it.
+    # Falls back automatically to gemma3:4b in the server if Dolphin isn't installed.
+    if not server_env.get("TWA_AI_TEXT_MODEL", "").strip():
+        server_env["TWA_AI_TEXT_MODEL"] = "dolphin-llama3:8b"
+    if not server_env.get("TWA_AI_TEXT_FALLBACK_MODELS", "").strip():
+        server_env["TWA_AI_TEXT_FALLBACK_MODELS"] = "gemma3:4b"
 
     if not reuse_existing_server:
         if os.name == "nt":

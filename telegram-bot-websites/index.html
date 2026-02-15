@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20260215-4">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -29,6 +29,7 @@
       </div>
       <div class="hero-right">
         <button id="syncBtn" class="btn btn-primary" type="button">Sync Media</button>
+        <button id="retitleBtn" class="btn btn-ghost" type="button">Improve Titles</button>
         <button id="toTopBtn" class="btn btn-ghost" type="button">Back to Top</button>
       </div>
     </header>
@@ -90,6 +91,10 @@
           <span id="viewerSize">-</span>
           <span id="viewerDate">-</span>
         </div>
+        <div class="viewer-actions">
+          <button id="viewerCopyLink" class="btn btn-ghost" type="button">Copy Link</button>
+          <button id="viewerCopyEmbed" class="btn btn-ghost" type="button">Copy Embed</button>
+        </div>
         <a id="viewerDownload" class="btn btn-primary" href="#" download>Download Original</a>
       </div>
     </div>
@@ -114,6 +119,6 @@
     </article>
   </template>
 
-  <script src="/script.js"></script>
+  <script src="/script.js?v=20260215-4"></script>
 </body>
 </html>

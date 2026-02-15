@@ -502,6 +502,16 @@ input[type="search"]::placeholder {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.viewer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.viewer-actions .btn {
+  padding-inline: 14px;
+}
+
 .btn {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);

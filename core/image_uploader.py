@@ -15,6 +15,7 @@ from config.settings import CHAT_ID
 from utils.formatters import Formatter
 from models.enums import user_downloads
 from core.logger import setup_logger
+from core.uploader import safe_edit_text
 
 logger = setup_logger("ImageUploader")
 
@@ -58,7 +59,8 @@ class ImageUploader:
                     
                     # Update progress every 5 images
                     if status_msg and (idx + 1) % 5 == 0:
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"📤 **Uploading Images to Group**\n\n"
                             f"🖼️ Progress: {idx + 1}/{len(image_paths)}\n"
                             f"✅ Uploaded: {total_uploaded} images\n\n"
@@ -78,7 +80,8 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"⏸️ **Rate Limit Hit**\n\n"
                             f"Telegram requires a {wait_time}s cooldown.\n\n"
                             f"⏳ Waiting {wait_time} seconds...\n"
@@ -92,7 +95,8 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"📤 **Resuming Image Upload**\n\n"
                             f"🖼️ Remaining: {len(image_paths) - total_uploaded} images\n\n"
                             f"⏳ Retrying upload..."
@@ -143,7 +147,8 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"⏸️ **Rate Limit Hit**\n\n"
                             f"Telegram requires a {wait_time}s cooldown.\n\n"
                             f"⏳ Waiting {wait_time} seconds...\n"
@@ -156,7 +161,7 @@ class ImageUploader:
                 
                 if status_msg:
                     try:
-                        await status_msg.edit_text("📤 **Resuming Upload...**")
+                        await safe_edit_text(status_msg, "📤 **Resuming Upload...**")
                     except Exception:
                         pass
                 
@@ -198,7 +203,8 @@ class ImageUploader:
         total_time = time.time() - overall_start
         
         from ui.keyboards import Keyboards
-        await status_msg.edit_text(
+        await safe_edit_text(
+            status_msg,
             f"✅ **Bulk Image Upload Complete!**\n\n"
             f"📊 **Summary:**\n"
             f"• Total: {total} images\n"

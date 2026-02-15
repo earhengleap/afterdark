@@ -13,6 +13,7 @@ Telegram Mini App Gallery Server.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import asynccontextmanager, suppress
 import base64
 import hashlib
@@ -70,6 +71,10 @@ STRICT_TWA_VERIFY = os.getenv("TWA_VERIFY_STRICT", "0") == "1"
 SYNC_TIMEOUT_SECONDS = max(10, int(os.getenv("TWA_SYNC_TIMEOUT_SECONDS", "90")))
 DOWNLOAD_TIMEOUT_SECONDS = max(10, int(os.getenv("TWA_DOWNLOAD_TIMEOUT_SECONDS", "180")))
 SERVICE_START_TIMEOUT_SECONDS = max(5, int(os.getenv("TWA_SERVICE_START_TIMEOUT_SECONDS", "20")))
+try:
+    SYNC_API_MAX_WAIT_SECONDS = max(3, int(os.getenv("TWA_SYNC_API_MAX_WAIT_SECONDS", "18").strip() or "18"))
+except ValueError:
+    SYNC_API_MAX_WAIT_SECONDS = 18
 EAGER_DOWNLOAD_MEDIA = os.getenv("TWA_EAGER_DOWNLOAD_MEDIA", "0").strip() == "1"
 EAGER_VIDEO_THUMBS = os.getenv("TWA_EAGER_VIDEO_THUMBS", "0").strip() == "1"
 LIVE_SYNC_ENABLED = os.getenv("TWA_LIVE_SYNC", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
@@ -87,20 +92,70 @@ LIVE_SYNC_LIMIT = max(20, min(_live_limit_raw, 500))
 AI_TITLE_ENABLED = os.getenv("TWA_AI_TITLES", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
 AI_TITLE_PROVIDER = os.getenv("TWA_AI_TITLE_PROVIDER", "ollama").strip().lower() or "ollama"
 AI_TITLE_OLLAMA_URL = os.getenv("TWA_AI_OLLAMA_URL", "http://127.0.0.1:11434/api/generate").strip()
-AI_TITLE_MODEL = os.getenv("TWA_AI_MODEL", "qwen2.5vl:3b").strip() or "qwen2.5vl:3b"
+# Default to a lightweight local vision model that runs reliably on low resources.
+AI_TITLE_MODEL = os.getenv("TWA_AI_MODEL", "moondream:latest").strip() or "moondream:latest"
+_fallback_models_raw = os.getenv("TWA_AI_FALLBACK_MODELS", "").strip()
+AI_TITLE_FALLBACK_MODELS: List[str] = []
+_seen_models: set[str] = set()
+for _candidate in [AI_TITLE_MODEL] + [x.strip() for x in _fallback_models_raw.split(",") if x.strip()]:
+    if not _candidate or _candidate in _seen_models:
+        continue
+    _seen_models.add(_candidate)
+    if _candidate != AI_TITLE_MODEL:
+        AI_TITLE_FALLBACK_MODELS.append(_candidate)
+del _seen_models, _fallback_models_raw, _candidate
+AI_TITLE_STYLE = os.getenv("TWA_AI_TITLE_STYLE", "explicit").strip().lower() or "explicit"
+if AI_TITLE_STYLE not in {"tasteful", "explicit"}:
+    AI_TITLE_STYLE = "explicit"
+AI_TITLE_TEXT_MODEL = os.getenv("TWA_AI_TEXT_MODEL", "dolphin-llama3:8b").strip() or "dolphin-llama3:8b"
+_text_fallback_raw = os.getenv("TWA_AI_TEXT_FALLBACK_MODELS", "").strip()
+AI_TITLE_TEXT_FALLBACK_MODELS: List[str] = []
+_seen_text_models: set[str] = set()
+for _candidate in [AI_TITLE_TEXT_MODEL] + [x.strip() for x in _text_fallback_raw.split(",") if x.strip()]:
+    if not _candidate or _candidate in _seen_text_models:
+        continue
+    _seen_text_models.add(_candidate)
+    if _candidate != AI_TITLE_TEXT_MODEL:
+        AI_TITLE_TEXT_FALLBACK_MODELS.append(_candidate)
+del _seen_text_models, _text_fallback_raw, _candidate
+# Default safety fallback so misconfigured/missing text models still produce titles.
+if not AI_TITLE_TEXT_FALLBACK_MODELS and AI_TITLE_TEXT_MODEL != "gemma3:4b":
+    AI_TITLE_TEXT_FALLBACK_MODELS.append("gemma3:4b")
+AI_TITLE_POLISH_ENABLED = (
+    os.getenv("TWA_AI_POLISH_TITLES", "1" if AI_TITLE_STYLE == "explicit" else "0").strip().lower()
+    not in {"0", "off", "false", "disabled", "no"}
+)
+# Default to missing-only so we don't keep rewriting existing titles automatically.
+# When you want to improve older titles, manually call POST /api/ai-titles?mode=style or set TWA_AI_RETITLE_MODE=style temporarily.
+AI_TITLE_RETITLE_MODE = os.getenv("TWA_AI_RETITLE_MODE", "missing").strip().lower() or "missing"
+if AI_TITLE_RETITLE_MODE not in {"missing", "fallback", "style", "force"}:
+    AI_TITLE_RETITLE_MODE = "missing"
 try:
     AI_TITLE_TIMEOUT_SECONDS = max(20, int(os.getenv("TWA_AI_TIMEOUT_SECONDS", "240").strip() or "240"))
 except ValueError:
     AI_TITLE_TIMEOUT_SECONDS = 240
 try:
-    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "3").strip() or "3"), 25))
+    _per_item_raw = int(os.getenv("TWA_AI_PER_ITEM_TIMEOUT_SECONDS", "0").strip() or "0")
+    # 0 disables extra per-item timeout; we still rely on AI_TITLE_TIMEOUT_SECONDS for the HTTP request.
+    AI_TITLE_PER_ITEM_TIMEOUT_SECONDS = 0 if _per_item_raw <= 0 else max(8, _per_item_raw)
+except ValueError:
+    AI_TITLE_PER_ITEM_TIMEOUT_SECONDS = 0
+try:
+    AI_TITLE_BATCH_SIZE_MAX = max(1, int(os.getenv("TWA_AI_BATCH_SIZE_MAX", "25").strip() or "25"))
+except ValueError:
+    AI_TITLE_BATCH_SIZE_MAX = 25
+# Keep this bounded so a misconfig doesn't accidentally hang the server.
+AI_TITLE_BATCH_SIZE_MAX = max(1, min(AI_TITLE_BATCH_SIZE_MAX, 5000))
+try:
+    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "3").strip() or "3"), AI_TITLE_BATCH_SIZE_MAX))
 except ValueError:
     AI_TITLE_BATCH_SIZE = 3
 try:
-    _scan_raw = int(os.getenv("TWA_AI_RECENT_SCAN_LIMIT", "240").strip() or "240")
-    AI_TITLE_RECENT_SCAN_LIMIT = 240 if _scan_raw <= 0 else _scan_raw
+    # 0 means scan full cached index (backfill titles for older media).
+    _scan_raw = int(os.getenv("TWA_AI_RECENT_SCAN_LIMIT", "0").strip() or "0")
+    AI_TITLE_RECENT_SCAN_LIMIT = 0 if _scan_raw <= 0 else _scan_raw
 except ValueError:
-    AI_TITLE_RECENT_SCAN_LIMIT = 240
+    AI_TITLE_RECENT_SCAN_LIMIT = 0
 try:
     AI_TITLE_POLL_SECONDS = max(5, int(os.getenv("TWA_AI_POLL_SECONDS", "12").strip() or "12"))
 except ValueError:
@@ -121,6 +176,11 @@ try:
     AI_TITLE_IMAGE_QUALITY = max(40, min(int(os.getenv("TWA_AI_IMAGE_QUALITY", "80").strip() or "80"), 95))
 except ValueError:
     AI_TITLE_IMAGE_QUALITY = 80
+AI_TITLE_IMAGE_PRIORITY = os.getenv("TWA_AI_IMAGE_PRIORITY", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
+try:
+    AI_TITLE_QUEUE_MAX = max(100, int(os.getenv("TWA_AI_QUEUE_MAX", "1200").strip() or "1200"))
+except ValueError:
+    AI_TITLE_QUEUE_MAX = 1200
 SESSION_LOCK_RECOVERY_ENABLED = os.getenv("TWA_SESSION_LOCK_RECOVERY", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
 SESSION_CLONE_CLEANUP = os.getenv("TWA_SESSION_CLONE_CLEANUP", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
 
@@ -165,6 +225,22 @@ def latest_message_id(items: List[Dict[str, Any]]) -> int:
 
 def count_ai_titled_items(items: List[Dict[str, Any]]) -> int:
     return sum(1 for item in items if str(item.get("ai_title", "")).strip())
+
+def compute_gallery_stats(items: List[Dict[str, Any]]) -> Dict[str, int]:
+    total = len(items)
+    videos = 0
+    images = 0
+    total_bytes = 0
+    for item in items:
+        if str(item.get("media_kind", "")) == "video":
+            videos += 1
+        else:
+            images += 1
+        try:
+            total_bytes += int(item.get("size") or 0)
+        except (TypeError, ValueError):
+            pass
+    return {"total": total, "videos": videos, "images": images, "bytes": total_bytes}
 
 
 class TelegramMiniAppAuth:
@@ -230,8 +306,14 @@ class TelegramGalleryService:
         self.last_sync_error: Optional[str] = None
         self._lock = asyncio.Lock()
         self._start_lock = asyncio.Lock()
+        self._ai_title_lock = asyncio.Lock()
         self._started = False
         self._last_ai_failure_at = 0.0
+        self._ai_queue: deque[int] = deque()
+        self._ai_queue_ids: set[int] = set()
+        self._background_sync_task: Optional[asyncio.Task] = None
+        self._ollama_models_cached_at = 0.0
+        self._ollama_models_cache: set[str] = set()
         self._base_session_name = GALLERY_USER_SESSION
         self._active_session_name = GALLERY_USER_SESSION
         self._session_clone_name: Optional[str] = None
@@ -243,6 +325,8 @@ class TelegramGalleryService:
             self._active_session_name = "web_gallery_session"
         self.client = self._build_client(self.session_mode, session_name=self._active_session_name)
         self.ffmpeg_bin = self._resolve_ffmpeg_bin()
+        # Load cached index immediately so the Mini App can render even if Telegram auth/start is slow.
+        self._load_index()
 
     @staticmethod
     def _resolve_ffmpeg_bin() -> Optional[str]:
@@ -287,6 +371,9 @@ class TelegramGalleryService:
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
+            # Bot sessions do not need to persist on disk; keeping them in-memory avoids sqlite locks
+            # when multiple TWA backends are accidentally started.
+            in_memory=True,
             workdir=str(self.cache_dir),
         )
 
@@ -334,6 +421,19 @@ class TelegramGalleryService:
             with suppress(OSError):
                 path.unlink(missing_ok=True)
 
+    def _enqueue_ai_title(self, message_id: int) -> None:
+        if message_id <= 0:
+            return
+        if message_id in self._ai_queue_ids:
+            return
+
+        self._ai_queue.append(message_id)
+        self._ai_queue_ids.add(message_id)
+
+        while len(self._ai_queue) > AI_TITLE_QUEUE_MAX:
+            dropped = self._ai_queue.popleft()
+            self._ai_queue_ids.discard(dropped)
+
     async def start(self) -> None:
         async with self._start_lock:
             if self._started:
@@ -342,28 +442,63 @@ class TelegramGalleryService:
             try:
                 await self.client.start()
             except Exception as exc:
-                if not (self.session_mode == "user" and SESSION_LOCK_RECOVERY_ENABLED and self._is_session_locked_error(exc)):
+                if not (SESSION_LOCK_RECOVERY_ENABLED and self._is_session_locked_error(exc)):
                     raise
 
-                clone_name = self._clone_locked_user_session()
-                if not clone_name:
-                    logger.error("User session is locked and clone fallback could not be created.")
-                    raise
-
-                fallback_client = self._build_client("user", session_name=clone_name)
-                await fallback_client.start()
-                self.client = fallback_client
-                self._active_session_name = clone_name
-                self._session_clone_name = clone_name
-                logger.warning(
-                    "Recovered from locked user session '%s' by using cloned session '%s'.",
-                    self._base_session_name,
-                    clone_name,
-                )
-                self.last_sync_error = (
-                    f"Session lock detected on '{self._base_session_name}'. "
-                    f"Recovered using cloned session '{clone_name}'."
-                )
+                if self.session_mode == "user":
+                    clone_name = self._clone_locked_user_session()
+                    if clone_name:
+                        fallback_client = self._build_client("user", session_name=clone_name)
+                        await fallback_client.start()
+                        self.client = fallback_client
+                        self._active_session_name = clone_name
+                        self._session_clone_name = clone_name
+                        logger.warning(
+                            "Recovered from locked user session '%s' by using cloned session '%s'.",
+                            self._base_session_name,
+                            clone_name,
+                        )
+                        self.last_sync_error = (
+                            f"Session lock detected on '{self._base_session_name}'. "
+                            f"Recovered using cloned session '{clone_name}'."
+                        )
+                    else:
+                        # Windows can deny copying a locked sqlite session file. In that case, degrade gracefully:
+                        # fall back to bot auth so the Mini App still loads from cache/recent media.
+                        fallback_name = f"web_gallery_fallback_{os.getpid()}_{int(time.time())}"
+                        fallback_client = self._build_client("bot", session_name=fallback_name)
+                        await fallback_client.start()
+                        self.client = fallback_client
+                        self.session_mode = "bot"
+                        self._active_session_name = fallback_name
+                        self._session_clone_name = None
+                        logger.warning(
+                            "User session '%s' is locked and clone could not be created; falling back to bot session '%s'.",
+                            self._base_session_name,
+                            fallback_name,
+                        )
+                        self.last_sync_error = (
+                            f"Session lock detected on '{self._base_session_name}' and clone failed. "
+                            "Fell back to bot auth (history may be limited)."
+                        )
+                else:
+                    # Bot auth should be in-memory (no sqlite), but handle any lock edge-cases anyway.
+                    previous_name = self._active_session_name
+                    fallback_name = f"web_gallery_inmem_{os.getpid()}_{int(time.time())}"
+                    fallback_client = self._build_client("bot", session_name=fallback_name)
+                    await fallback_client.start()
+                    self.client = fallback_client
+                    self.session_mode = "bot"
+                    self._active_session_name = fallback_name
+                    self._session_clone_name = None
+                    logger.warning(
+                        "Bot session '%s' reported locked; recovered using in-memory session '%s'.",
+                        previous_name,
+                        fallback_name,
+                    )
+                    self.last_sync_error = (
+                        "Session lock detected for bot auth. Recovered using in-memory bot session."
+                    )
 
             self._started = True
             self._load_index()
@@ -391,6 +526,9 @@ class TelegramGalleryService:
         except (ValueError, OSError):
             self.media_index = []
             self._load_index_from_cache_files()
+        else:
+            # Scrub any previously-stored unsafe titles (e.g., "teen/school") so they never reach the UI.
+            self._scrub_blocked_ai_titles()
 
     def _load_index_from_cache_files(self) -> None:
         # Fallback index path for fast UI boot when no JSON index exists yet.
@@ -461,6 +599,35 @@ class TelegramGalleryService:
         }
         self.index_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    def _scrub_blocked_ai_titles(self) -> None:
+        if not self.media_index:
+            return
+
+        changed = False
+        for entry in self.media_index:
+            title = str(entry.get("ai_title", "")).strip()
+            if not title:
+                continue
+            if not self._contains_blocked_title_terms(title):
+                continue
+
+            # Remove unsafe title and re-enqueue for adult-only re-analysis.
+            entry["ai_title"] = ""
+            entry["ai_title_style"] = ""
+            entry["ai_title_model"] = ""
+            entry["ai_title_generated_at"] = None
+            entry["ai_title_is_fallback"] = False
+            try:
+                msg_id = int(entry.get("message_id", 0))
+            except (TypeError, ValueError):
+                msg_id = 0
+            if msg_id > 0:
+                self._enqueue_ai_title(msg_id)
+            changed = True
+
+        if changed:
+            self._save_index()
+
     def _merge_partial_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         existing_by_id = {int(x.get("message_id", 0)): x for x in self.media_index}
         incoming_by_id = {int(x.get("message_id", 0)): x for x in items}
@@ -469,9 +636,17 @@ class TelegramGalleryService:
         for msg_id, old_item in existing_by_id.items():
             if msg_id in incoming_by_id:
                 merged_item = {**old_item, **incoming_by_id[msg_id]}
+                incoming_title = str(merged_item.get("ai_title", "")).strip()
+                if incoming_title and self._contains_blocked_title_terms(incoming_title):
+                    merged_item["ai_title"] = ""
+                    merged_item["ai_title_style"] = ""
+                    merged_item["ai_title_model"] = ""
+                    merged_item["ai_title_generated_at"] = None
+                    merged_item["ai_title_is_fallback"] = False
+
                 if not str(merged_item.get("ai_title", "")).strip():
                     old_ai_title = str(old_item.get("ai_title", "")).strip()
-                    if old_ai_title:
+                    if old_ai_title and not self._contains_blocked_title_terms(old_ai_title):
                         merged_item["ai_title"] = old_ai_title
                 merged_map[msg_id] = merged_item
             else:
@@ -564,6 +739,288 @@ class TelegramGalleryService:
         return cleaned
 
     @staticmethod
+    def _sanitize_ai_vision_text(value: str, max_chars: int = 800) -> str:
+        """Looser sanitizer for vision captions (do not truncate to 100 chars)."""
+        cleaned = " ".join((value or "").replace("\r", " ").replace("\n", " ").split()).strip()
+        if not cleaned:
+            return ""
+        if cleaned.startswith("\"") and cleaned.endswith("\"") and len(cleaned) > 1:
+            cleaned = cleaned[1:-1].strip()
+        if max_chars > 0 and len(cleaned) > max_chars:
+            cleaned = cleaned[:max_chars].rstrip()
+        return cleaned.strip()
+
+    @staticmethod
+    def _normalize_title_key(value: str) -> str:
+        return " ".join(str(value or "").strip().lower().split())
+
+    def _unique_title_variant(self, base_title: str, message_id: int) -> Optional[str]:
+        """Ask the text model for an alternate phrasing when a title collides."""
+        if not base_title:
+            return None
+        if not AI_TITLE_POLISH_ENABLED:
+            return None
+        if AI_TITLE_PROVIDER != "ollama" or not AI_TITLE_OLLAMA_URL:
+            return None
+        if AI_TITLE_STYLE != "explicit":
+            return None
+
+        prompt = (
+            "Create a UNIQUE porn-site style explicit adult gallery title. "
+            "Plain text only, 4 to 10 words, no emojis, no hashtags, no quotes. "
+            "Make it DIFFERENT wording than the base title while keeping the same meaning. "
+            "Always include at least one explicit anatomy word: boobs/tits/pussy/dick/cock. "
+            "Do not mention or imply age, teens, students, school terms, ethnicity, race, or nationality. "
+            "Do not describe coercion or violence.\n"
+            f"Unique seed: {int(message_id)}\n"
+            f"Base title: {base_title}\n"
+            "Return only the title."
+        )
+
+        result = self._ollama_generate_text_with_fallback(
+            prompt=prompt,
+            timeout_seconds=min(60, max(15, AI_TITLE_TIMEOUT_SECONDS)),
+            models=[AI_TITLE_TEXT_MODEL] + list(AI_TITLE_TEXT_FALLBACK_MODELS),
+        )
+        if not result:
+            return None
+        candidate, _used_model = result
+        candidate = self._clamp_title_words(candidate, min_words=3, max_words=10)
+        if not candidate:
+            return None
+        if self._contains_blocked_title_terms(candidate):
+            return None
+        if not self._has_explicit_anatomy_signal(candidate):
+            return None
+        # Ensure we actually changed phrasing.
+        if self._normalize_title_key(candidate) == self._normalize_title_key(base_title):
+            return None
+        return candidate
+
+    def _ensure_unique_ai_title(self, title: str, message_id: int, used_keys: set[str]) -> str:
+        if not title:
+            return title
+
+        base = self._sanitize_ai_title(title)
+        base_key = self._normalize_title_key(base)
+        if not base_key:
+            return title
+        if base_key not in used_keys:
+            used_keys.add(base_key)
+            return base
+
+        # Title collided: ask the model for a different phrasing (preferred over hard-coded adjective arrays).
+        rerolled = self._unique_title_variant(base, message_id=message_id)
+        if rerolled:
+            reroll_key = self._normalize_title_key(rerolled)
+            if reroll_key and reroll_key not in used_keys:
+                used_keys.add(reroll_key)
+                return self._sanitize_ai_title(rerolled)
+
+        # Last resort: add a stable "scene" marker with message id.
+        words = base.split()
+        suffix = ["Scene", str(int(message_id))]
+        max_words = 10
+        if len(words) + len(suffix) > max_words:
+            words = words[: max(1, max_words - len(suffix))]
+        candidate = self._sanitize_ai_title(" ".join([*words, *suffix]))
+        key = self._normalize_title_key(candidate)
+        if key and key not in used_keys:
+            used_keys.add(key)
+            return candidate
+
+        return base
+
+    @staticmethod
+    def _has_explicit_signal(value: str) -> bool:
+        if not value:
+            return False
+        lowered = f" {value.lower()} "
+        tokens = (
+            " nude ",
+            " naked ",
+            " sex ",
+            " fuck ",
+            " fucking ",
+            " blowjob ",
+            " oral ",
+            " anal ",
+            " pussy ",
+            " dick ",
+            " cock ",
+            " tits ",
+            " boobs ",
+            " nipples ",
+            " penetration ",
+            " cum ",
+            " orgasm ",
+        )
+        return any(tok in lowered for tok in tokens)
+
+    @staticmethod
+    def _has_explicit_anatomy_signal(value: str) -> bool:
+        if not value:
+            return False
+        lowered = f" {value.lower()} "
+        tokens = (
+            " pussy ",
+            " dick ",
+            " cock ",
+            " tits ",
+            " boobs ",
+            " nipples ",
+        )
+        return any(tok in lowered for tok in tokens)
+
+    @staticmethod
+    def _contains_blocked_title_terms(value: str) -> bool:
+        if not value:
+            return False
+        lowered = f" {value.lower()} "
+
+        # Safety guardrails: never allow titles that imply minors, age, or sensitive attributes.
+        always_blocked_terms = (
+            " teen ",
+            " teenage ",
+            " schoolgirl ",
+            " school girl ",
+            " schoolboy ",
+            " school boy ",
+            " student ",
+            " underage ",
+            " minor ",
+            " child ",
+            " kid ",
+            " loli ",
+            " shota ",
+            " barely legal ",
+            " young girl ",
+            " young boy ",
+            " rape ",
+            " raped ",
+            " raping ",
+            " forced ",
+            " non-consensual ",
+            " nonconsensual ",
+            " asian ",
+            " european ",
+            " latina ",
+            " ebony ",
+            " caucasian ",
+            " japanese ",
+            " chinese ",
+            " korean ",
+            " thai ",
+            " vietnamese ",
+            " filipina ",
+            " russian ",
+        )
+        if any(term in lowered for term in always_blocked_terms):
+            return True
+
+        # Block explicit anatomy words unless user explicitly opts into explicit mode.
+        tasteful_only_terms = (
+            " pussy ",
+            " dick ",
+            " cock ",
+            " penis ",
+            " vagina ",
+            " tits ",
+            " nipples ",
+        )
+        if AI_TITLE_STYLE == "tasteful" and any(term in lowered for term in tasteful_only_terms):
+            return True
+
+        # Block explicit age mentions (we never guess or label ages).
+        if re.search(r"\b(1[0-7]|18|19|20|21)\b", lowered):
+            return True
+
+        return False
+
+    @staticmethod
+    def _fallback_ai_title(media_kind: str, seed: int = 0) -> str:
+        if AI_TITLE_STYLE == "explicit":
+            # Keep fallback titles porn-site style (adult-only) so the UI never shows bland placeholders.
+            # Avoid the word "tease" (users reported it gets overused and feels generic).
+            safe_seed = int(seed or 0)
+            video_templates = (
+                "Dirty nude fucking with hard cock and pussy",
+                "Hot naked cock pumping wet pussy",
+                "Horny nude sex with cock and pussy",
+                "Hard cock pounding wet pussy",
+                "Naked fucking: cock and wet pussy",
+                "Raw nude sex: hard cock, wet pussy",
+                "Sloppy nude fucking with cock and pussy",
+                "Hot nude sex with tits and hard cock",
+            )
+            image_templates = (
+                "Nude tits and wet pussy close-up",
+                "Hot naked body, tits out, wet pussy",
+                "Horny nude babe showing tits and pussy",
+                "Naked tits, juicy pussy, horny pose",
+                "Dirty nude boobs and wet pussy shot",
+                "Nude body with tits and pussy on display",
+                "Wet pussy and tits, horny nude selfie",
+                "Hot naked tits and pussy closeup",
+            )
+
+            templates = video_templates if media_kind == "video" else image_templates
+            idx = abs(safe_seed) % len(templates)
+            return templates[idx]
+        return "Romantic Adult Video Moment" if media_kind == "video" else "Romantic Adult Moment"
+
+    @staticmethod
+    def _is_fallback_ai_title(value: str) -> bool:
+        title = (value or "").strip()
+        if not title:
+            return False
+        return title in {
+            "Romantic Adult Video Moment",
+            "Romantic Adult Moment",
+            "Explicit Adult Video Clip",
+            "Explicit Adult Moment",
+            "Hot nude cock and pussy tease",
+            "Hot nude tits and pussy tease",
+        }
+
+    @staticmethod
+    def _ai_title_needs_generation(entry: Dict[str, Any], mode: str) -> bool:
+        """Return True if this entry should be (re)analyzed according to retitle mode."""
+        current_title = str(entry.get("ai_title", "")).strip()
+        if not current_title:
+            return True
+        # If a previously-generated title contains blocked terms, always retitle.
+        if TelegramGalleryService._contains_blocked_title_terms(current_title):
+            return True
+
+        mode_norm = (mode or "missing").strip().lower() or "missing"
+        if mode_norm == "missing":
+            return False
+        if mode_norm == "force":
+            return True
+        if mode_norm == "fallback":
+            if bool(entry.get("ai_title_is_fallback")):
+                return True
+            return TelegramGalleryService._is_fallback_ai_title(current_title)
+        if mode_norm == "style":
+            prev_style = str(entry.get("ai_title_style", "")).strip().lower()
+            # Treat missing metadata as eligible for re-title when mode=style.
+            if not prev_style or prev_style != AI_TITLE_STYLE:
+                return True
+            # If user wants porn-site style explicit titles, "tease" ends up massively overused and generic.
+            # Consider it eligible for re-title so older titles can be refreshed into more dynamic wording.
+            if AI_TITLE_STYLE == "explicit" and re.search(r"\bteas(e|ing)\b", current_title.lower()):
+                return True
+            # In explicit mode, re-title older "romantic/neutral" outputs so porn keywords appear.
+            if AI_TITLE_STYLE == "explicit" and not TelegramGalleryService._has_explicit_anatomy_signal(current_title):
+                return True
+            if bool(entry.get("ai_title_is_fallback")):
+                return True
+            return TelegramGalleryService._is_fallback_ai_title(current_title)
+
+        return False
+
+    @staticmethod
     def _prepare_ai_image_bytes(image_path: Path) -> Optional[bytes]:
         try:
             original = image_path.read_bytes()
@@ -599,31 +1056,104 @@ class TelegramGalleryService:
 
         return original
 
-    def _ollama_title_from_image_path(self, image_path: Path, media_kind: str, caption: str) -> Optional[str]:
-        if not image_path.exists():
-            return None
+    @staticmethod
+    def _clamp_title_words(title: str, min_words: int = 3, max_words: int = 10) -> str:
+        words = (title or "").split()
+        if not words:
+            return ""
+        if len(words) > max_words:
+            words = words[:max_words]
+        if len(words) < min_words:
+            return ""
+        return " ".join(words).strip()
 
-        image_bytes = self._prepare_ai_image_bytes(image_path)
-        if not image_bytes:
-            return None
+    @staticmethod
+    def _compress_vision_text(value: str, max_chars: int = 360) -> str:
+        text = " ".join((value or "").split()).strip()
+        if not text:
+            return ""
+        if max_chars <= 0 or len(text) <= max_chars:
+            return text
+        head = max(80, int(max_chars * 0.62))
+        tail = max(40, max_chars - head - 5)
+        return f"{text[:head].rstrip()} ... {text[-tail:].lstrip()}".strip()
 
-        prompt = (
-            "Create one concise gallery title for this adult media preview. "
-            "Output plain text only, 4 to 10 words, no emojis, no hashtags."
+    @staticmethod
+    def _looks_informative_vision_text(value: str) -> bool:
+        text = (value or "").strip()
+        if len(text) < 4:
+            return False
+        return re.search(r"[A-Za-z0-9]", text) is not None
+
+    @staticmethod
+    def _looks_like_refusal_text(value: str) -> bool:
+        text = (value or "").strip().lower()
+        if not text:
+            return False
+        tokens = (
+            "i can't",
+            "i cannot",
+            "can't help",
+            "cannot help",
+            "can't assist",
+            "cannot assist",
+            "unable to",
+            "i'm sorry",
+            "i am sorry",
+            "as an ai",
+            "policy",
+            "guidelines",
+            "cannot comply",
+            "can't comply",
         )
-        if media_kind == "video":
-            prompt += " The image is a video preview frame."
-        if caption:
-            prompt += f" Context caption: {caption[:220]}"
+        return any(tok in text for tok in tokens)
 
+    @staticmethod
+    def _ollama_tags_url() -> str:
+        base = AI_TITLE_OLLAMA_URL
+        if "/api/" in base:
+            base = base.split("/api/", 1)[0]
+        return base.rstrip("/") + "/api/tags"
+
+    def _ollama_installed_models(self, max_age_seconds: int = 90) -> set[str]:
+        """Return a cached set of Ollama model tags, best-effort."""
+        now = time.time()
+        if self._ollama_models_cache and (now - self._ollama_models_cached_at) < max_age_seconds:
+            return set(self._ollama_models_cache)
+
+        tags_url = self._ollama_tags_url()
+        request = urllib.request.Request(tags_url, headers={"Content-Type": "application/json"}, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=3) as response:
+                body = response.read().decode("utf-8", errors="ignore")
+            parsed = json.loads(body)
+            models = parsed.get("models") or []
+            found: set[str] = set()
+            for entry in models:
+                name = str(entry.get("name", "")).strip()
+                if name:
+                    found.add(name)
+            if found:
+                self._ollama_models_cache = found
+            self._ollama_models_cached_at = now
+        except Exception:
+            # Keep previous cache; update timestamp to avoid hammering when Ollama is down.
+            self._ollama_models_cached_at = now
+        return set(self._ollama_models_cache)
+
+    def _ollama_generate_text(self, model: str, prompt: str, timeout_seconds: int) -> Optional[str]:
+        if not model:
+            return None
         payload = {
-            "model": AI_TITLE_MODEL,
+            "model": model,
             "prompt": prompt,
-            "images": [base64.b64encode(image_bytes).decode("ascii")],
             "stream": False,
-            "options": {"temperature": 0.2},
+            "options": {
+                # A bit more variety in explicit mode, while staying readable.
+                "temperature": 0.55 if AI_TITLE_STYLE == "explicit" else 0.35,
+                "num_predict": 56,
+            },
         }
-
         data = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             AI_TITLE_OLLAMA_URL,
@@ -631,20 +1161,266 @@ class TelegramGalleryService:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-
         try:
-            with urllib.request.urlopen(request, timeout=AI_TITLE_TIMEOUT_SECONDS) as response:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 body = response.read().decode("utf-8", errors="ignore")
             parsed = json.loads(body)
-            title = self._sanitize_ai_title(str(parsed.get("response", "")))
-            if title:
-                self._clear_ai_failure()
-                return title
         except Exception:
-            self._mark_ai_failure()
             return None
 
+        # Ollama returns {"error": "..."} for missing models or other failures.
+        if parsed.get("error"):
+            return None
+
+        return self._sanitize_ai_title(str(parsed.get("response", "")))
+
+    def _ollama_generate_text_with_fallback(
+        self,
+        prompt: str,
+        timeout_seconds: int,
+        models: Optional[List[str]] = None,
+    ) -> Optional[Tuple[str, str]]:
+        """Try multiple text models in order, returning (text, model_used)."""
+        candidates = models or []
+        installed = self._ollama_installed_models()
+        seen: set[str] = set()
+        for model in candidates:
+            model_name = str(model or "").strip()
+            if not model_name or model_name in seen:
+                continue
+            seen.add(model_name)
+            if installed and model_name not in installed:
+                continue
+            text = self._ollama_generate_text(model=model_name, prompt=prompt, timeout_seconds=timeout_seconds)
+            if text:
+                return text, model_name
         return None
+
+    def _ollama_polish_title_with_model(
+        self,
+        base_title: str,
+        media_kind: str,
+        caption: str,
+        message_id: int,
+    ) -> Optional[Tuple[str, str]]:
+        if not AI_TITLE_POLISH_ENABLED:
+            return None
+        if AI_TITLE_STYLE != "explicit":
+            return None
+        if not base_title:
+            return None
+
+        prompt = (
+            "Rewrite this into a porn-site style explicit adult gallery title. "
+            "Plain text only, 4 to 10 words, no emojis, no hashtags, no quotes. "
+            "Keep it aligned with what's visible/implied; if uncertain, stay generic and do not invent niche acts. "
+            "Always include at least one explicit anatomy word: boobs/tits/pussy/dick/cock. "
+            "For videos, include one action verb when possible: fuck/fucking/ride/riding/suck/sucking/pound/pounding/thrust/thrusting. "
+            "Only include very specific act keywords when clearly implied (blowjob/oral/penetration/cum/orgasm). "
+            "Avoid the word 'tease/teasing' (it gets overused and sounds generic). "
+            "If nudity is implied, include 'nude' or 'naked'; otherwise use 'sexy body' or 'lingerie'. "
+            "Avoid bland repeated phrases like 'Adult moment' or 'Preview'. "
+            "Add 1-2 spicy adjectives when they fit: hot/dirty/horny/naughty/juicy/throbbing/filthy/kinky/raw/wet/sloppy/creamy/deep/hard. "
+            "Make it feel like a real porn-site listing title and keep it catchy. "
+            "Do not mention or imply age, teens, students, school terms, ethnicity, race, or nationality. "
+            "Do not describe coercion or violence.\n"
+            f"Media kind: {media_kind}\n"
+            f"Unique seed: {int(message_id)}\n"
+            f"Original title: {base_title}\n"
+        )
+        if caption:
+            prompt += f"Caption context: {caption[:220]}\n"
+        prompt += "Return only the rewritten title."
+
+        rewrite_result = self._ollama_generate_text_with_fallback(
+            prompt=prompt,
+            timeout_seconds=min(60, max(15, AI_TITLE_TIMEOUT_SECONDS)),
+            models=[AI_TITLE_TEXT_MODEL] + list(AI_TITLE_TEXT_FALLBACK_MODELS),
+        )
+        if not rewrite_result:
+            return None
+        rewritten, used_model = rewrite_result
+        rewritten = self._clamp_title_words(rewritten, min_words=3, max_words=10)
+        if not rewritten:
+            return None
+        if self._contains_blocked_title_terms(rewritten):
+            return None
+        if not self._has_explicit_anatomy_signal(rewritten):
+            return None
+        return rewritten, used_model
+
+    def _ollama_polish_title(self, base_title: str, media_kind: str, caption: str, message_id: int) -> Optional[str]:
+        result = self._ollama_polish_title_with_model(
+            base_title=base_title,
+            media_kind=media_kind,
+            caption=caption,
+            message_id=message_id,
+        )
+        if not result:
+            return None
+        title, _model = result
+        return title
+
+    def _ollama_title_from_image_path(
+        self,
+        image_path: Path,
+        media_kind: str,
+        caption: str,
+        message_id: int,
+    ) -> Optional[Tuple[str, str, bool]]:
+        if not image_path.exists():
+            return None
+
+        image_bytes = self._prepare_ai_image_bytes(image_path)
+        if not image_bytes:
+            return None
+
+        prompt_suffix = ""
+        if media_kind == "video":
+            prompt_suffix += " The image is a video preview frame."
+        if caption:
+            prompt_suffix += f" Context caption: {caption[:220]}"
+
+        if AI_TITLE_STYLE == "explicit":
+            # Keep vision prompts direct and avoid long "porn keyword lists" which some models respond to poorly.
+            # We apply porn-site title wording via the text polisher model (adult-only; no age/teen/school/ethnicity).
+            prompt_candidates = [
+                (
+                    "Describe the scene in plain words. "
+                    "Be direct and specific about what is visible. "
+                    "Mention setting, pose, nudity, and any obvious sex act (if visible). "
+                    "Avoid guessing personal attributes like age or ethnicity. "
+                    "Avoid describing violence or coercion."
+                ),
+                (
+                    "Write one blunt sentence describing what is visible. "
+                    "Mention nudity if present and any obvious sexual activity if visible. "
+                    "Avoid guessing age or ethnicity. "
+                    "Avoid violence or coercion."
+                ),
+                (
+                    "List 3 to 6 short key phrases describing visible elements. "
+                    "Avoid age or ethnicity. Avoid violence or coercion."
+                ),
+            ]
+        else:
+            prompt_candidates = [
+                (
+                    "Create one concise gallery title for this adult media preview. "
+                    "Output plain text only, 4 to 10 words, no emojis, no hashtags. "
+                    "Use romantic, tasteful wording. "
+                    "Do not mention ethnicity, race, nationality, age, school terms, or explicit anatomy words."
+                )
+            ]
+
+        prompts_to_try = [p + prompt_suffix for p in prompt_candidates]
+
+        encoded_image = base64.b64encode(image_bytes).decode("ascii")
+        models_to_try = [AI_TITLE_MODEL] + list(AI_TITLE_FALLBACK_MODELS)
+        last_error: Optional[Exception] = None
+
+        for model_name in models_to_try:
+            if not model_name:
+                continue
+            for prompt in prompts_to_try:
+                payload = {
+                    "model": model_name,
+                    "prompt": prompt,
+                    "images": [encoded_image],
+                    "stream": False,
+                    "options": {"temperature": 0.22, "num_predict": 84},
+                }
+
+                data = json.dumps(payload).encode("utf-8")
+                request = urllib.request.Request(
+                    AI_TITLE_OLLAMA_URL,
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+
+                try:
+                    with urllib.request.urlopen(request, timeout=AI_TITLE_TIMEOUT_SECONDS) as response:
+                        body = response.read().decode("utf-8", errors="ignore")
+                    parsed = json.loads(body)
+                    if parsed.get("error"):
+                        # Model missing / incompatible; try next model.
+                        break
+                    raw = self._sanitize_ai_vision_text(str(parsed.get("response", "")))
+                    if self._looks_like_refusal_text(raw):
+                        continue
+                    if not self._looks_informative_vision_text(raw):
+                        continue
+
+                    if AI_TITLE_STYLE == "explicit" and AI_TITLE_POLISH_ENABLED:
+                        title = self._compress_vision_text(raw, max_chars=360)
+                    else:
+                        title = self._clamp_title_words(raw, min_words=3, max_words=10)
+
+                    if not title:
+                        continue
+
+                    self._clear_ai_failure()
+
+                    # If the model emits blocked terms, fall back to a safe explicit title and optionally polish it.
+                    if self._contains_blocked_title_terms(title):
+                        fallback_title = self._fallback_ai_title(media_kind, seed=message_id)
+                        if AI_TITLE_STYLE == "explicit" and AI_TITLE_POLISH_ENABLED:
+                            polished_result = self._ollama_polish_title_with_model(
+                                fallback_title,
+                                media_kind=media_kind,
+                                caption=caption,
+                                message_id=message_id,
+                            )
+                            if polished_result:
+                                polished, text_model = polished_result
+                                return polished, f"{model_name}+{text_model}", True
+                        return fallback_title, model_name, True
+
+                    # In explicit mode, always rewrite into a porn-style title so anatomy keywords are present.
+                    if AI_TITLE_STYLE == "explicit" and AI_TITLE_POLISH_ENABLED:
+                        polished_result = self._ollama_polish_title_with_model(
+                            title,
+                            media_kind=media_kind,
+                            caption=caption,
+                            message_id=message_id,
+                        )
+                        if polished_result:
+                            polished, text_model = polished_result
+                            return polished, f"{model_name}+{text_model}", False
+                        if not self._has_explicit_anatomy_signal(title):
+                            fallback_title = self._fallback_ai_title(media_kind, seed=message_id)
+                            polished_fallback_result = self._ollama_polish_title_with_model(
+                                fallback_title,
+                                media_kind=media_kind,
+                                caption=caption,
+                                message_id=message_id,
+                            )
+                            if polished_fallback_result:
+                                polished_fallback, text_model = polished_fallback_result
+                                return polished_fallback, f"{model_name}+{text_model}", True
+                            return fallback_title, model_name, True
+
+                    return title, model_name, False
+                except Exception as exc:
+                    last_error = exc
+                    continue
+
+        # Total failure: still return a deterministic safe explicit title so the UI doesn't stay blank.
+        if last_error is not None:
+            self._mark_ai_failure()
+        fallback_title = self._fallback_ai_title(media_kind, seed=message_id)
+        if AI_TITLE_STYLE == "explicit" and AI_TITLE_POLISH_ENABLED:
+            polished_result = self._ollama_polish_title_with_model(
+                fallback_title,
+                media_kind=media_kind,
+                caption=caption,
+                message_id=message_id,
+            )
+            if polished_result:
+                polished, text_model = polished_result
+                return polished, f"fallback+{text_model}", True
+        return fallback_title, "fallback", True
 
     def _video_frame_path(self, message_id: int) -> Path:
         return self.cache_dir / f"{message_id}_frame.jpg"
@@ -710,6 +1486,37 @@ class TelegramGalleryService:
             pass
         return local_path
 
+    def _image_ai_thumb_path(self, message_id: int) -> Path:
+        return self.cache_dir / f"{message_id}_image_ai_thumb.jpg"
+
+    async def _ensure_image_thumb_for_ai(self, media_obj: Any, message_id: int) -> Optional[Path]:
+        thumb_path = self._image_ai_thumb_path(message_id)
+        if thumb_path.exists():
+            return thumb_path
+
+        thumb_obj = self._pick_best_thumb(media_obj)
+        if not thumb_obj:
+            return None
+
+        try:
+            downloaded = await asyncio.wait_for(
+                self.client.download_media(thumb_obj, file_name=str(thumb_path)),
+                timeout=min(25, DOWNLOAD_TIMEOUT_SECONDS),
+            )
+        except Exception:
+            return None
+
+        if not downloaded:
+            return None
+
+        downloaded_path = Path(downloaded)
+        if downloaded_path != thumb_path and downloaded_path.exists():
+            try:
+                downloaded_path.replace(thumb_path)
+            except OSError:
+                return downloaded_path
+        return thumb_path if thumb_path.exists() else downloaded_path
+
     async def _ensure_video_cached_for_ai(self, item: Dict[str, Any], message: Any) -> Optional[Path]:
         local_path = self.cache_dir / str(item.get("file_name", ""))
         if local_path.exists():
@@ -749,7 +1556,14 @@ class TelegramGalleryService:
             local_image = self.cache_dir / str(item.get("file_name", ""))
             if local_image.exists():
                 return local_image
-            return await self._ensure_image_cached_for_ai(item, message)
+            thumb_image = await self._ensure_image_thumb_for_ai(media_obj, message_id)
+            if thumb_image and thumb_image.exists():
+                return thumb_image
+            # Full downloads can be slow; only fall back to caching the full image if we couldn't get a thumb.
+            cached_image = await self._ensure_image_cached_for_ai(item, message)
+            if cached_image and cached_image.exists():
+                return cached_image
+            return None
 
         if media_kind == "video":
             thumb_path = self._thumb_path(message_id)
@@ -770,10 +1584,10 @@ class TelegramGalleryService:
 
         return None
 
-    async def _generate_ai_title_for_item(self, item: Dict[str, Any]) -> Optional[str]:
+    async def _generate_ai_title_for_item(self, item: Dict[str, Any], mode: str = "missing") -> Optional[str]:
         if not self._ai_generation_ready():
             return None
-        if str(item.get("ai_title", "")).strip():
+        if not self._ai_title_needs_generation(item, mode):
             return None
 
         message_id = int(item.get("message_id", 0))
@@ -795,86 +1609,210 @@ class TelegramGalleryService:
             return None
 
         caption_text = str(item.get("caption") or message.caption or "").strip()
-        title = await asyncio.to_thread(
-            self._ollama_title_from_image_path,
-            source_image,
-            media_kind,
-            caption_text,
-        )
+        result: Optional[Tuple[str, str, bool]]
+        if AI_TITLE_PER_ITEM_TIMEOUT_SECONDS > 0:
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self._ollama_title_from_image_path,
+                        source_image,
+                        media_kind,
+                        caption_text,
+                        message_id,
+                    ),
+                    timeout=AI_TITLE_PER_ITEM_TIMEOUT_SECONDS,
+                )
+            except TimeoutError:
+                return None
+        else:
+            result = await asyncio.to_thread(
+                self._ollama_title_from_image_path,
+                source_image,
+                media_kind,
+                caption_text,
+                message_id,
+            )
+        if not result:
+            return None
+        title, used_model, is_fallback = result
+        # If we only had a low-res Telegram thumb for an image and it yielded a fallback title,
+        # download the full image once and retry for better analysis.
+        if (
+            media_kind == "image"
+            and bool(is_fallback)
+            and source_image.name.endswith("_image_ai_thumb.jpg")
+        ):
+            full_image = await self._ensure_image_cached_for_ai(item, message)
+            if full_image and full_image.exists():
+                try:
+                    retry_result = await asyncio.to_thread(
+                        self._ollama_title_from_image_path,
+                        full_image,
+                        media_kind,
+                        caption_text,
+                        message_id,
+                    )
+                except Exception:
+                    retry_result = None
+                if retry_result:
+                    retry_title, retry_model, retry_is_fallback = retry_result
+                    if retry_title and not retry_is_fallback:
+                        title, used_model, is_fallback = retry_title, retry_model, retry_is_fallback
         if not title:
             return None
 
+        # Metadata for future re-titling decisions.
+        item["ai_title_style"] = AI_TITLE_STYLE
+        item["ai_title_model"] = used_model
+        item["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
+        item["ai_title_is_fallback"] = bool(is_fallback)
         return title
 
-    async def generate_missing_ai_titles(self, batch_size: int, recent_limit: int) -> int:
-        if not self._ai_generation_ready():
-            return 0
-        if not self._started:
-            return 0
-        if not self.media_index:
-            return 0
+    async def generate_missing_ai_titles(self, batch_size: int, recent_limit: int, mode: str = "missing") -> int:
+        async with self._ai_title_lock:
+            if not self._ai_generation_ready():
+                return 0
+            if not self._started:
+                return 0
+            if not self.media_index:
+                return 0
 
-        batch = max(1, min(int(batch_size), 25))
-        requested_scan = int(recent_limit)
-        if requested_scan <= 0:
-            scan_limit = len(self.media_index)
-        else:
-            scan_limit = max(batch, min(requested_scan, len(self.media_index)))
-
-        async with self._lock:
-            candidates = [
-                dict(x)
-                for x in self.media_index[:scan_limit]
-                if not str(x.get("ai_title", "")).strip()
-            ]
-
-        if not candidates:
-            return 0
-
-        generated = 0
-        changed = False
-        attempts = 0
-        max_attempts = max(batch, min(scan_limit, batch * 4))
-        for item in candidates:
-            if generated >= batch or attempts >= max_attempts:
-                break
-            attempts += 1
-            try:
-                title = await self._generate_ai_title_for_item(item)
-            except Exception:
-                continue
-            if not title:
-                continue
-
-            message_id = int(item.get("message_id", 0))
-            if message_id <= 0:
-                continue
+            batch = max(1, min(int(batch_size), AI_TITLE_BATCH_SIZE_MAX))
+            requested_scan = int(recent_limit)
+            if requested_scan <= 0:
+                scan_limit = len(self.media_index)
+            else:
+                scan_limit = max(batch, min(requested_scan, len(self.media_index)))
 
             async with self._lock:
-                current = next(
-                    (x for x in self.media_index if int(x.get("message_id", 0)) == message_id),
-                    None,
-                )
-                if not current:
-                    continue
-                if str(current.get("ai_title", "")).strip():
-                    continue
+                by_id = {int(x.get("message_id", 0)): x for x in self.media_index}
 
-                # Carry over metadata updates if AI generation downloaded media for analysis.
-                for field in ("file_name", "url", "is_cached", "size", "thumb_url"):
-                    value = item.get(field)
-                    if value not in (None, ""):
-                        current[field] = value
+                # Newest queued items first (real-time priority for new media).
+                # Do not drain the queue up-front; only remove items once they get titled.
+                queue_budget = min(len(self._ai_queue), max(batch * 4, 12))
+                if queue_budget:
+                    queued_ids = list(reversed(list(self._ai_queue)[-queue_budget:]))
+                else:
+                    queued_ids = []
 
-                current["ai_title"] = title
-                generated += 1
-                changed = True
+                queued_set = set(queued_ids)
+                queued_candidates = [
+                    dict(by_id[msg_id])
+                    for msg_id in queued_ids
+                    if msg_id in by_id and self._ai_title_needs_generation(by_id[msg_id], mode)
+                ]
 
-        if generated and changed:
+                scan_candidates = [
+                    dict(x)
+                    for x in self.media_index[:scan_limit]
+                    if int(x.get("message_id", 0)) not in queued_set
+                    and self._ai_title_needs_generation(x, mode)
+                ]
+
+                candidates = queued_candidates + scan_candidates
+
+            if not candidates:
+                return 0
+
+                if AI_TITLE_IMAGE_PRIORITY:
+                    image_candidates = [x for x in candidates if str(x.get("media_kind", "")) == "image"]
+                    non_image_candidates = [x for x in candidates if str(x.get("media_kind", "")) != "image"]
+
+                def _candidate_key(entry: Dict[str, Any]) -> tuple[int, int, int]:
+                    # Prioritize: missing title -> fallback title -> other re-titles.
+                    # This makes "regen all titles" complete faster and avoids spending cycles polishing already-titled items.
+                    title = str(entry.get("ai_title", "") or "").strip()
+                    if not title:
+                        title_state = 0
+                    else:
+                        is_fallback = bool(entry.get("ai_title_is_fallback"))
+                        title_state = 1 if is_fallback or self._is_fallback_ai_title(title) else 2
+
+                    # No caption + no AI title usually shows raw filename (e.g. ".mp4/.jpg"); prioritize those.
+                    caption = str(entry.get("caption", "") or "").strip()
+                    has_caption = 1 if caption else 0
+                    cached = 0 if bool(entry.get("is_cached")) else 1
+                    try:
+                        size = int(entry.get("size") or 0)
+                    except (TypeError, ValueError):
+                        size = 0
+                    return (title_state, has_caption, cached, size)
+
+                image_candidates.sort(key=_candidate_key)
+                non_image_candidates.sort(key=_candidate_key)
+                candidates = image_candidates + non_image_candidates
+
             async with self._lock:
-                self._save_index()
+                used_title_keys = {
+                    self._normalize_title_key(str(x.get("ai_title", "")))
+                    for x in self.media_index
+                    if str(x.get("ai_title", "")).strip()
+                }
 
-        return generated
+            generated = 0
+            changed = False
+            attempts = 0
+            max_attempts = max(batch, min(len(candidates), batch * 4))
+
+            for item in candidates:
+                if generated >= batch or attempts >= max_attempts:
+                    break
+                attempts += 1
+                try:
+                    title = await self._generate_ai_title_for_item(item, mode=mode)
+                except Exception:
+                    continue
+                if not title:
+                    continue
+
+                message_id = int(item.get("message_id", 0))
+                if message_id <= 0:
+                    continue
+
+                async with self._lock:
+                    current = next(
+                        (x for x in self.media_index if int(x.get("message_id", 0)) == message_id),
+                        None,
+                    )
+                    if not current:
+                        continue
+                    if not self._ai_title_needs_generation(current, mode):
+                        continue
+
+                    # Carry over metadata updates if AI generation downloaded media for analysis.
+                    for field in (
+                        "file_name",
+                        "url",
+                        "is_cached",
+                        "size",
+                        "thumb_url",
+                        "ai_title_style",
+                        "ai_title_model",
+                        "ai_title_generated_at",
+                        "ai_title_is_fallback",
+                    ):
+                        value = item.get(field)
+                        if value not in (None, ""):
+                            current[field] = value
+
+                    old_key = self._normalize_title_key(str(current.get("ai_title", "")))
+                    if old_key:
+                        used_title_keys.discard(old_key)
+
+                    title = self._ensure_unique_ai_title(title, message_id=message_id, used_keys=used_title_keys)
+                    current["ai_title"] = title
+                    generated += 1
+                    changed = True
+                    if message_id in self._ai_queue_ids:
+                        self._ai_queue_ids.discard(message_id)
+                        with suppress(ValueError):
+                            self._ai_queue.remove(message_id)
+
+            if generated and changed:
+                async with self._lock:
+                    self._save_index()
+
+            return generated
 
     @staticmethod
     def _guess_extension(file_name: str, mime_type: str, fallback: str) -> str:
@@ -910,15 +1848,16 @@ class TelegramGalleryService:
         if limit is not None:
             limit = max(1, limit)
 
+        if not self._started:
+            try:
+                await asyncio.wait_for(self.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
+            except TimeoutError as exc:
+                self.last_sync_error = (
+                    f"Gallery session start timed out after {SERVICE_START_TIMEOUT_SECONDS}s."
+                )
+                raise HTTPException(status_code=504, detail=self.last_sync_error) from exc
+
         async with self._lock:
-            if not self._started:
-                try:
-                    await asyncio.wait_for(self.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
-                except TimeoutError as exc:
-                    self.last_sync_error = (
-                        f"Gallery session start timed out after {SERVICE_START_TIMEOUT_SECONDS}s."
-                    )
-                    raise HTTPException(status_code=504, detail=self.last_sync_error) from exc
 
             items: List[Dict[str, Any]] = []
             skipped_timeouts = 0
@@ -967,6 +1906,9 @@ class TelegramGalleryService:
                         media_size = local_path.stat().st_size if local_path.exists() else 0
                     existing_item = existing_items_by_id.get(int(message.id), {})
                     existing_ai_title = str(existing_item.get("ai_title", "")).strip()
+                    if existing_ai_title and self._contains_blocked_title_terms(existing_ai_title):
+                        # Never surface unsafe prior titles; re-analyze instead.
+                        existing_ai_title = ""
 
                     thumb_url: Optional[str]
                     if media_kind == "image":
@@ -996,9 +1938,16 @@ class TelegramGalleryService:
                         "duration": getattr(media_obj, "duration", None),
                         "caption": (message.caption or "").strip(),
                         "ai_title": existing_ai_title,
+                        "ai_title_style": str(existing_item.get("ai_title_style", "")).strip(),
+                        "ai_title_model": str(existing_item.get("ai_title_model", "")).strip(),
+                        "ai_title_generated_at": existing_item.get("ai_title_generated_at"),
+                        "ai_title_is_fallback": bool(existing_item.get("ai_title_is_fallback")),
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
                     }
                     items.append(item)
+                    if limit is not None and not existing_ai_title:
+                        # Prefer near real-time titles for recent media (live sync + UI polls).
+                        self._enqueue_ai_title(int(message.id))
 
             try:
                 if limit is None:
@@ -1082,6 +2031,7 @@ async def lifespan(_: FastAPI):
     startup_sync_task: Optional[asyncio.Task] = None
     live_sync_task: Optional[asyncio.Task] = None
     ai_title_task: Optional[asyncio.Task] = None
+    connect_task: Optional[asyncio.Task] = None
 
     async def run_startup_sync() -> None:
         startup_raw = os.getenv("TWA_STARTUP_SYNC_LIMIT", "all").strip().lower()
@@ -1119,21 +2069,29 @@ async def lifespan(_: FastAPI):
         await asyncio.sleep(6)
         while True:
             try:
-                await service.generate_missing_ai_titles(
-                    batch_size=AI_TITLE_BATCH_SIZE,
-                    recent_limit=AI_TITLE_RECENT_SCAN_LIMIT,
-                )
+                # Prefer quick, real-time titling for newly fetched media.
+                queue_len = len(service._ai_queue)  # noqa: SLF001 - internal queue for real-time prioritization
+                batch = AI_TITLE_BATCH_SIZE
+                if queue_len > 0:
+                    batch = max(batch, min(12, max(4, queue_len)))
+                await service.generate_missing_ai_titles(batch_size=batch, recent_limit=AI_TITLE_RECENT_SCAN_LIMIT, mode=AI_TITLE_RETITLE_MODE)
             except Exception:
                 pass
             await asyncio.sleep(AI_TITLE_POLL_SECONDS)
 
     try:
-        await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
-        # Start background sync at boot, defaulting to full-history collection.
+        async def connect_gallery() -> None:
+            try:
+                await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
+            except Exception as exc:
+                # Don't block app startup; cached index can still render.
+                service.last_sync_error = f"Gallery session start unavailable: {exc}"
+
+        # Never block FastAPI startup on Telegram auth. If Telegram start is slow/hung,
+        # we still want /api/health and cached index endpoints to respond.
+        connect_task = asyncio.create_task(connect_gallery())
         startup_sync_task = asyncio.create_task(run_startup_sync())
-        # Keep recent group posts synced so Mini App can update in near real-time.
         live_sync_task = asyncio.create_task(run_live_sync())
-        # Continuously generate AI titles for new recent media.
         ai_title_task = asyncio.create_task(run_ai_title_worker())
     except Exception as exc:
         # Keep app booting so UI and health endpoint stay reachable.
@@ -1141,6 +2099,10 @@ async def lifespan(_: FastAPI):
     try:
         yield
     finally:
+        if connect_task and not connect_task.done():
+            connect_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await connect_task
         if startup_sync_task and not startup_sync_task.done():
             startup_sync_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -1339,9 +2301,9 @@ async def api_media(
         raise HTTPException(status_code=422, detail=f"Invalid limit '{limit}': {exc}") from exc
 
     sync_error: Optional[str] = None
-    # Trigger sync when explicitly requested, cache is empty, or we still do not
-    # have a full-history index while caller asked for full output.
-    needs_sync = refresh or not service.media_index or (limit_value is None and not service.last_sync_full)
+    # Default to serving cached index (fast + avoids Telegram session churn).
+    # Callers can request a refresh explicitly.
+    needs_sync = refresh or not service.media_index
 
     if needs_sync:
         try:
@@ -1352,14 +2314,41 @@ async def api_media(
     else:
         items = service.media_index
 
+    response_items = apply_limit(items, limit_value)
+
+    # Enqueue AI titles for a small recent slice so initial page load triggers real-time titles,
+    # even when the UI is calling /api/media?limit=all.
+    if AI_TITLE_ENABLED and response_items:
+        enqueue_limit = min(len(response_items), max(120, LIVE_SYNC_LIMIT))
+        for entry in response_items[:enqueue_limit]:
+            try:
+                msg_id = int(entry.get("message_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if msg_id <= 0:
+                continue
+            if str(entry.get("ai_title", "")).strip():
+                continue
+            service._enqueue_ai_title(msg_id)
+
+        if not service._ai_title_lock.locked():
+            asyncio.create_task(
+                service.generate_missing_ai_titles(
+                    batch_size=min(6, max(1, AI_TITLE_BATCH_SIZE)),
+                    recent_limit=max(enqueue_limit, AI_TITLE_RECENT_SCAN_LIMIT),
+                    mode=AI_TITLE_RETITLE_MODE,
+                )
+            )
+
     effective_sync_error = sync_error or service.last_sync_error
     if items and not refresh:
         # Avoid noisy warnings for normal reads when cached media is available.
         effective_sync_error = None
 
     return {
-        "items": apply_limit(items, limit_value),
+        "items": response_items,
         "total": len(items),
+        "stats": compute_gallery_stats(items),
         "ai_titled_count": count_ai_titled_items(items),
         "requested_limit": "all" if limit_value is None else limit_value,
         "latest_message_id": latest_message_id(items),
@@ -1367,6 +2356,93 @@ async def api_media(
         "chat_id": CHAT_ID,
         "webapp": context,
         "sync_error": effective_sync_error,
+        "session_mode": service.session_mode,
+    }
+
+
+@app.get("/api/media/page")
+async def api_media_page(
+    limit: int = Query(240, ge=1, le=2000),
+    before: Optional[int] = Query(None),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Paginated media list for the Mini App.
+
+    This avoids returning a huge JSON payload over tunnels (serveo/localhost.run),
+    while still allowing the UI to load the entire gallery by paging.
+    """
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+
+    if not service.media_index:
+        # Warm the cache with a small sync so first page isn't empty.
+        with suppress(HTTPException):
+            await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False)
+
+    items = service.media_index
+    total = len(items)
+
+    before_id = int(before or 0)
+    start = 0
+    if before_id > 0:
+        # Find first item older than the cursor.
+        for idx, entry in enumerate(items):
+            try:
+                msg_id = int(entry.get("message_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if msg_id < before_id:
+                start = idx
+                break
+        else:
+            start = total
+
+    page_items = items[start : start + int(limit)]
+    next_before: Optional[int] = None
+    if page_items:
+        try:
+            next_before = int(page_items[-1].get("message_id", 0))
+        except (TypeError, ValueError):
+            next_before = None
+
+    has_more = start + len(page_items) < total
+
+    # Enqueue AI titles for the page so titles fill in while user scrolls.
+    if AI_TITLE_ENABLED and page_items:
+        for entry in page_items:
+            try:
+                msg_id = int(entry.get("message_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if msg_id <= 0:
+                continue
+            if str(entry.get("ai_title", "")).strip():
+                continue
+            service._enqueue_ai_title(msg_id)
+
+        if not service._ai_title_lock.locked():
+            asyncio.create_task(
+                service.generate_missing_ai_titles(
+                    batch_size=min(6, max(1, AI_TITLE_BATCH_SIZE)),
+                    recent_limit=max(int(limit), AI_TITLE_RECENT_SCAN_LIMIT),
+                    mode=AI_TITLE_RETITLE_MODE,
+                )
+            )
+
+    return {
+        "items": page_items,
+        "total": total,
+        "stats": compute_gallery_stats(items),
+        "ai_titled_count": count_ai_titled_items(items),
+        "requested_limit": int(limit),
+        "before": before_id or None,
+        "next_before": next_before,
+        "has_more": has_more,
+        "latest_message_id": latest_message_id(items),
+        "synced_at": service.last_sync_at,
+        "chat_id": CHAT_ID,
+        "webapp": context,
+        "sync_error": service.last_sync_error,
         "session_mode": service.session_mode,
     }
 
@@ -1400,9 +2476,34 @@ async def api_media_recent(
     else:
         items = service.media_index
 
+    response_items = apply_limit(items, limit_value)
+
+    if AI_TITLE_ENABLED and response_items:
+        for entry in response_items:
+            try:
+                msg_id = int(entry.get("message_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if msg_id <= 0:
+                continue
+            if str(entry.get("ai_title", "")).strip():
+                continue
+            service._enqueue_ai_title(msg_id)
+
+        if not service._ai_title_lock.locked():
+            # Kick off a small background run so the UI sees titles appear quickly.
+            asyncio.create_task(
+                service.generate_missing_ai_titles(
+                    batch_size=min(6, max(1, AI_TITLE_BATCH_SIZE)),
+                    recent_limit=max(limit_value, AI_TITLE_RECENT_SCAN_LIMIT),
+                    mode=AI_TITLE_RETITLE_MODE,
+                )
+            )
+
     return {
-        "items": apply_limit(items, limit_value),
+        "items": response_items,
         "total": len(items),
+        "stats": compute_gallery_stats(items),
         "ai_titled_count": count_ai_titled_items(items),
         "requested_limit": limit_value,
         "latest_message_id": latest_message_id(items),
@@ -1418,6 +2519,8 @@ async def api_media_recent(
 async def api_sync(
     limit: str = Query("all"),
     force_redownload: bool = Query(False),
+    response_limit: str = Query("240"),
+    wait_seconds: int = Query(SYNC_API_MAX_WAIT_SECONDS, ge=3, le=600),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
@@ -1428,38 +2531,75 @@ async def api_sync(
         raise HTTPException(status_code=422, detail=f"Invalid limit '{limit}': {exc}") from exc
 
     try:
-        items = await service.sync_group_media(limit=limit_value, force_redownload=force_redownload)
-        sync_error = None
+        response_limit_value = parse_limit_value(response_limit, default=240)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid response_limit '{response_limit}': {exc}") from exc
+
+    timed_out = False
+    sync_started = False
+    sync_error: Optional[str] = None
+    sync_notice: Optional[str] = None
+
+    async def _do_sync() -> List[Dict[str, Any]]:
+        return await service.sync_group_media(limit=limit_value, force_redownload=force_redownload)
+
+    # Avoid hanging the Mini App UI: wait a bit, then continue syncing in background.
+    try:
+        sync_started = True
+        items = await asyncio.wait_for(_do_sync(), timeout=int(wait_seconds))
+    except TimeoutError:
+        timed_out = True
+        items = service.media_index
+        sync_notice = f"Sync is running in background (waited {int(wait_seconds)}s)."
+        if not service._background_sync_task or service._background_sync_task.done():
+            service._background_sync_task = asyncio.create_task(_do_sync())
     except HTTPException as exc:
         items = service.media_index
         sync_error = str(exc.detail)
+    except Exception as exc:
+        items = service.media_index
+        sync_error = str(exc)
+
+    response_items = apply_limit(items, response_limit_value)
 
     return {
-        "items": apply_limit(items, limit_value),
+        "items": response_items,
         "total": len(items),
+        "stats": compute_gallery_stats(items),
         "ai_titled_count": count_ai_titled_items(items),
         "requested_limit": "all" if limit_value is None else limit_value,
+        "response_limit": "all" if response_limit_value is None else response_limit_value,
+        "sync_started": sync_started,
+        "timed_out": timed_out,
+        "wait_seconds": int(wait_seconds),
+        "next_before": int(response_items[-1].get("message_id", 0)) if response_items else None,
+        "has_more": (len(items) > int(response_limit_value)) if response_limit_value is not None else False,
         "latest_message_id": latest_message_id(items),
         "synced_at": service.last_sync_at,
         "chat_id": CHAT_ID,
         "webapp": context,
         "sync_error": sync_error,
+        "sync_notice": sync_notice,
         "session_mode": service.session_mode,
     }
 
 
 @app.post("/api/ai-titles")
 async def api_ai_titles(
-    batch_size: int = Query(AI_TITLE_BATCH_SIZE, ge=1, le=25),
+    batch_size: int = Query(AI_TITLE_BATCH_SIZE, ge=1, le=AI_TITLE_BATCH_SIZE_MAX),
     recent_limit: int = Query(AI_TITLE_RECENT_SCAN_LIMIT, ge=0, le=50000),
+    mode: str = Query(AI_TITLE_RETITLE_MODE),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
     context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    mode_norm = (mode or "missing").strip().lower() or "missing"
+    if mode_norm not in {"missing", "fallback", "style", "force"}:
+        raise HTTPException(status_code=422, detail=f"Invalid mode '{mode}'; use missing,fallback,style,force")
     timed_out = False
     try:
         generated = await asyncio.wait_for(
-            service.generate_missing_ai_titles(batch_size=batch_size, recent_limit=recent_limit),
+            service.generate_missing_ai_titles(batch_size=batch_size, recent_limit=recent_limit, mode=mode_norm),
             timeout=AI_TITLE_API_MAX_WAIT_SECONDS,
         )
     except TimeoutError:
@@ -1467,7 +2607,7 @@ async def api_ai_titles(
         timed_out = True
         # Keep generation running in background so manual trigger never blocks callers.
         asyncio.create_task(
-            service.generate_missing_ai_titles(batch_size=batch_size, recent_limit=recent_limit)
+            service.generate_missing_ai_titles(batch_size=batch_size, recent_limit=recent_limit, mode=mode_norm)
         )
     return {
         "ok": True,
@@ -1477,6 +2617,7 @@ async def api_ai_titles(
         "ai_titled_count": count_ai_titled_items(service.media_index),
         "requested_batch": batch_size,
         "recent_limit": recent_limit,
+        "mode": mode_norm,
         "cached_items": len(service.media_index),
         "latest_message_id": latest_message_id(service.media_index),
         "synced_at": service.last_sync_at,
@@ -1500,10 +2641,21 @@ async def api_health() -> Dict[str, Any]:
         "ai_titles_enabled": AI_TITLE_ENABLED,
         "ai_title_provider": AI_TITLE_PROVIDER,
         "ai_title_model": AI_TITLE_MODEL,
+        "ai_title_fallback_models": AI_TITLE_FALLBACK_MODELS,
+        "ai_title_text_model": AI_TITLE_TEXT_MODEL,
+        "ai_title_text_fallback_models": AI_TITLE_TEXT_FALLBACK_MODELS,
+        "ai_title_style": AI_TITLE_STYLE,
+        "ai_title_polish_titles": AI_TITLE_POLISH_ENABLED,
         "ai_title_timeout_seconds": AI_TITLE_TIMEOUT_SECONDS,
+        "ai_title_per_item_timeout_seconds": AI_TITLE_PER_ITEM_TIMEOUT_SECONDS,
         "ai_title_batch_size": AI_TITLE_BATCH_SIZE,
+        "ai_title_batch_size_max": AI_TITLE_BATCH_SIZE_MAX,
         "ai_title_recent_scan_limit": AI_TITLE_RECENT_SCAN_LIMIT,
         "ai_title_poll_seconds": AI_TITLE_POLL_SECONDS,
+        "ai_title_retitle_mode": AI_TITLE_RETITLE_MODE,
+        "ai_title_image_priority": AI_TITLE_IMAGE_PRIORITY,
+        "ai_title_max_image_side": AI_TITLE_MAX_IMAGE_SIDE,
+        "ai_title_image_quality": AI_TITLE_IMAGE_QUALITY,
     }
 
 

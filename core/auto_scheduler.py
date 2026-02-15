@@ -5,6 +5,7 @@ from pyrogram import Client
 from pyrogram.types import Message
 from core.uploader import VideoUploader
 from core.image_uploader import ImageUploader
+from core.uploader import safe_edit_text
 from ui.keyboards import Keyboards
 
 class AutoScheduler:
@@ -72,6 +73,7 @@ class AutoScheduler:
         The internal loop handling countdown and triggering upload.
         """
         original_caption = message.caption or message.text or ""
+        target_chat_id = message.chat.id
         # Remove any existing clean signature if it exists to avoid duplication issues
         # (Though we usually just append)
 
@@ -157,7 +159,7 @@ class AutoScheduler:
                 
                 # So we should send a new status message "Auto uploading..."
                 status_msg = await client.send_message(
-                    chat_id=user_id,
+                    chat_id=target_chat_id,
                     text="🚀 **Auto-upload triggered...**"
                 )
                 
@@ -179,7 +181,8 @@ class AutoScheduler:
                     except:
                         size_text = "Unknown"
                         
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         "✅ **Video Uploaded Successfully!**\n\n"
                         f"📁 File: `{filename}`\n"
                         f"💾 Size: {size_text}\n\n"
@@ -187,7 +190,8 @@ class AutoScheduler:
                         reply_markup=Keyboards.back_to_main()
                     )
                 else:
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         f"❌ **Upload Failed**\n\n"
                         f"Error: {result_msg}",
                         reply_markup=Keyboards.back_to_main()
@@ -195,14 +199,14 @@ class AutoScheduler:
 
             elif content_type == "video_bulk":
                 status_msg = await client.send_message(
-                    chat_id=user_id,
+                    chat_id=target_chat_id,
                     text="🚀 **Bulk Auto-upload triggered...**"
                 )
                 await VideoUploader.upload_multiple(content_path, status_msg, user_id)
 
             elif content_type == "image_bulk":
                 status_msg = await client.send_message(
-                    chat_id=user_id,
+                    chat_id=target_chat_id,
                     text="🚀 **Image Auto-upload triggered...**"
                 )
                 await ImageUploader.upload_multiple_images(content_path, status_msg, user_id)
@@ -214,7 +218,7 @@ class AutoScheduler:
                 # Or pass a dict. The type hint in start_timer is just a hint, python is dynamic.
                 
                 status_msg = await client.send_message(
-                    chat_id=user_id,
+                    chat_id=target_chat_id,
                     text="🚀 **Mixed Content Auto-upload triggered...**"
                 )
                 

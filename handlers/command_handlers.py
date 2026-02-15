@@ -18,6 +18,7 @@ from core.metrics import metrics
 from utils.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
+from core.uploader import safe_edit_text
 from utils.video_processor import VideoProcessor
 from ui.messages import Messages
 from ui.keyboards import Keyboards
@@ -326,21 +327,21 @@ async def process_shared_url(client: Client, message: Message, url: str, user_id
         
         if video_paths and len(video_paths) > 0:
             # Send videos to user
-            await status_msg.edit_text(f"📤 **Sending {len(video_paths)} video(s)...**")
+            await safe_edit_text(status_msg, f"📤 **Sending {len(video_paths)} video(s)...**")
             
             # Use existing send function which handles formatting and buttons
             try:
                 await send_videos_to_user(video_paths, message, user_id, x_username, url, username, client)
             except Exception as e:
                 logger.error(f"Error sending video: {e}")
-                await status_msg.edit_text(f"❌ Error sending video: {str(e)[:100]}")
+                await safe_edit_text(status_msg, f"❌ Error sending video: {str(e)[:100]}")
                 return
             
             await status_msg.delete()
             return
         
         # Try image download
-        await status_msg.edit_text("🖼️ **Trying image download...**")
+        await safe_edit_text(status_msg, "🖼️ **Trying image download...**")
         image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
         image_paths, image_info = await ImageDownloader.download(
             url,
@@ -351,20 +352,22 @@ async def process_shared_url(client: Client, message: Message, url: str, user_id
         )
         
         if image_paths and len(image_paths) > 0:
-            await status_msg.edit_text(f"📤 **Sending {len(image_paths)} image(s)...**")
+            await safe_edit_text(status_msg, f"📤 **Sending {len(image_paths)} image(s)...**")
             
             # Send images as media group
             media_group = [InputMediaPhoto(img) for img in image_paths[:10]]
             await client.send_media_group(message.chat.id, media_group)
             
-            await status_msg.edit_text(
+            await safe_edit_text(
+                status_msg,
                 f"✅ **Download Complete!**\n\n"
                 f"📥 {len(image_paths)} image(s) sent successfully!"
             )
             return
         
         # No content found
-        await status_msg.edit_text(
+        await safe_edit_text(
+            status_msg,
             f"❌ **No Media Found**\n\n"
             f"The URL doesn't contain any downloadable videos or images.\n\n"
             f"Please try a different X post."
@@ -602,7 +605,8 @@ def setup_command_handlers(app: Client):
         if "x.com" in url or "twitter.com" in url:
             if user_intent == "video" or user_intent == "auto":
                 # Try video download first (supports multiple videos)
-                await status_msg.edit_text(
+                await safe_edit_text(
+                    status_msg,
                     f"🎬 **Video Download Started**\n\n"
                     f"👤 **X User:** {clickable_username}\n"
                     f"🔗 **URL:** {formatted_url}\n"
@@ -626,7 +630,8 @@ def setup_command_handlers(app: Client):
                     total_videos = len(video_paths)
                     total_size = sum(os.path.getsize(vp) for vp in video_paths if os.path.exists(vp)) / (1024 * 1024)
                     
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         f"✅ **Video Download Complete**\n\n"
                         f"👤 **X User:** {clickable_username}\n"
                         f"🔗 **URL:** {formatted_url}\n"
@@ -675,7 +680,8 @@ def setup_command_handlers(app: Client):
                     
                 elif user_intent == "auto":
                     # Video not found, try images (only in auto mode)
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         f"🖼️ **No Video Found - Checking Images**\n\n"
                         f"👤 **X User:** {clickable_username}\n"
                         f"🔗 **URL:** {formatted_url}\n"
@@ -702,7 +708,8 @@ def setup_command_handlers(app: Client):
                             
                             total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)
                             
-                            await status_msg.edit_text(
+                            await safe_edit_text(
+                                status_msg,
                                 f"✅ **Images Download Complete**\n\n"
                                 f"👤 **X User:** {clickable_username}\n"
                                 f"🔗 **URL:** {formatted_url}\n"
@@ -754,7 +761,8 @@ def setup_command_handlers(app: Client):
                         except Exception as e:
                             logger.error(f"Error sending images: {e}")
                             try:
-                                await status_msg.edit_text(
+                                await safe_edit_text(
+                                    status_msg,
                                     f"❌ **Image Send Failed**\n\n"
                                     f"👤 **X User:** {clickable_username}\n"
                                     f"🔗 **URL:** {formatted_url}\n"
@@ -768,7 +776,8 @@ def setup_command_handlers(app: Client):
                             await log_user_action(user_id, username, url, "failed", "image")
                     else:
                         # Both video and image failed
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"❌ **Download Failed**\n\n"
                             f"👤 **X User:** {clickable_username}\n"
                             f"🔗 **URL:** {formatted_url}\n"
@@ -784,7 +793,8 @@ def setup_command_handlers(app: Client):
                         await log_user_action(user_id, username, url, "failed", "unknown")
                 else:
                     # Video explicitly requested but not found
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         f"❌ **No Video Found**\n\n"
                         f"👤 **X User:** {clickable_username}\n"
                         f"🔗 **URL:** {formatted_url}\n"
@@ -797,7 +807,8 @@ def setup_command_handlers(app: Client):
             
             elif user_intent == "images":
                 # User explicitly wants images
-                await status_msg.edit_text(
+                await safe_edit_text(
+                    status_msg,
                     f"🖼️ **Image Download Requested**\n\n"
                     f"👤 **X User:** {clickable_username}\n"
                     f"🔗 **URL:** {formatted_url}\n"
@@ -822,7 +833,8 @@ def setup_command_handlers(app: Client):
                         
                         total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)
                         
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"✅ **Images Download Complete**\n\n"
                             f"👤 **X User:** {clickable_username}\n"
                             f"🔗 **URL:** {formatted_url}\n"
@@ -872,7 +884,8 @@ def setup_command_handlers(app: Client):
                         
                     except Exception as e:
                         try:
-                            await status_msg.edit_text(
+                            await safe_edit_text(
+                                status_msg,
                                 f"❌ **Image Send Failed**\n\n"
                                 f"⚠️ **Error:** {str(e)[:100]}",
                                 disable_web_page_preview=False
@@ -882,7 +895,8 @@ def setup_command_handlers(app: Client):
                         await log_user_action(user_id, username, url, "failed", "image")
                 else:
                     # Try video as fallback
-                    await status_msg.edit_text(
+                    await safe_edit_text(
+                        status_msg,
                         f"🎬 **No Images Found - Checking Video**\n\n"
                         f"👤 **X User:** {clickable_username}\n"
                         f"🔗 **URL:** {formatted_url}\n\n"
@@ -900,7 +914,8 @@ def setup_command_handlers(app: Client):
                         total_videos = len(video_paths)
                         total_size = sum(os.path.getsize(vp) for vp in video_paths if os.path.exists(vp)) / (1024 * 1024)
                         
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"✅ **Video Found Instead**\n\n"
                             f"🎬 **Videos:** {total_videos}\n"
                             f"💾 **Size:** {total_size:.2f} MB\n\n"
@@ -912,7 +927,8 @@ def setup_command_handlers(app: Client):
                         await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
                         await log_user_action(user_id, username, url, "success", "video")
                     else:
-                        await status_msg.edit_text(
+                        await safe_edit_text(
+                            status_msg,
                             f"❌ **No Media Found**\n\n"
                             f"⚠️ No images or videos found at this URL.",
                             disable_web_page_preview=False
@@ -920,7 +936,8 @@ def setup_command_handlers(app: Client):
                         await log_user_action(user_id, username, url, "failed", "unknown")
         else:
             # Non-X/Twitter URL
-            await status_msg.edit_text(
+            await safe_edit_text(
+                status_msg,
                 f"🎬 **Video Download Started**\n\n"
                 f"🔗 **URL:** {formatted_url}\n"
                 f"📥 **Requested by:** {username}\n"
@@ -940,7 +957,8 @@ def setup_command_handlers(app: Client):
                 await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
                 await log_user_action(user_id, username, url, "success", "video")
             else:
-                await status_msg.edit_text(
+                await safe_edit_text(
+                    status_msg,
                     f"❌ **Download Failed**\n\n"
                     f"🔗 **URL:** {formatted_url}\n"
                     f"⚠️ Could not download video from this URL.",

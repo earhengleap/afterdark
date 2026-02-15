@@ -20,9 +20,17 @@ audio/
 *.webp
 
 # Telegram session files and user data
-# *.session
-# *.session-journal
-# *.session.*
+*.session
+*.session-journal
+*.session-wal
+*.session-shm
+telegram-bot-websites/media_cache/
+data/*.db
+data/runtime/
+data/twa_public_url.txt
+users/*.json
+config/twitter_cookies.txt
+twitter_cookies.txt
 
 # Python cache and build files
 __pycache__/
@@ -45,6 +53,7 @@ build/
 *.tmp
 *.temp
 .cache/
+tests/_tmp/
 
 # IDE and OS files
 .vscode/

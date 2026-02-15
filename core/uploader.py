@@ -8,7 +8,7 @@ import time
 from typing import List, Optional, Tuple
 
 from pyrogram import Client
-from pyrogram.errors import FloodWait, MessageNotModified
+from pyrogram.errors import FloodWait, MessageIdInvalid, MessageNotModified
 from pyrogram.types import Message
 
 from config.settings import CHAT_ID
@@ -22,10 +22,26 @@ logger = setup_logger("VideoUploader")
 
 
 async def safe_edit_text(status_msg: Message, text: str, **kwargs) -> None:
-    try:
-        await status_msg.edit_text(text, **kwargs)
-    except MessageNotModified:
-        pass
+    max_retries = 2
+    retry_count = 0
+
+    while True:
+        try:
+            await status_msg.edit_text(text, **kwargs)
+            return
+        except MessageNotModified:
+            return
+        except MessageIdInvalid:
+            # Message was deleted/invalid, nothing to edit.
+            return
+        except FloodWait as e:
+            retry_count += 1
+            if retry_count >= max_retries:
+                return
+            await asyncio.sleep(e.value + 1)
+            continue
+        except Exception:
+            return
 
 
 class VideoUploader:

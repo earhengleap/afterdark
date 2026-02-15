@@ -60,3 +60,89 @@ $env:TWA_TUNNEL_PROVIDER='localhostrun'
 # Disable tunnel autostart (local-only)
 $env:TWA_TUNNEL_PROVIDER='none'
 ```
+
+## Optional AI Titles (free, local)
+Mini App can auto-generate short titles for images/videos using local Ollama vision model.
+
+### 1) Install Ollama and pull vision model
+```powershell
+# Default (lightweight + reliable)
+ollama pull moondream:latest
+
+# Optional vision fallback (can be very slow on CPU)
+ollama pull qwen2.5vl:3b
+
+# Optional (larger vision model; may crash on low-resource machines)
+ollama pull llava:7b
+```
+
+### 2) Keep Ollama running
+```powershell
+ollama serve
+```
+
+### 3) Enable AI title generation
+```powershell
+$env:TWA_AI_TITLES='1'
+$env:TWA_AI_TITLE_PROVIDER='ollama'
+$env:TWA_AI_MODEL='moondream:latest'
+$env:TWA_AI_FALLBACK_MODELS='qwen2.5vl:3b'   # optional
+
+# Title style: "explicit" (default) or "tasteful"
+$env:TWA_AI_TITLE_STYLE='explicit'
+
+# Optional: use a fast text model to polish titles (porn-style phrasing)
+$env:TWA_AI_TEXT_MODEL='gemma3:4b'
+$env:TWA_AI_POLISH_TITLES='1'
+```
+
+More explicit/uncensored wording (local, via Ollama):
+```powershell
+# Optional: Dolphin (text-only) as the title polisher.
+# Pick the exact Dolphin tag you want from the Ollama library, then pull it:
+#   ollama pull <dolphin-model-tag>
+# Confirm it exists locally:
+#   ollama list
+
+# Use Dolphin for title polishing; fall back to gemma3 if Dolphin is missing/unavailable.
+$env:TWA_AI_TEXT_MODEL='<dolphin-model-tag>'
+$env:TWA_AI_TEXT_FALLBACK_MODELS='gemma3:4b'
+```
+
+Safety guardrails (built-in): titles will not include age/teen/school terms or sensitive attributes.
+
+### 4) Optional tuning
+```powershell
+# model response timeout (seconds). Keep high on CPU-only machines.
+$env:TWA_AI_TIMEOUT_SECONDS='240'
+
+# seconds between AI title worker cycles
+$env:TWA_AI_POLL_SECONDS='12'
+
+# titles generated per cycle
+$env:TWA_AI_BATCH_SIZE='3'
+
+# scan window for missing titles:
+# - 0 = scan full cached index (backfill older media)
+# - N = only scan newest N items
+$env:TWA_AI_RECENT_SCAN_LIMIT='0'
+
+# re-title behavior:
+# - missing   (default): only generate when ai_title is empty
+# - fallback  : retry items that have fallback titles
+# - style     : retry when ai_title_style differs from current TWA_AI_TITLE_STYLE (plus fallback)
+# - force     : overwrite titles (within recent scan limit)
+$env:TWA_AI_RETITLE_MODE='missing'
+```
+
+### 5) Manual trigger (optional)
+```powershell
+# Generate titles now for newest media (without waiting for next worker cycle)
+Invoke-WebRequest -UseBasicParsing -Method Post "http://127.0.0.1:5000/api/ai-titles?batch_size=3&recent_limit=240&mode=style"
+```
+
+One-time improvement pass (re-title older titles into the current style):
+```powershell
+# This runs in batches; repeat until you're satisfied.
+Invoke-WebRequest -UseBasicParsing -Method Post "http://127.0.0.1:5000/api/ai-titles?batch_size=10&recent_limit=0&mode=style"
+```
