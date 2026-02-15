@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260215-4">
+  <link rel="stylesheet" href="/style.css?v=20260215-6">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -17,50 +17,58 @@
   <div class="bg-noise"></div>
 
   <div class="app">
-    <header class="hero surface">
-      <div class="hero-left">
-        <div class="hero-topline">
-          <span class="pill age-pill">18+</span>
-          <span class="pill live-pill">Private Collection</span>
+    <div class="sticky-stack" aria-label="Gallery header">
+      <header class="topbar surface">
+        <div class="brand">
+          <div class="hero-topline">
+            <span class="pill age-pill">18+</span>
+            <span class="pill live-pill">Private Vault</span>
+          </div>
+          <p class="kicker">Telegram Media Gallery</p>
+          <h1>AfterDark Vault</h1>
+          <p id="sessionText" class="session-text">Connecting Telegram Mini App...</p>
         </div>
-        <p class="kicker">Telegram Media Gallery</p>
-        <h1>AfterDark Vault</h1>
-        <p id="sessionText" class="session-text">Connecting Telegram Mini App...</p>
-      </div>
-      <div class="hero-right">
-        <button id="syncBtn" class="btn btn-primary" type="button">Sync Media</button>
-        <button id="retitleBtn" class="btn btn-ghost" type="button">Improve Titles</button>
-        <button id="toTopBtn" class="btn btn-ghost" type="button">Back to Top</button>
-      </div>
-    </header>
 
-    <section class="toolbar surface">
-      <label class="search-wrap" for="searchInput">
-        <span class="search-icon" aria-hidden="true">Search</span>
-        <input id="searchInput" type="search" placeholder="Search caption or filename">
-      </label>
-
-      <div class="tabs" role="tablist" aria-label="Media filter">
-        <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true">All</button>
-        <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false">Videos</button>
-        <button class="tab" data-filter="image" type="button" role="tab" aria-selected="false">Images</button>
-      </div>
-
-      <div class="toolbar-meta">
-        <label class="sort-wrap" for="sortSelect">
-          <span>Sort</span>
-          <select id="sortSelect">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="largest">Largest files</option>
-          </select>
+        <label class="search-wrap top-search" for="searchInput">
+          <span class="search-icon" aria-hidden="true">Search</span>
+          <input id="searchInput" type="search" placeholder="Search title, description, caption, filename">
         </label>
+
+        <div class="top-actions">
+          <button id="syncBtn" class="btn btn-primary" type="button">Sync</button>
+          <button id="retitleBtn" class="btn btn-ghost" type="button">Improve</button>
+          <button id="toTopBtn" class="btn btn-ghost" type="button">Top</button>
+        </div>
+      </header>
+
+      <section class="controls surface" aria-label="Gallery controls">
+        <div class="tabs" role="tablist" aria-label="Media filter">
+          <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true">All</button>
+          <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false">Videos</button>
+          <button class="tab" data-filter="image" type="button" role="tab" aria-selected="false">Images</button>
+        </div>
+
+        <div class="controls-right">
+          <label class="sort-wrap" for="sortSelect">
+            <span>Sort</span>
+            <select id="sortSelect">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="largest">Largest</option>
+            </select>
+          </label>
+          <div class="layout-wrap" role="group" aria-label="Layout density">
+            <button id="layoutDenseBtn" class="chip" type="button" aria-pressed="true" data-layout="dense">Dense</button>
+            <button id="layoutComfortBtn" class="chip" type="button" aria-pressed="false" data-layout="comfort">Comfort</button>
+          </div>
+        </div>
+
         <div class="meta-row">
           <span id="countText">0 items</span>
           <span id="syncText">Not synced</span>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section class="stats">
       <article class="surface stat-card"><small>Total Items</small><strong id="statTotal">0</strong></article>
@@ -82,8 +90,11 @@
     <div class="viewer-backdrop"></div>
     <div class="viewer-shell surface">
       <button id="closeViewer" class="viewer-close" type="button">Close</button>
+      <button id="viewerPrev" class="viewer-nav viewer-prev" type="button" aria-label="Previous">Prev</button>
+      <button id="viewerNext" class="viewer-nav viewer-next" type="button" aria-label="Next">Next</button>
       <div id="viewerMedia" class="viewer-media"></div>
       <div class="viewer-info">
+        <div class="sheet-grip" aria-hidden="true"></div>
         <h2 id="viewerTitle">Media</h2>
         <p id="viewerDescription">No description</p>
         <p id="viewerCaption">No caption</p>
@@ -108,8 +119,14 @@
           <div class="thumb-skeleton"></div>
           <div class="media-slot"></div>
           <div class="thumb-overlay">
-            <span class="badge badge-kind"></span>
-            <span class="badge badge-cache"></span>
+            <div class="thumb-top">
+              <span class="badge badge-kind"></span>
+              <span class="badge badge-cache"></span>
+            </div>
+            <div class="thumb-bottom">
+              <span class="badge badge-res"></span>
+              <span class="badge badge-duration"></span>
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -120,6 +137,6 @@
     </article>
   </template>
 
-  <script src="/script.js?v=20260215-5"></script>
+  <script src="/script.js?v=20260215-6"></script>
 </body>
 </html>

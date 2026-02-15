@@ -6,6 +6,7 @@ const state = {
   filter: "all",
   sort: "newest",
   search: "",
+  density: "dense",
   syncAt: null,
   initData: tg ? tg.initData : "",
   context: null,
@@ -27,6 +28,7 @@ const state = {
   liveRecentLimit: 120,
   latestMessageId: 0,
   aiTitledCount: 0,
+  viewerIndex: -1,
 };
 
 const elements = {
@@ -38,6 +40,8 @@ const elements = {
   searchInput: document.getElementById("searchInput"),
   tabs: Array.from(document.querySelectorAll(".tab")),
   sortSelect: document.getElementById("sortSelect"),
+  layoutDenseBtn: document.getElementById("layoutDenseBtn"),
+  layoutComfortBtn: document.getElementById("layoutComfortBtn"),
   countText: document.getElementById("countText"),
   syncText: document.getElementById("syncText"),
   statTotal: document.getElementById("statTotal"),
@@ -49,6 +53,8 @@ const elements = {
   cardTemplate: document.getElementById("cardTemplate"),
   viewer: document.getElementById("viewer"),
   viewerMedia: document.getElementById("viewerMedia"),
+  viewerInfo: document.querySelector(".viewer-info"),
+  sheetGrip: document.querySelector(".sheet-grip"),
   viewerTitle: document.getElementById("viewerTitle"),
   viewerDescription: document.getElementById("viewerDescription"),
   viewerCaption: document.getElementById("viewerCaption"),
@@ -58,6 +64,8 @@ const elements = {
   viewerDownload: document.getElementById("viewerDownload"),
   viewerCopyLink: document.getElementById("viewerCopyLink"),
   viewerCopyEmbed: document.getElementById("viewerCopyEmbed"),
+  viewerPrev: document.getElementById("viewerPrev"),
+  viewerNext: document.getElementById("viewerNext"),
   closeViewer: document.getElementById("closeViewer"),
 };
 
@@ -116,6 +124,30 @@ function fmtDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Unknown";
   return d.toLocaleString();
+}
+
+function fmtDuration(seconds) {
+  const raw = Number(seconds) || 0;
+  if (!Number.isFinite(raw) || raw <= 0) return "";
+
+  const sec = Math.max(0, Math.floor(raw));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function resBadgeFor(item) {
+  const w = Number(item.width) || 0;
+  const h = Number(item.height) || 0;
+  const maxSide = Math.max(w, h);
+  if (maxSide >= 2160 || w >= 3840 || h >= 2160) return "4K";
+  if (maxSide >= 1080 || w >= 1920 || h >= 1080) return "HD";
+  if (maxSide >= 720 || w >= 1280 || h >= 720) return "HD";
+  return "";
 }
 
 function titleFor(item) {
@@ -349,23 +381,35 @@ function renderGrid() {
   visibleItems.forEach((item, idx) => {
     const node = elements.cardTemplate.content.firstElementChild.cloneNode(true);
     node.style.setProperty("--delay", `${(idx % 24) * 16}ms`);
+    node.classList.toggle("kind-video", item.media_kind === "video");
+    node.classList.toggle("kind-image", item.media_kind !== "video");
 
     const button = node.querySelector(".card-btn");
     const thumb = node.querySelector(".thumb");
     const mediaSlot = node.querySelector(".media-slot");
     const kindBadge = node.querySelector(".badge-kind");
     const cacheBadge = node.querySelector(".badge-cache");
+    const resBadge = node.querySelector(".badge-res");
+    const durationBadge = node.querySelector(".badge-duration");
     const title = node.querySelector(".card-title");
     const subtitle = node.querySelector(".card-subtitle");
 
     wireThumbMedia(item, thumb, mediaSlot);
 
-    kindBadge.textContent = item.media_kind;
+    kindBadge.textContent = item.media_kind === "video" ? "video" : "image";
     cacheBadge.textContent = item.is_cached ? "cached" : "stream";
     cacheBadge.classList.add(item.is_cached ? "cached" : "stream");
 
+    if (resBadge) {
+      resBadge.textContent = item.media_kind === "video" ? resBadgeFor(item) : "";
+    }
+    if (durationBadge) {
+      durationBadge.textContent = item.media_kind === "video" ? fmtDuration(item.duration) : "";
+    }
+
     title.textContent = titleFor(item);
-    subtitle.textContent = `${fmtBytes(item.size)} . ${fmtRelative(item.date)}${item.is_cached ? "" : " . on demand"}`;
+    const desc = String(item.ai_description || "").trim();
+    subtitle.textContent = desc || `${fmtBytes(item.size)} . ${fmtRelative(item.date)}${item.is_cached ? "" : " . on demand"}`;
 
     button.addEventListener("click", () => openViewer(item));
     fragment.appendChild(node);
@@ -376,9 +420,41 @@ function renderGrid() {
   updateLoadMoreButton();
 }
 
-function openViewer(item) {
+function setViewerIndexForItem(item) {
+  const id = Number(item && item.message_id) || 0;
+  if (!id || !Array.isArray(state.filtered) || !state.filtered.length) {
+    state.viewerIndex = -1;
+    return;
+  }
+  const idx = state.filtered.findIndex((x) => Number(x.message_id) === id);
+  state.viewerIndex = idx >= 0 ? idx : -1;
+}
+
+function updateViewerNav() {
+  if (!elements.viewerPrev || !elements.viewerNext) return;
+  const idx = Number(state.viewerIndex);
+  const has = Array.isArray(state.filtered) && state.filtered.length > 0 && idx >= 0;
+  const prevOk = has && idx > 0;
+  const nextOk = has && idx < state.filtered.length - 1;
+  elements.viewerPrev.disabled = !prevOk;
+  elements.viewerNext.disabled = !nextOk;
+}
+
+function openViewerByIndex(index) {
+  const idx = Number(index);
+  if (!Number.isFinite(idx) || idx < 0 || idx >= state.filtered.length) return;
+  state.viewerIndex = idx;
+  openViewer(state.filtered[idx], false);
+}
+
+function openViewer(item, recomputeIndex = true) {
   elements.viewerMedia.innerHTML = "";
   const fullUrl = new URL(item.url, window.location.origin).toString();
+
+  if (recomputeIndex) {
+    setViewerIndexForItem(item);
+  }
+  updateViewerNav();
 
   if (item.media_kind === "video") {
     const video = document.createElement("video");
@@ -395,6 +471,9 @@ function openViewer(item) {
     elements.viewerMedia.appendChild(img);
   }
 
+  if (elements.viewerInfo) {
+    elements.viewerInfo.classList.remove("expanded");
+  }
   elements.viewerTitle.textContent = titleFor(item);
   if (elements.viewerDescription) {
     elements.viewerDescription.textContent = (item.ai_description || "").trim() || "No AI description yet";
@@ -450,6 +529,10 @@ function closeViewer() {
   elements.viewer.setAttribute("aria-hidden", "true");
   elements.viewerMedia.innerHTML = "";
   document.body.style.overflow = "";
+  state.viewerIndex = -1;
+  if (elements.viewerInfo) {
+    elements.viewerInfo.classList.remove("expanded");
+  }
 
   if (tg && tg.BackButton) {
     tg.BackButton.hide();
@@ -461,11 +544,13 @@ function normalizeItems(items) {
     const isCached = typeof item.is_cached === "boolean" ? item.is_cached : String(item.url || "").startsWith("/media/");
     const thumbUrl = item.thumb_url || (item.media_kind === "image" ? item.url : "/assets/video-placeholder.svg");
     const aiTitle = typeof item.ai_title === "string" ? item.ai_title : "";
+    const aiDescription = typeof item.ai_description === "string" ? item.ai_description : "";
     return {
       ...item,
       is_cached: isCached,
       thumb_url: thumbUrl,
       ai_title: aiTitle,
+      ai_description: aiDescription,
     };
   });
 }
@@ -819,11 +904,54 @@ function setupMiniAppChrome() {
   }
 }
 
+function getStoredDensity() {
+  try {
+    const v = localStorage.getItem("twa_density");
+    return v === "comfort" ? "comfort" : "dense";
+  } catch (_) {
+    return "dense";
+  }
+}
+
+function setDensity(next) {
+  const density = next === "comfort" ? "comfort" : "dense";
+  state.density = density;
+  document.documentElement.dataset.density = density;
+
+  if (elements.layoutDenseBtn) {
+    elements.layoutDenseBtn.setAttribute("aria-pressed", density === "dense" ? "true" : "false");
+  }
+  if (elements.layoutComfortBtn) {
+    elements.layoutComfortBtn.setAttribute("aria-pressed", density === "comfort" ? "true" : "false");
+  }
+
+  try {
+    localStorage.setItem("twa_density", density);
+  } catch (_) {
+    // no-op
+  }
+
+  renderGrid();
+}
+
 function bindUI() {
   elements.searchInput.addEventListener("input", (ev) => {
     state.search = ev.target.value;
     applyFilter(true);
   });
+
+  if (elements.layoutDenseBtn) {
+    elements.layoutDenseBtn.addEventListener("click", () => {
+      setDensity("dense");
+      callHaptic("light");
+    });
+  }
+  if (elements.layoutComfortBtn) {
+    elements.layoutComfortBtn.addEventListener("click", () => {
+      setDensity("comfort");
+      callHaptic("light");
+    });
+  }
 
   elements.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -886,9 +1014,39 @@ function bindUI() {
     }
   });
 
+  if (elements.viewerPrev) {
+    elements.viewerPrev.addEventListener("click", () => {
+      if (state.viewerIndex > 0) {
+        openViewerByIndex(state.viewerIndex - 1);
+        callHaptic("light");
+      }
+    });
+  }
+  if (elements.viewerNext) {
+    elements.viewerNext.addEventListener("click", () => {
+      if (state.viewerIndex >= 0 && state.viewerIndex < state.filtered.length - 1) {
+        openViewerByIndex(state.viewerIndex + 1);
+        callHaptic("light");
+      }
+    });
+  }
+  if (elements.sheetGrip && elements.viewerInfo) {
+    elements.sheetGrip.addEventListener("click", () => {
+      elements.viewerInfo.classList.toggle("expanded");
+      callHaptic("light");
+    });
+  }
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.viewer.classList.contains("hidden")) {
       closeViewer();
+    }
+    if (!elements.viewer.classList.contains("hidden")) {
+      if (event.key === "ArrowLeft" && state.viewerIndex > 0) {
+        openViewerByIndex(state.viewerIndex - 1);
+      } else if (event.key === "ArrowRight" && state.viewerIndex >= 0 && state.viewerIndex < state.filtered.length - 1) {
+        openViewerByIndex(state.viewerIndex + 1);
+      }
     }
   });
 }
@@ -896,6 +1054,7 @@ function bindUI() {
 async function bootstrap() {
   bindUI();
   setupMiniAppChrome();
+  setDensity(getStoredDensity());
 
   try {
     await fetchContext();
