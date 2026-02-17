@@ -2,37 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>AfterDark Vault</title>
-  <meta name="theme-color" content="#0a0f14">
-  <meta name="description" content="AI-powered Telegram media gallery with intelligent content analysis">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="description" content="AI-powered Telegram media gallery">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
   
-  <!-- Preconnect for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="/api">
-  
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Styles -->
-  <link rel="stylesheet" href="/style.css?v=20260216-ai">
-  
-  <!-- Telegram WebApp -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=20260217b">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <!-- Animated background elements -->
-  <div class="bg-orb orb-a" aria-hidden="true"></div>
-  <div class="bg-orb orb-b" aria-hidden="true"></div>
-  <div class="bg-orb orb-c" aria-hidden="true"></div>
-  <div class="bg-noise" aria-hidden="true"></div>
-
   <div class="app">
-    <!-- Sticky header section -->
-    <div class="sticky-stack" role="banner" aria-label="Gallery navigation">
+    <div class="sticky-stack">
       <header class="topbar surface">
         <div class="brand">
           <div class="hero-topline">
@@ -44,22 +31,22 @@
           <p id="sessionText" class="session-text">Initializing...</p>
         </div>
 
-        <label class="search-wrap top-search" for="searchInput">
-          <span class="search-icon" aria-hidden="true">Search</span>
+        <label class="search-wrap" for="searchInput">
+          <span class="search-icon">Search</span>
           <input 
             id="searchInput" 
             type="search" 
-            placeholder="Search AI titles, descriptions, captions..."
+            placeholder="Search titles, descriptions..."
             autocomplete="off"
             aria-label="Search media"
           >
         </label>
 
-        <div class="top-actions" role="group" aria-label="Primary actions">
+        <div class="top-actions">
           <button id="syncBtn" class="btn btn-primary" type="button" aria-label="Sync media from Telegram">
             <span>Sync</span>
           </button>
-          <button id="retitleBtn" class="btn btn-ai" type="button" aria-label="Improve titles with AI">
+          <button id="retitleBtn" class="btn btn-ai" type="button" aria-label="Enhance with AI">
             <span>AI</span>
           </button>
           <button id="toTopBtn" class="btn btn-ghost" type="button" aria-label="Scroll to top">
@@ -68,34 +55,34 @@
         </div>
       </header>
 
-      <section class="controls surface" aria-label="Gallery filters and sorting">
+      <section class="controls surface" aria-label="Gallery filters">
         <div class="tabs" role="tablist" aria-label="Media type filter">
-          <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true" tabindex="0">
+          <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true" aria-controls="grid">
             All
           </button>
-          <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false" tabindex="-1">
+          <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false" aria-controls="grid">
             Videos
           </button>
-          <button class="tab" data-filter="image" type="button" role="tab" aria-selected="false" tabindex="-1">
+          <button class="tab" data-filter="image" type="button" role="tab" aria-selected="false" aria-controls="grid">
             Images
           </button>
         </div>
 
         <div class="controls-right">
           <label class="sort-wrap" for="sortSelect">
-            <span>Sort by</span>
+            <span>Sort</span>
             <select id="sortSelect" aria-label="Sort order">
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="largest">Largest Files</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="largest">Largest</option>
               <option value="ai">AI Enhanced</option>
             </select>
           </label>
           <div class="layout-wrap" role="group" aria-label="Layout density">
-            <button id="layoutDenseBtn" class="chip" type="button" aria-pressed="true" data-layout="dense" aria-label="Dense layout">
+            <button id="layoutDenseBtn" class="chip" type="button" aria-pressed="true" data-layout="dense" aria-label="Compact layout">
               Compact
             </button>
-            <button id="layoutComfortBtn" class="chip" type="button" aria-pressed="false" data-layout="comfort" aria-label="Comfortable layout">
+            <button id="layoutComfortBtn" class="chip" type="button" aria-pressed="false" data-layout="comfort" aria-label="Spacious layout">
               Spacious
             </button>
           </div>
@@ -104,15 +91,14 @@
         <div class="meta-row" aria-live="polite" aria-atomic="true">
           <span id="countText">0 items</span>
           <span id="syncText">Not synced</span>
-          <span id="aiStatusText" class="hidden">AI Ready</span>
+          <span id="aiStatusText" class="hidden" aria-live="polite">AI Ready</span>
         </div>
       </section>
     </div>
 
-    <!-- Statistics cards -->
-    <section class="stats" aria-label="Media statistics" role="region">
+    <section class="stats" aria-label="Media statistics">
       <article class="surface stat-card">
-        <small>Total Items</small>
+        <small>Total</small>
         <strong id="statTotal">0</strong>
       </article>
       <article class="surface stat-card">
@@ -129,14 +115,13 @@
       </article>
     </section>
 
-    <!-- Main content area -->
     <main role="main" aria-label="Media gallery">
       <div id="grid" class="grid" role="list" aria-label="Media items"></div>
       
-      <div id="emptyState" class="empty hidden" role="status">
-        <div class="empty-icon">🔍</div>
-        <p>No media found for this filter.</p>
-        <p style="font-size: 12px; margin-top: 8px; opacity: 0.7;">Try adjusting your search or sync new content</p>
+      <div id="emptyState" class="empty hidden" role="status" aria-live="polite">
+        <div class="empty-icon">&#128269;</div>
+        <p>No media found</p>
+        <p style="font-size: 13px; margin-top: 8px; opacity: 0.6;">Try adjusting your search or sync new content</p>
       </div>
       
       <button id="loadMoreBtn" class="btn load-more hidden" type="button" aria-label="Load more media">
@@ -145,46 +130,31 @@
     </main>
   </div>
 
-  <!-- Media viewer modal -->
-  <aside id="viewer" class="viewer hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Media viewer">
-    <div class="viewer-backdrop" aria-hidden="true"></div>
+  <aside id="viewer" class="viewer hidden" role="dialog" aria-modal="true" aria-label="Media viewer" aria-hidden="true">
+    <div class="viewer-backdrop"></div>
     <div class="viewer-shell surface">
-      <button id="closeViewer" class="viewer-close" type="button" aria-label="Close viewer">
-        Close
-      </button>
-      <button id="viewerPrev" class="viewer-nav viewer-prev" type="button" aria-label="Previous media" disabled>
-        Previous
-      </button>
-      <button id="viewerNext" class="viewer-nav viewer-next" type="button" aria-label="Next media" disabled>
-        Next
-      </button>
+      <button id="closeViewer" class="viewer-close" type="button" aria-label="Close viewer">&#x2715;</button>
+      <button id="viewerPrev" class="viewer-nav viewer-prev" type="button" aria-label="Previous media" disabled>&#8249;</button>
+      <button id="viewerNext" class="viewer-nav viewer-next" type="button" aria-label="Next media" disabled>&#8250;</button>
       
       <div id="viewerMedia" class="viewer-media" role="img" aria-label="Media content"></div>
       
-      <div class="viewer-info" id="viewerInfoPanel">
-        <div class="sheet-grip" aria-hidden="true" role="button" tabindex="0" aria-label="Expand or collapse details"></div>
-        
-        <div class="swipe-hint" aria-hidden="true">
-          <span class="swipe-hint-icon">👆</span>
-          <span>Swipe up for details</span>
-        </div>
-        
-        <h2 id="viewerTitle">Media</h2>
+      <div class="viewer-info" id="viewerInfoPanel" role="region" aria-label="Media details">
+        <h2 id="viewerTitle" tabindex="-1">Media</h2>
         
         <div class="viewer-section">
           <p class="label">AI Description</p>
-          <p id="viewerDescription">No AI description yet</p>
+          <p id="viewerDescription">No description</p>
         </div>
         
         <div class="viewer-section">
-          <p class="label">Original Caption</p>
+          <p class="label">Caption</p>
           <p id="viewerCaption">No caption</p>
         </div>
         
-        <!-- AI Insights Panel -->
-        <div id="aiInsightsPanel" class="ai-insights hidden">
+        <div id="aiInsightsPanel" class="ai-insights hidden" role="region" aria-label="AI Insights">
           <div class="ai-insights-title">
-            <span>✨</span>
+            <span>&#10024;</span>
             <span>AI Insights</span>
           </div>
           <div id="aiInsightsContent" class="ai-insights-content"></div>
@@ -198,27 +168,24 @@
         </div>
         
         <div class="viewer-actions" role="group" aria-label="Media actions">
-          <button id="viewerCopyLink" class="btn btn-ghost" type="button">
-            Copy Link
-          </button>
-          <button id="viewerCopyEmbed" class="btn btn-ghost" type="button">
-            Copy Embed
-          </button>
-          <a id="viewerDownload" class="btn btn-primary" href="#" download role="button">
-            Download
-          </a>
+          <button id="viewerCopyLink" class="btn btn-ghost" type="button">Copy Link</button>
+          <button id="viewerCopyEmbed" class="btn btn-ghost" type="button">Embed</button>
+          <a id="viewerDownload" class="btn btn-primary" href="#" download role="button">Download</a>
+        </div>
+        
+        <div class="suggested-section" id="suggestedSection">
+          <h3 class="suggested-title">Up Next</h3>
+          <div class="suggested-grid" id="suggestedGrid"></div>
         </div>
       </div>
     </div>
   </aside>
 
-  <!-- Toast notification container -->
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- Card template -->
   <template id="cardTemplate">
     <article class="card" role="listitem">
-      <button class="card-btn" type="button" aria-label="View media">
+      <button class="card-btn" type="button" aria-label="View media details">
         <div class="thumb">
           <div class="thumb-skeleton" aria-hidden="true"></div>
           <div class="media-slot"></div>
@@ -241,7 +208,6 @@
     </article>
   </template>
 
-  <!-- Scripts -->
-  <script src="/script.js?v=20260216-ai"></script>
+  <script src="/script.js?v=20260217b"></script>
 </body>
 </html>

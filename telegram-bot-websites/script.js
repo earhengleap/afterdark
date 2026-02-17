@@ -465,6 +465,24 @@ function ensureObserver() {
   );
 }
 
+function getAspectRatioClass(item) {
+  const w = Number(item.width) || 0;
+  const h = Number(item.height) || 0;
+  
+  if (!w || !h) {
+    if (item.media_kind === "video") return "landscape";
+    return "square";
+  }
+  
+  const ratio = w / h;
+  
+  if (ratio > 1.5) return "wide";
+  if (ratio > 1.1) return "landscape";
+  if (ratio > 0.9) return "square";
+  if (ratio > 0.7) return "tall";
+  return "portrait";
+}
+
 function wireThumbMedia(item, thumb, mediaSlot) {
   const isVideo = item.media_kind === "video";
   const fallbackSrc = "/assets/video-placeholder.svg";
@@ -492,6 +510,8 @@ function wireThumbMedia(item, thumb, mediaSlot) {
 
   mediaSlot.appendChild(media);
   if (state.thumbObserver) state.thumbObserver.observe(media);
+  
+  thumb.classList.add(getAspectRatioClass(item));
 }
 
 function updateLoadMoreButton() {
@@ -532,7 +552,7 @@ function renderGrid() {
     const node = elements.cardTemplate.content.firstElementChild.cloneNode(true);
     const isAI = hasAIEnhancement(item);
     
-    node.style.setProperty("--delay", `${Math.min((idx % 20) * 25, 400)}ms`);
+    node.style.setProperty("--delay", `${Math.min(idx * 15, 400)}ms`);
     node.classList.toggle("kind-video", item.media_kind === "video");
     node.classList.toggle("kind-image", item.media_kind !== "video");
     node.classList.toggle("ai-enhanced", isAI);
@@ -548,6 +568,11 @@ function renderGrid() {
     const subtitle = node.querySelector(".card-subtitle");
 
     wireThumbMedia(item, thumb, mediaSlot);
+
+    if (item.media_kind === "video") {
+      thumb.classList.remove("portrait", "tall", "square", "wide");
+      thumb.classList.add("landscape");
+    }
 
     kindBadge.textContent = item.media_kind === "video" ? "VIDEO" : "IMAGE";
     cacheBadge.textContent = item.is_cached ? "CACHED" : "STREAM";
@@ -612,15 +637,39 @@ function openViewer(item, recomputeIndex = true) {
     video.controls = true;
     video.autoplay = true;
     video.playsInline = true;
-    video.preload = "metadata";
+    video.preload = "auto";
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.maxHeight = "calc(100vh - 32px)";
+    video.style.objectFit = "contain";
+    video.style.backgroundColor = "#000";
+    
+    // Prevent touch events from propagating to parent
+    video.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+    video.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: true });
+    video.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
+    video.addEventListener("click", (e) => e.stopPropagation());
+    
     elements.viewerMedia.appendChild(video);
   } else {
     const img = document.createElement("img");
     img.src = item.url;
     img.alt = titleFor(item);
     img.loading = "eager";
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.maxHeight = "calc(100vh - 32px)";
+    img.style.objectFit = "contain";
+    
+    // Prevent touch events from propagating
+    img.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+    img.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: true });
+    img.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
+    img.addEventListener("click", (e) => e.stopPropagation());
+    
     elements.viewerMedia.appendChild(img);
   }
 
@@ -697,9 +746,55 @@ function openViewer(item, recomputeIndex = true) {
     elements.viewer.setAttribute("aria-hidden", "false");
   }
   document.body.style.overflow = "hidden";
+  
+  // Show suggested videos
+  renderSuggestedVideos(item);
 
   if (tg && tg.BackButton) tg.BackButton.show();
   callHaptic("medium");
+}
+
+function renderSuggestedVideos(currentItem) {
+  const suggestedGrid = document.getElementById("suggestedGrid");
+  const suggestedSection = document.getElementById("suggestedSection");
+  
+  if (!suggestedGrid || !suggestedSection) return;
+  
+  // Get suggested items (same type, excluding current)
+  const suggested = state.filtered
+    .filter(item => item.media_kind === currentItem.media_kind && item.message_id !== currentItem.message_id)
+    .slice(0, 6);
+  
+  if (suggested.length === 0) {
+    suggestedSection.classList.add("hidden");
+    return;
+  }
+  
+  suggestedSection.classList.remove("hidden");
+  suggestedGrid.innerHTML = "";
+  
+  const fragment = document.createDocumentFragment();
+  
+  suggested.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "suggested-card";
+    card.innerHTML = `
+      <div class="suggested-thumb">
+        <img src="${item.thumb_url || item.url}" alt="${titleFor(item)}" loading="lazy">
+        <span class="suggested-duration">${item.media_kind === "video" ? fmtDuration(item.duration) : ""}</span>
+      </div>
+      <div class="suggested-info">
+        <p class="suggested-item-title">${titleFor(item)}</p>
+        <p class="suggested-item-meta">${fmtRelative(item.date)}</p>
+      </div>
+    `;
+    card.addEventListener("click", () => {
+      openViewer(item);
+    });
+    fragment.appendChild(card);
+  });
+  
+  suggestedGrid.appendChild(fragment);
 }
 
 function closeViewer() {
@@ -725,20 +820,60 @@ function navigateViewer(direction) {
 
 // Touch gesture handling
 function initTouchGestures() {
-  if (!state.isTouch || !elements.viewer) return;
+  if (!elements.viewer) return;
   
   let startX = 0;
   let startY = 0;
   let startTime = 0;
+  let isScrolling = false;
+  let scrollTimeout = null;
+  
+  // Prevent body scroll when viewer is open
+  elements.viewer.addEventListener("touchmove", (e) => {
+    // Allow scrolling within the viewer info panel
+    const infoPanel = elements.viewerInfo;
+    if (infoPanel && infoPanel.contains(e.target)) {
+      return; // Let the info panel handle its own scroll
+    }
+    
+    // Prevent scrolling the background
+    e.preventDefault();
+  }, { passive: false });
   
   elements.viewer.addEventListener("touchstart", (e) => {
+    // Don't capture touches on the video player
+    const viewerMedia = elements.viewerMedia;
+    if (viewerMedia && viewerMedia.contains(e.target)) {
+      return;
+    }
+    
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     startTime = Date.now();
+    isScrolling = false;
+  }, { passive: true });
+  
+  elements.viewer.addEventListener("touchmove", () => {
+    isScrolling = true;
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => { isScrolling = false; }, 150);
   }, { passive: true });
   
   elements.viewer.addEventListener("touchend", (e) => {
+    // Don't handle touches that were on the video
+    const viewerMedia = elements.viewerMedia;
+    if (viewerMedia && viewerMedia.contains(e.target)) {
+      return;
+    }
+    
     if (!startX || !startY) return;
+    
+    // Ignore if we were scrolling
+    if (isScrolling) {
+      startX = 0;
+      startY = 0;
+      return;
+    }
     
     const endX = e.changedTouches[0].clientX;
     const endY = e.changedTouches[0].clientY;
@@ -753,9 +888,9 @@ function initTouchGestures() {
     // Horizontal swipe for navigation
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold && velocity > 0.3) {
       if (diffX > 0) {
-        navigateViewer(1); // Swipe left -> next
+        navigateViewer(1);
       } else {
-        navigateViewer(-1); // Swipe right -> prev
+        navigateViewer(-1);
       }
     }
     
@@ -768,16 +903,22 @@ function initTouchGestures() {
     startY = 0;
   }, { passive: true });
   
-  // Double tap to zoom (simplified - just logs for now)
-  let lastTap = 0;
-  elements.viewerMedia?.addEventListener("touchend", (e) => {
-    const currentTime = Date.now();
-    if (currentTime - lastTap < 300) {
-      // Double tap detected
-      callHaptic("medium");
+  // Click outside to close
+  const backdrop = elements.viewer?.querySelector(".viewer-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", () => {
+      closeViewer();
+    });
+  }
+  
+  let lastScroll = 0;
+  window.addEventListener("scroll", () => {
+    const currentScroll = window.scrollY;
+    if (elements.toTopBtn) {
+      elements.toTopBtn.style.opacity = currentScroll > 300 ? "1" : "0.5";
     }
-    lastTap = currentTime;
-  });
+    lastScroll = currentScroll;
+  }, { passive: true });
 }
 
 // Data normalization
