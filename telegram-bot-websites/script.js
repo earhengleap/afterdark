@@ -628,8 +628,21 @@ function openViewer(item, recomputeIndex = true) {
     elements.viewerInfo.classList.remove("expanded");
   }
   
+  // Check if item needs AI generation and trigger it
+  const needsAI = !item.ai_title || !item.ai_description;
+  if (needsAI) {
+    console.log(`[AI] Viewer opened for item ${item.message_id} without AI content - triggering generation`);
+    // Trigger immediate AI generation
+    void generateAIForItem(Number(item.message_id));
+    
+    // Show generating indicator
+    if (elements.viewerDescription) {
+      elements.viewerDescription.innerHTML = `<span class="ai-generating">✨ AI is analyzing this ${item.media_kind}...</span>`;
+    }
+  }
+  
   if (elements.viewerTitle) elements.viewerTitle.textContent = titleFor(item);
-  if (elements.viewerDescription) {
+  if (elements.viewerDescription && !needsAI) {
     elements.viewerDescription.textContent = (item.ai_description || "").trim() || "No AI description available";
   }
   if (elements.viewerCaption) {
@@ -888,7 +901,11 @@ function mergeRecentPayload(data) {
 const aiCheckState = {
   checking: new Set(),
   checkTimer: null,
-  checkInterval: 3000, // Check every 3 seconds
+  checkInterval: 2000, // Check every 2 seconds (faster)
+  fastCheckInterval: 1000, // Check every 1 second when new items detected
+  isFastMode: false,
+  lastItemCount: 0,
+  newItemsDetected: false,
 };
 
 async function checkAIStatusForItem(messageId) {
@@ -944,17 +961,48 @@ async function checkAIStatusForItem(messageId) {
 }
 
 async function checkPendingAIItems() {
+  // Detect if we have new items
+  const currentItemCount = state.items.length;
+  const hasNewItems = currentItemCount > aiCheckState.lastItemCount;
+  aiCheckState.lastItemCount = currentItemCount;
+  
   // Find items without AI titles
   const pendingItems = state.items.filter(item => {
     const hasTitle = item.ai_title || item.ai_description;
     return !hasTitle && !aiCheckState.checking.has(Number(item.message_id));
-  }).slice(0, 10); // Check up to 10 items at a time
+  });
+  
+  // If we have new items or many pending, switch to fast mode
+  if (hasNewItems || pendingItems.length > 5) {
+    if (!aiCheckState.isFastMode) {
+      aiCheckState.isFastMode = true;
+      console.log(`[AI] Switching to fast mode - ${pendingItems.length} pending items`);
+      // Restart with faster interval
+      stopAIChecks();
+      aiCheckState.checkTimer = setInterval(() => {
+        void checkPendingAIItems();
+      }, aiCheckState.fastCheckInterval);
+    }
+  } else if (pendingItems.length === 0 && aiCheckState.isFastMode) {
+    // No more pending, switch back to normal
+    aiCheckState.isFastMode = false;
+    console.log('[AI] Switching to normal mode - all caught up');
+    stopAIChecks();
+    aiCheckState.checkTimer = setInterval(() => {
+      void checkPendingAIItems();
+    }, aiCheckState.checkInterval);
+  }
   
   if (pendingItems.length === 0) return;
   
+  // Check up to 15 items at a time (increased from 10)
+  const itemsToCheck = pendingItems.slice(0, 15);
+  
+  console.log(`[AI] Checking ${itemsToCheck.length} items (${pendingItems.length} total pending)`);
+  
   // Check each pending item
   await Promise.all(
-    pendingItems.map(item => checkAIStatusForItem(Number(item.message_id)))
+    itemsToCheck.map(item => checkAIStatusForItem(Number(item.message_id)))
   );
 }
 
