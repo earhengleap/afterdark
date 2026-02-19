@@ -53,9 +53,13 @@ $env:TWA_TUNNEL_PROVIDER='auto'
 
 # Force serveo tunnel
 $env:TWA_TUNNEL_PROVIDER='serveo'
+$env:TWA_SERVEO_SSH_PORTS='22,443'   # try 22 first, then 443
+$env:TWA_SERVEO_URL_TIMEOUT='45'
+$env:TWA_SERVEO_CONNECT_TIMEOUT='8'
 
 # Force localhost.run over SSH
 $env:TWA_TUNNEL_PROVIDER='localhostrun'
+$env:TWA_LOCALHOSTRUN_URL_TIMEOUT='120'
 
 # Disable tunnel autostart (local-only)
 $env:TWA_TUNNEL_PROVIDER='none'

@@ -45,6 +45,58 @@ logger = setup_logger()
 # ==================== TWA BOOTSTRAP ====================
 
 _aux_processes = []
+_NOTIFY_USERNAME = "@HengleapEar"
+
+
+async def _send_tunnel_notification_async(public_url: str) -> None:
+    """Async function to send tunnel URL notification to Telegram user."""
+    try:
+        app = Client(
+            "tunnel_notifier",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            bot_token=BOT_TOKEN,
+            workdir=str(Path(__file__).parent / "data")
+        )
+        await app.start()
+        try:
+            message = (
+                f"🌐 **Tunnel Active**\n\n"
+                f"URL: {public_url}\n\n"
+                f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            await app.send_message(_NOTIFY_USERNAME, message)
+            logger.info(f"✅ Tunnel URL sent to {_NOTIFY_USERNAME}")
+        finally:
+            await app.stop()
+    except Exception as e:
+        logger.error(f"❌ Failed to send tunnel notification to {_NOTIFY_USERNAME}: {e}")
+        raise
+
+
+def _send_tunnel_notification(public_url: str) -> None:
+    """Send tunnel URL notification to Telegram user."""
+    import asyncio
+    
+    async def wrapped_notification():
+        """Wrapper to catch and log any errors."""
+        try:
+            await _send_tunnel_notification_async(public_url)
+        except Exception as e:
+            logger.error(f"❌ Tunnel notification task failed: {e}")
+    
+    try:
+        try:
+            # Try to get the running event loop (we're in async context)
+            loop = asyncio.get_running_loop()
+            # Schedule the notification as a background task
+            task = asyncio.create_task(wrapped_notification())
+            logger.info(f"📤 Scheduled tunnel notification for {_NOTIFY_USERNAME}")
+        except RuntimeError:
+            # No running event loop, use asyncio.run (sync context)
+            asyncio.run(_send_tunnel_notification_async(public_url))
+    except Exception as e:
+        logger.error(f"❌ Failed to schedule tunnel notification: {e}")
 
 
 def _is_true(value: str) -> bool:
@@ -110,6 +162,52 @@ def _serveo_log_paths(root_dir: Path) -> tuple[Path, Path]:
     stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "serveo.stdout.log")
     stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "serveo.stderr.log")
     return stdout_path, stderr_path
+
+
+def _parse_port_candidates(raw: str, defaults: list[int]) -> list[int]:
+    ports: list[int] = []
+    for token in str(raw or "").split(","):
+        value = token.strip()
+        if not value.isdigit():
+            continue
+        port = int(value)
+        if 1 <= port <= 65535 and port not in ports:
+            ports.append(port)
+    return ports or list(defaults)
+
+
+def _serveo_ssh_ports() -> list[int]:
+    single = os.getenv("TWA_SERVEO_SSH_PORT", "").strip()
+    if single.isdigit():
+        port = int(single)
+        if 1 <= port <= 65535:
+            return [port]
+    return _parse_port_candidates(os.getenv("TWA_SERVEO_SSH_PORTS", "").strip(), [22, 443])
+
+
+def _ssh_target_host(target: str) -> str:
+    value = str(target or "").strip()
+    if "@" in value:
+        return value.rsplit("@", 1)[-1]
+    return value
+
+
+def _is_tcp_reachable(host: str, port: int, timeout_seconds: float = 6.0) -> bool:
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout_seconds):
+            return True
+    except Exception:
+        return False
+
+
+def _terminate_process(proc: subprocess.Popen | None) -> None:
+    if not proc:
+        return
+    try:
+        if proc.poll() is None:
+            proc.terminate()
+    except Exception:
+        pass
 
 
 def _read_localhostrun_public_url(root_dir: Path) -> str | None:
@@ -384,87 +482,121 @@ def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
 
     remote_port = _serveo_remote_port()
     tunnel_target = _serveo_target()
-    command = [
-        ssh_executable,
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        "-o",
-        "ExitOnForwardFailure=yes",
-        "-o",
-        "ServerAliveInterval=30",
-        "-o",
-        "ServerAliveCountMax=3",
-        "-R",
-        f"{remote_port}:127.0.0.1:{twa_port}",
-        tunnel_target,
-    ]
-
-    stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
-    stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
+    target_host = _ssh_target_host(tunnel_target)
+    connect_timeout_raw = os.getenv("TWA_SERVEO_CONNECT_TIMEOUT", "8").strip()
     try:
-        if os.name == "nt":
-            tunnel_proc = subprocess.Popen(
-                command,
-                cwd=str(root_dir),
-                env=os.environ.copy(),
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                stdout=stdout_handle,
-                stderr=stderr_handle,
-            )
-        else:
-            tunnel_proc = subprocess.Popen(
-                command,
-                cwd=str(root_dir),
-                env=os.environ.copy(),
-                stdout=stdout_handle,
-                stderr=stderr_handle,
-            )
-    finally:
-        stdout_handle.close()
-        stderr_handle.close()
+        connect_timeout = max(2, int(connect_timeout_raw))
+    except ValueError:
+        connect_timeout = 8
 
-    _aux_processes.append(tunnel_proc)
-    time.sleep(2)
-    if tunnel_proc.poll() is not None:
-        logger.warning("serveo tunnel exited early. Check serveo output terminal.")
+    ssh_ports = _serveo_ssh_ports()
+    reachable_ports = [port for port in ssh_ports if _is_tcp_reachable(target_host, port, connect_timeout)]
+    if not reachable_ports:
+        logger.warning(
+            f"serveo host '{target_host}' is unreachable on SSH port(s) {ssh_ports}. "
+            "Check firewall/ISP/VPN routing or set TWA_SERVEO_TARGET/TWA_SERVEO_SSH_PORTS."
+        )
         return False
 
-    timeout_raw = os.getenv("TWA_SERVEO_URL_TIMEOUT", "30").strip()
+    timeout_raw = os.getenv("TWA_SERVEO_URL_TIMEOUT", "45").strip()
     try:
         timeout_seconds = max(5, int(timeout_raw))
     except ValueError:
-        timeout_seconds = 30
+        timeout_seconds = 45
 
-    public_url = _wait_for_serveo_public_url(root_dir, timeout_seconds)
-    if public_url:
-        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+    health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+    try:
+        health_timeout = max(3, int(health_timeout_raw))
+    except ValueError:
+        health_timeout = 18
+
+    for ssh_port in reachable_ports:
+        command = [
+            ssh_executable,
+            "-p",
+            str(ssh_port),
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-o",
+            "ServerAliveInterval=30",
+            "-o",
+            "ServerAliveCountMax=3",
+            "-R",
+            f"{remote_port}:127.0.0.1:{twa_port}",
+            tunnel_target,
+        ]
+
         try:
-            health_timeout = max(3, int(health_timeout_raw))
-        except ValueError:
-            health_timeout = 18
+            stdout_log.write_text("", encoding="utf-8")
+            stderr_log.write_text("", encoding="utf-8")
+        except Exception:
+            pass
+
+        stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
+        stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
+        try:
+            if os.name == "nt":
+                tunnel_proc = subprocess.Popen(
+                    command,
+                    cwd=str(root_dir),
+                    env=os.environ.copy(),
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    stdout=stdout_handle,
+                    stderr=stderr_handle,
+                )
+            else:
+                tunnel_proc = subprocess.Popen(
+                    command,
+                    cwd=str(root_dir),
+                    env=os.environ.copy(),
+                    stdout=stdout_handle,
+                    stderr=stderr_handle,
+                )
+        finally:
+            stdout_handle.close()
+            stderr_handle.close()
+
+        _aux_processes.append(tunnel_proc)
+        time.sleep(2)
+        if tunnel_proc.poll() is not None:
+            logger.warning(
+                f"serveo tunnel exited early on SSH port {ssh_port}. "
+                "Trying next serveo port/fallback."
+            )
+            _terminate_process(tunnel_proc)
+            continue
+
+        public_url = _wait_for_serveo_public_url(root_dir, timeout_seconds)
+        if not public_url:
+            logger.warning(
+                f"serveo started on SSH port {ssh_port}, but no public URL was found in "
+                f"{stdout_log} or {stderr_log}."
+            )
+            _terminate_process(tunnel_proc)
+            continue
 
         if not _wait_for_public_url_health(public_url, health_timeout):
             logger.warning(
                 f"serveo URL is not healthy after {health_timeout}s: {public_url}. "
-                "Trying fallback provider."
+                "Trying next serveo port/fallback."
             )
-            try:
-                if tunnel_proc.poll() is None:
-                    tunnel_proc.terminate()
-            except Exception:
-                pass
-            return False
+            _terminate_process(tunnel_proc)
+            continue
 
         logger.info(f"TWA serveo tunnel active: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
+        _send_tunnel_notification(public_url)
         return True
-    else:
+
+    if len(reachable_ports) > 1:
         logger.warning(
-            f"serveo started, but no public URL was found in {stdout_log} or {stderr_log}. "
-            "Set TWA_PUBLIC_URL manually if needed."
+            f"serveo failed across reachable SSH port(s) {reachable_ports}. "
+            "Trying fallback provider."
         )
-        return False
+    return False
 
 
 def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
@@ -531,13 +663,14 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
     time.sleep(2)
     if tunnel_proc.poll() is not None:
         logger.warning("localhost.run tunnel exited early. Check localhost.run output terminal.")
+        _terminate_process(tunnel_proc)
         return False
 
-    timeout_raw = os.getenv("TWA_LOCALHOSTRUN_URL_TIMEOUT", "30").strip()
+    timeout_raw = os.getenv("TWA_LOCALHOSTRUN_URL_TIMEOUT", "120").strip()
     try:
         timeout_seconds = max(5, int(timeout_raw))
     except ValueError:
-        timeout_seconds = 30
+        timeout_seconds = 120
 
     public_url = _wait_for_localhostrun_public_url(root_dir, timeout_seconds)
     if public_url:
@@ -562,12 +695,14 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
         logger.info(f"TWA localhost.run tunnel active: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
+        _send_tunnel_notification(public_url)
         return True
     else:
         logger.warning(
             f"localhost.run started, but no public URL was found in {stdout_log} or {stderr_log}. "
             "Set TWA_PUBLIC_URL manually if needed."
         )
+        _terminate_process(tunnel_proc)
         return False
 
 

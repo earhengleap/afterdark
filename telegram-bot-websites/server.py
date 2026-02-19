@@ -38,12 +38,26 @@ import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import URL
+from starlette.responses import Response
 from pyrogram import Client
 from pyrogram.errors import RPCError
 try:
     from PIL import Image
 except Exception:
     Image = None
+
+
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            ext = path.lower().split(".")[-1] if "." in path else ""
+            if ext in ("jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov"):
+                response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
 
 if os.name == "nt":
     # Selector loop is more stable than Proactor for high churn TCP closes on Windows.
@@ -66,7 +80,7 @@ try:
     PORT = int(os.getenv("TWA_PORT", "5000").strip() or "5000")
 except ValueError:
     PORT = 5000
-DEFAULT_SYNC_LIMIT = 250
+DEFAULT_SYNC_LIMIT = None  # Sync ALL media by default
 STRICT_TWA_VERIFY = os.getenv("TWA_VERIFY_STRICT", "0") == "1"
 SYNC_TIMEOUT_SECONDS = max(10, int(os.getenv("TWA_SYNC_TIMEOUT_SECONDS", "90")))
 DOWNLOAD_TIMEOUT_SECONDS = max(10, int(os.getenv("TWA_DOWNLOAD_TIMEOUT_SECONDS", "180")))
@@ -76,7 +90,9 @@ try:
 except ValueError:
     SYNC_API_MAX_WAIT_SECONDS = 18
 EAGER_DOWNLOAD_MEDIA = os.getenv("TWA_EAGER_DOWNLOAD_MEDIA", "0").strip() == "1"
-EAGER_VIDEO_THUMBS = os.getenv("TWA_EAGER_VIDEO_THUMBS", "0").strip() == "1"
+EAGER_VIDEO_THUMBS = os.getenv("TWA_EAGER_VIDEO_THUMBS", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
+EAGER_IMAGE_THUMBS = os.getenv("TWA_EAGER_IMAGE_THUMBS", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
+PARALLEL_THUMB_DOWNLOADS = max(1, min(10, int(os.getenv("TWA_PARALLEL_THUMBS", "5").strip() or "5")))
 LIVE_SYNC_ENABLED = os.getenv("TWA_LIVE_SYNC", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
 try:
     LIVE_SYNC_SECONDS = max(5, int(os.getenv("TWA_LIVE_SYNC_SECONDS", "8").strip() or "8"))
@@ -223,8 +239,25 @@ def latest_message_id(items: List[Dict[str, Any]]) -> int:
         return 0
 
 
+DEFAULT_MEDIA_TITLE_RE = re.compile(r"^(video|image|media)(?:\s*(?:#\s*)?\d+)?$", flags=re.IGNORECASE)
+
+
+def is_default_media_title(value: str) -> bool:
+    title = " ".join(str(value or "").strip().split())
+    if not title:
+        return False
+    return bool(DEFAULT_MEDIA_TITLE_RE.fullmatch(title))
+
+
 def count_ai_titled_items(items: List[Dict[str, Any]]) -> int:
-    return sum(1 for item in items if str(item.get("ai_title", "")).strip())
+    return sum(
+        1
+        for item in items
+        if (
+            str(item.get("ai_title", "")).strip()
+            and not is_default_media_title(str(item.get("ai_title", "")))
+        )
+    )
 
 def compute_gallery_stats(items: List[Dict[str, Any]]) -> Dict[str, int]:
     total = len(items)
@@ -563,7 +596,11 @@ class TelegramGalleryService:
                     "thumb_url": (
                         f"/media/{self._thumb_file_name(message_id)}"
                         if (media_kind == "video" and self._thumb_path(message_id).exists())
-                        else (f"/media/{local_path.name}" if media_kind == "image" else f"/assets/video-placeholder.svg")
+                        else (
+                            f"/media/{self._image_thumb_file_name(message_id)}"
+                            if (media_kind == "image" and self._image_thumb_path(message_id).exists())
+                            else (f"/media/{local_path.name}" if media_kind == "image" else f"/assets/video-placeholder.svg")
+                        )
                     ),
                     "mime_type": mime_type,
                     "size": int(stat.st_size),
@@ -611,6 +648,23 @@ class TelegramGalleryService:
             if not title and not description:
                 continue
 
+            # Old placeholders ("Video #123") should never be treated as final AI output.
+            if title and is_default_media_title(title):
+                entry["ai_title"] = ""
+                entry["ai_title_style"] = ""
+                entry["ai_title_model"] = ""
+                entry["ai_title_generated_at"] = None
+                entry["ai_title_is_fallback"] = False
+                try:
+                    msg_id = int(entry.get("message_id", 0))
+                except (TypeError, ValueError):
+                    msg_id = 0
+                if msg_id > 0:
+                    self._enqueue_ai_title(msg_id)
+                changed = True
+                # Continue to blocked-term checks for description.
+                title = ""
+
             blocked = False
             if title and self._contains_blocked_title_terms(title):
                 blocked = True
@@ -649,7 +703,10 @@ class TelegramGalleryService:
             if msg_id in incoming_by_id:
                 merged_item = {**old_item, **incoming_by_id[msg_id]}
                 incoming_title = str(merged_item.get("ai_title", "")).strip()
-                if incoming_title and self._contains_blocked_title_terms(incoming_title):
+                if incoming_title and (
+                    self._contains_blocked_title_terms(incoming_title)
+                    or is_default_media_title(incoming_title)
+                ):
                     merged_item["ai_title"] = ""
                     merged_item["ai_title_style"] = ""
                     merged_item["ai_title_model"] = ""
@@ -664,7 +721,11 @@ class TelegramGalleryService:
 
                 if not str(merged_item.get("ai_title", "")).strip():
                     old_ai_title = str(old_item.get("ai_title", "")).strip()
-                    if old_ai_title and not self._contains_blocked_title_terms(old_ai_title):
+                    if (
+                        old_ai_title
+                        and not self._contains_blocked_title_terms(old_ai_title)
+                        and not is_default_media_title(old_ai_title)
+                    ):
                         merged_item["ai_title"] = old_ai_title
 
                 if not str(merged_item.get("ai_description", "")).strip():
@@ -689,6 +750,13 @@ class TelegramGalleryService:
 
     def _thumb_path(self, message_id: int) -> Path:
         return self.cache_dir / self._thumb_file_name(message_id)
+
+    @staticmethod
+    def _image_thumb_file_name(message_id: int) -> str:
+        return f"{message_id}_image_thumb.jpg"
+
+    def _image_thumb_path(self, message_id: int) -> Path:
+        return self.cache_dir / self._image_thumb_file_name(message_id)
 
     def _thumb_url_if_cached(self, message_id: int) -> Optional[str]:
         thumb_path = self._thumb_path(message_id)
@@ -727,12 +795,292 @@ class TelegramGalleryService:
 
         downloaded_path = Path(downloaded)
         if downloaded_path != thumb_path and downloaded_path.exists():
-            # Normalize to predictable thumb file name for stable URLs.
             try:
                 downloaded_path.replace(thumb_path)
             except OSError:
                 return downloaded_path
+        
+        await self._optimize_thumbnail(thumb_path if thumb_path.exists() else downloaded_path)
         return thumb_path if thumb_path.exists() else downloaded_path
+
+    async def _optimize_thumbnail(self, thumb_path: Path) -> None:
+        if not thumb_path or not thumb_path.exists():
+            return
+        if Image is None:
+            return
+        try:
+            with Image.open(thumb_path) as img:
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGB")
+                width, height = img.size
+                max_size = 400
+                if width > max_size or height > max_size:
+                    scale = max_size / max(width, height)
+                    new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                output = io.BytesIO()
+                img.save(output, format="JPEG", quality=75, optimize=True)
+                output.seek(0)
+                thumb_path.write_bytes(output.getvalue())
+        except Exception:
+            pass
+
+    async def _generate_video_thumb_ffmpeg(self, video_path: Path, thumb_path: Path, message_id: int) -> Optional[Path]:
+        """Generate video thumbnail using ffmpeg as fallback when no embedded thumb exists."""
+        if not video_path.exists():
+            logger.warning(f"[THUMB] Video file not found for ffmpeg: {video_path}")
+            return None
+        
+        # Check file is valid (not temp, not empty)
+        if video_path.name.endswith(".temp") or video_path.stat().st_size < 1000:
+            logger.warning(f"[THUMB] Video file is incomplete/temp: {video_path}")
+            return None
+        
+        if not self.ffmpeg_bin:
+            logger.warning(f"[THUMB] ffmpeg not available for video {message_id}")
+            return None
+        
+        try:
+            # Try with seeking first
+            cmd = [
+                self.ffmpeg_bin,
+                "-y",
+                "-i", str(video_path),
+                "-ss", "00:00:01",
+                "-vframes", "1",
+                "-vf", "scale=400:400:force_original_aspect_ratio=decrease,pad=400:400:(ow-iw)/2:(oh-ih)/2:black",
+                "-q:v", "2",
+                str(thumb_path),
+            ]
+            
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=30
+            )
+            
+            # If first attempt failed, try without seeking
+            if process.returncode != 0 or not thumb_path.exists():
+                cmd_no_seek = [
+                    self.ffmpeg_bin,
+                    "-y",
+                    "-i", str(video_path),
+                    "-vframes", "1",
+                    "-vf", "scale=400:400:force_original_aspect_ratio=decrease",
+                    "-q:v", "2",
+                    str(thumb_path),
+                ]
+                process2 = await asyncio.create_subprocess_exec(
+                    *cmd_no_seek,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await asyncio.wait_for(process2.communicate(), timeout=30)
+            
+            if thumb_path.exists() and thumb_path.stat().st_size > 0:
+                logger.info(f"[THUMB] Generated ffmpeg thumb for video {message_id}")
+                await self._optimize_thumbnail(thumb_path)
+                return thumb_path
+            else:
+                logger.warning(f"[THUMB] ffmpeg failed for video {message_id}")
+                return None
+        except asyncio.TimeoutError:
+            logger.warning(f"[THUMB] ffmpeg timeout for video {message_id}")
+            return None
+        except Exception as e:
+            logger.warning(f"[THUMB] ffmpeg error for video {message_id}: {e}")
+            return None
+
+    def _find_video_file(self, message_id: int) -> Optional[Path]:
+        """Find any video file in cache for this message_id (any extension, ignoring temp files)."""
+        # Try common video extensions
+        extensions = [".mp4", ".mov", ".avi", ".mkv", ".webm"]
+        for ext in extensions:
+            video_path = self.cache_dir / f"{message_id}_video{ext}"
+            if video_path.exists():
+                # Make sure it's not a temp file
+                if not video_path.name.endswith(".temp") and video_path.stat().st_size > 1000:
+                    return video_path
+        
+        # Also try pattern matching for any file starting with message_id_video (but not temp)
+        try:
+            for f in self.cache_dir.iterdir():
+                if f.is_file() and f.name.startswith(f"{message_id}_video") and not f.name.endswith(".temp"):
+                    if f.stat().st_size > 1000:  # Make sure file is complete (at least 1KB)
+                        return f
+        except Exception:
+            pass
+        
+        return None
+
+    async def _get_video_thumb_with_ffmpeg_fallback(self, message: Any, message_id: int) -> Optional[Path]:
+        """Get video thumbnail - tries embedded thumb first, then falls back to ffmpeg."""
+        thumb_path = self._thumb_path(message_id)
+        if thumb_path.exists():
+            return thumb_path
+        
+        media_tuple = self._extract_media(message)
+        if not media_tuple:
+            # Try to find cached video file
+            cached_video = self._find_video_file(message_id)
+            if cached_video:
+                return await self._generate_video_thumb_ffmpeg(cached_video, thumb_path, message_id)
+            return None
+        
+        media_kind, media_obj, _, ext = media_tuple
+        
+        # Try embedded thumbnail first
+        thumb_obj = self._pick_best_thumb(media_obj)
+        if thumb_obj:
+            try:
+                downloaded = await asyncio.wait_for(
+                    self.client.download_media(thumb_obj, file_name=str(thumb_path)),
+                    timeout=min(30, DOWNLOAD_TIMEOUT_SECONDS),
+                )
+                if downloaded and Path(downloaded).exists():
+                    await self._optimize_thumbnail(thumb_path if thumb_path.exists() else Path(downloaded))
+                    if thumb_path.exists():
+                        return thumb_path
+            except Exception as e:
+                logger.warning(f"[THUMB] Failed to download embedded thumb for {message_id}: {e}")
+        
+        # Try to find cached video file first
+        cached_video = self._find_video_file(message_id)
+        if cached_video:
+            result = await self._generate_video_thumb_ffmpeg(cached_video, thumb_path, message_id)
+            if result:
+                return result
+        
+        # Download video if not cached
+        try:
+            video_name = f"{message_id}_video{ext}"
+            video_path = self.cache_dir / video_name
+            downloaded = await asyncio.wait_for(
+                self.client.download_media(message, file_name=str(video_path)),
+                timeout=DOWNLOAD_TIMEOUT_SECONDS,
+            )
+            if downloaded:
+                video_path = Path(downloaded)
+        except Exception as e:
+            logger.warning(f"[THUMB] Failed to download video {message_id}: {e}")
+            return None
+        
+        if video_path.exists():
+            return await self._generate_video_thumb_ffmpeg(video_path, thumb_path, message_id)
+        
+        return None
+
+    def _find_image_file(self, message_id: int) -> Optional[Path]:
+        """Find any image file in cache for this message_id (any extension)."""
+        extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+        for ext in extensions:
+            img_path = self.cache_dir / f"{message_id}_image{ext}"
+            if img_path.exists():
+                return img_path
+        
+        # Also try pattern matching for any file starting with message_id_image
+        for f in self.cache_dir.iterdir():
+            if f.is_file() and f.name.startswith(f"{message_id}_image"):
+                return f
+        
+        return None
+
+    async def _download_thumbs_parallel(self, items: List[Dict[str, Any]], messages_map: Dict[int, Any]) -> None:
+        logger.info(f"[THUMB] Starting parallel thumbnail download for {len(items)} items")
+        
+        async def download_single_thumb(item: Dict[str, Any]) -> bool:
+            message_id = int(item.get("message_id", 0))
+            media_kind = str(item.get("media_kind", ""))
+            message = messages_map.get(message_id)
+            
+            if media_kind == "video":
+                thumb_path = self._thumb_path(message_id)
+                if thumb_path.exists():
+                    return True
+                
+                # Try to get from message if available
+                if message:
+                    downloaded_thumb = await self._get_video_thumb_with_ffmpeg_fallback(message, message_id)
+                    if downloaded_thumb and downloaded_thumb.exists():
+                        for idx, i in enumerate(self.media_index):
+                            if int(i.get("message_id", 0)) == message_id:
+                                self.media_index[idx]["thumb_url"] = f"/media/{downloaded_thumb.name}"
+                                break
+                        return True
+                
+                # Try to find cached video file
+                cached_video = self._find_video_file(message_id)
+                if cached_video:
+                    downloaded_thumb = await self._generate_video_thumb_ffmpeg(cached_video, thumb_path, message_id)
+                    if downloaded_thumb and downloaded_thumb.exists():
+                        for idx, i in enumerate(self.media_index):
+                            if int(i.get("message_id", 0)) == message_id:
+                                self.media_index[idx]["thumb_url"] = f"/media/{downloaded_thumb.name}"
+                                break
+                        return True
+                
+                logger.warning(f"[THUMB] Could not generate thumb for video {message_id}")
+                
+            elif media_kind == "image":
+                thumb_path = self._image_thumb_path(message_id)
+                if thumb_path.exists():
+                    return True
+                
+                # First try to find cached original image
+                cached_image = self._find_image_file(message_id)
+                if cached_image and cached_image.exists():
+                    try:
+                        await self._optimize_thumbnail(cached_image)
+                        # Use the original as thumb if optimization succeeded
+                        if cached_image.exists():
+                            # Copy to thumb path
+                            import shutil
+                            try:
+                                shutil.copy2(cached_image, thumb_path)
+                            except Exception:
+                                pass
+                            if thumb_path.exists():
+                                for idx, i in enumerate(self.media_index):
+                                    if int(i.get("message_id", 0)) == message_id:
+                                        self.media_index[idx]["thumb_url"] = f"/media/{thumb_path.name}"
+                                        break
+                                return True
+                    except Exception as e:
+                        logger.warning(f"[THUMB] Failed to optimize cached image {message_id}: {e}")
+                
+                # Download from Telegram if not cached
+                if message:
+                    media_tuple = self._extract_media(message)
+                    if media_tuple:
+                        _, media_obj, _, _ = media_tuple
+                        try:
+                            await self.client.download_media(media_obj, file_name=str(thumb_path))
+                            await self._optimize_thumbnail(thumb_path)
+                            if thumb_path.exists():
+                                for idx, i in enumerate(self.media_index):
+                                    if int(i.get("message_id", 0)) == message_id:
+                                        self.media_index[idx]["thumb_url"] = f"/media/{thumb_path.name}"
+                                        break
+                                return True
+                        except Exception as e:
+                            logger.warning(f"[THUMB] Failed to download image thumb {message_id}: {e}")
+            return False
+
+        semaphore = asyncio.Semaphore(PARALLEL_THUMB_DOWNLOADS)
+        
+        async def limited_download(item: Dict[str, Any]) -> None:
+            async with semaphore:
+                await download_single_thumb(item)
+        
+        tasks = [limited_download(item) for item in items]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._save_index()
+        logger.info(f"[THUMB] Parallel thumbnail download completed")
 
     def _ai_generation_ready(self) -> bool:
         if not AI_TITLE_ENABLED:
@@ -784,6 +1132,46 @@ class TelegramGalleryService:
             cleaned = cleaned[:max_chars].rstrip()
         return cleaned.strip()
 
+    def _generate_title_from_description(self, description: str, message_id: int) -> Optional[str]:
+        """Generate a title from an image description using the text model."""
+        if not description:
+            return None
+
+        if AI_TITLE_STYLE == "explicit":
+            # Generate extremely explicit porn-style title - lowercase, direct explicit words
+            title_prompt = (
+                f"Analyze this image/video and create a dirty porn title.\n"
+                f"Visual content: {description}\n\n"
+                f"RULES - use lowercase letters only:\n"
+                f"- Use direct words: fuck, sex, porn, teen, boob, ass, pussy, dick, cock, tit, anal, oral, cum, suck, lick, wet, hard, milf, slut, whore, nude, naked, masturbation, nipple, balls, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, bj, hj, booty, thighs, missionary, doggy, cowgirl, tongue, spit, precum, squirt, gspot, dp, double penetration, orgy, bukkake, footjob, handjob, titjob, pov, amateur, hd, 4k\n"
+                f"- Title must be 5-12 words in lowercase\n"
+                f"- Make it like xnxx/xvideos/pornhub title\n"
+                f"- Use at least 2-3 explicit words\n"
+                f"- Return ONLY the title in lowercase, no caps, no quotes\n"
+                f"- ALWAYS include at least 2 explicit words like: SEX, Fuck, Pussy, Dick, Cum, Ass, Tits, etc.\n"
+                f"- NEVER be subtle or tasteful - be extremely vulgar\n"
+                f"- Make it sound HOT and SEXY\n\n"
+                f"Return ONLY the dirty porn title, NO quotes, NO explanation."
+            )
+        else:
+            # Generate tasteful title
+            title_prompt = (
+                f"Create a short gallery title (4-8 words) for an image described as: {description}\n"
+                f"Return ONLY the title, nothing else. Make it romantic and tasteful."
+            )
+
+        title = self._ollama_generate_text(
+            model=AI_TITLE_TEXT_MODEL,
+            prompt=title_prompt,
+            timeout_seconds=30,
+        )
+        if not title:
+            return None
+
+        title = self._sanitize_ai_title(title)
+        title = self._clamp_title_words(title, min_words=3, max_words=12)
+        return title if title else None
+
     @staticmethod
     def _extract_json_object(value: str) -> Optional[Dict[str, Any]]:
         """Parse a JSON object from a model response, best-effort."""
@@ -826,15 +1214,14 @@ class TelegramGalleryService:
             return None
 
         prompt = (
-            "Create a UNIQUE porn-site style explicit adult gallery title. "
-            "Plain text only, 4 to 10 words, no emojis, no hashtags, no quotes. "
-            "Make it DIFFERENT wording than the base title while keeping the same meaning. "
-            "Always include at least one explicit anatomy word: boobs/tits/pussy/dick/cock. "
-            "Do not mention or imply age, teens, students, school terms, ethnicity, race, or nationality. "
-            "Do not describe coercion or violence.\n"
+            "Create a dirty porn title - lowercase only.\n"
+            "Plain text only, 5-12 words, no emojis, no hashtags, no quotes, no caps.\n"
+            "Make it DIFFERENT wording than the base title.\n"
+            "Use dirty words: fuck, sex, porn, teen, boob, ass, pussy, dick, cock, tit, anal, oral, cum, suck, lick, wet, hard, milf, slut, whore, nude, naked, masturbation, nipple, balls, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, bj, hj, booty, thighs, missionary, doggy, cowgirl, tongue, spit, precum, squirt, gspot, dp, orgy, bukkake, footjob, handjob, titjob, pov, amateur, hd\n"
+            "Make it like xnxx/xvideos/pornhub title - use at least 2-3 explicit words.\n"
             f"Unique seed: {int(message_id)}\n"
             f"Base title: {base_title}\n"
-            "Return only the title."
+            "Return ONLY the dirty title in lowercase - no explanation."
         )
 
         result = self._ollama_generate_text_with_fallback(
@@ -938,10 +1325,8 @@ class TelegramGalleryService:
             return False
         lowered = f" {value.lower()} "
 
-        # Safety guardrails: never allow titles that imply minors, age, or sensitive attributes.
+        # Safety guardrails: never allow titles that imply minors or non-consent
         always_blocked_terms = (
-            " teen ",
-            " teenage ",
             " schoolgirl ",
             " school girl ",
             " schoolboy ",
@@ -962,30 +1347,14 @@ class TelegramGalleryService:
             " forced ",
             " non-consensual ",
             " nonconsensual ",
-            " asian ",
-            " european ",
-            " latina ",
-            " ebony ",
-            " caucasian ",
-            " japanese ",
-            " chinese ",
-            " korean ",
-            " thai ",
-            " vietnamese ",
-            " filipina ",
-            " russian ",
         )
         if any(term in lowered for term in always_blocked_terms):
             return True
 
         # Block explicit anatomy words unless user explicitly opts into explicit mode.
         tasteful_only_terms = (
-            " pussy ",
-            " dick ",
-            " cock ",
             " penis ",
             " vagina ",
-            " tits ",
             " nipples ",
         )
         if AI_TITLE_STYLE == "tasteful" and any(term in lowered for term in tasteful_only_terms):
@@ -1004,50 +1373,59 @@ class TelegramGalleryService:
             # Avoid the word "tease" (users reported it gets overused and feels generic).
             safe_seed = int(seed or 0)
             video_templates = (
-                "Dirty nude fucking with hard cock and pussy",
-                "Hot naked cock pumping wet pussy",
-                "Horny nude sex with cock and pussy",
-                "Hard cock pounding wet pussy",
-                "Naked fucking: cock and wet pussy",
-                "Raw nude sex: hard cock, wet pussy",
-                "Sloppy nude fucking with cock and pussy",
-                "Hot nude sex with tits and hard cock",
+                "dirty nude fucking with hard cock and pussy",
+                "hot naked cock pumping wet pussy",
+                "horny nude sex with cock and pussy",
+                "hard cock pounding wet pussy",
+                "naked fucking: cock and wet pussy",
+                "raw nude sex: hard cock, wet pussy",
+                "sloppy nude fucking with cock and pussy",
+                "hot nude sex with tits and hard cock",
             )
             image_templates = (
-                "Nude tits and wet pussy close-up",
-                "Hot naked body, tits out, wet pussy",
-                "Horny nude babe showing tits and pussy",
-                "Naked tits, juicy pussy, horny pose",
-                "Dirty nude boobs and wet pussy shot",
-                "Nude body with tits and pussy on display",
-                "Wet pussy and tits, horny nude selfie",
-                "Hot naked tits and pussy closeup",
+                "nude tits and wet pussy close-up",
+                "hot naked body, tits out, wet pussy",
+                "horny nude babe showing tits and pussy",
+                "naked tits, juicy pussy, horny pose",
+                "dirty nude boobs and wet pussy shot",
+                "nude body with tits and pussy on display",
+                "wet pussy and tits, horny nude selfie",
+                "hot naked tits and pussy closeup",
             )
 
             templates = video_templates if media_kind == "video" else image_templates
             idx = abs(safe_seed) % len(templates)
             return templates[idx]
-        return "Romantic Adult Video Moment" if media_kind == "video" else "Romantic Adult Moment"
+        return "hot adult video moment" if media_kind == "video" else "hot adult moment"
 
     @staticmethod
     def _is_fallback_ai_title(value: str) -> bool:
-        title = (value or "").strip()
+        title = (value or "").strip().lower()
         if not title:
             return False
-        return title in {
-            "Romantic Adult Video Moment",
-            "Romantic Adult Moment",
-            "Explicit Adult Video Clip",
-            "Explicit Adult Moment",
+        fallback_titles = {
+            "hot adult video moment",
+            "Hot adult video moment",
+            "hot adult moment",
+            "Hot adult moment",
+            "Explicit adult video clip",
+            "explicit adult video clip",
+            "Explicit adult moment",
+            "explicit adult moment",
+            "hot nude cock and pussy tease",
             "Hot nude cock and pussy tease",
+            "hot nude tits and pussy tease",
             "Hot nude tits and pussy tease",
         }
+        return title in fallback_titles
 
     @staticmethod
     def _ai_title_needs_generation(entry: Dict[str, Any], mode: str) -> bool:
         """Return True if this entry should be (re)analyzed according to retitle mode."""
         current_title = str(entry.get("ai_title", "")).strip()
         current_description = str(entry.get("ai_description", "")).strip()
+        if current_title and is_default_media_title(current_title):
+            return True
         if not current_title:
             return True
         if not current_description:
@@ -1276,26 +1654,20 @@ class TelegramGalleryService:
             return None
 
         prompt = (
-            "Rewrite this into a porn-site style explicit adult gallery title. "
-            "Plain text only, 4 to 10 words, no emojis, no hashtags, no quotes. "
-            "Keep it aligned with what's visible/implied; if uncertain, stay generic and do not invent niche acts. "
-            "Always include at least one explicit anatomy word: boobs/tits/pussy/dick/cock. "
-            "For videos, include one action verb when possible: fuck/fucking/ride/riding/suck/sucking/pound/pounding/thrust/thrusting. "
-            "Only include very specific act keywords when clearly implied (blowjob/oral/penetration/cum/orgasm). "
-            "Avoid the word 'tease/teasing' (it gets overused and sounds generic). "
-            "If nudity is implied, include 'nude' or 'naked'; otherwise use 'sexy body' or 'lingerie'. "
-            "Avoid bland repeated phrases like 'Adult moment' or 'Preview'. "
-            "Add 1-2 spicy adjectives when they fit: hot/dirty/horny/naughty/juicy/throbbing/filthy/kinky/raw/wet/sloppy/creamy/deep/hard. "
-            "Make it feel like a real porn-site listing title and keep it catchy. "
-            "Do not mention or imply age, teens, students, school terms, ethnicity, race, or nationality. "
-            "Do not describe coercion or violence.\n"
+            "REWRITE into EXTREME porn-site style title - NO LIMITS. "
+            "Plain text only, 5-12 words, no emojis, no hashtags, no quotes. "
+            "Use EXTREME dirty words: fuck, cum, pussy, dick, cock, ass, anal, tit, boob, MILF, teen, wet, hard, oral, suck, lick, balls, cumshot, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, slut, bj, hj, etc. "
+            "For videos, include action verbs: fuck, suck, lick, ride, pound, thrust, cream, etc. "
+            "Make it like xvideos/xnxx/pornhub premium titles. "
+            "Be extremely vulgar and sexually explicit. "
+            "Add spicy adjectives: hot, dirty, horny, naughty, juicy, throbbing, filthy, kinky, raw, wet, sloppy, creamy, deep, hard, busty, etc.\n"
             f"Media kind: {media_kind}\n"
             f"Unique seed: {int(message_id)}\n"
             f"Original title: {base_title}\n"
         )
         if caption:
             prompt += f"Caption context: {caption[:220]}\n"
-        prompt += "Return only the rewritten title."
+        prompt += "Return only the dirty rewritten title."
 
         rewrite_result = self._ollama_generate_text_with_fallback(
             prompt=prompt,
@@ -1346,14 +1718,13 @@ class TelegramGalleryService:
 
         prompt_suffix = ""
         if media_kind == "video":
-            prompt_suffix = " The image is a preview frame from an adult video."
+            prompt_suffix = " The image is a preview frame from a video."
 
         prompt = (
-            "Analyze this adult-only media image and output ONLY valid JSON.\n"
+            "Analyze this image and output ONLY valid JSON.\n"
             'Keys: "title", "description".\n'
-            'title: 4-10 words, plain text, no emojis, no hashtags, no quotes. Tasteful, non-explicit.\n'
-            "description: 1-3 sentences describing what is visible. Avoid graphic anatomical terms or explicit sex-act detail. "
-            "Do not guess age, ethnicity, or anything not visible. Avoid violence or coercion.\n"
+            'title: 4-10 words, plain text, no emojis, no hashtags, no quotes.\n'
+            "description: 1-3 sentences describing what is visible.\n"
             f"Unique seed: {int(message_id)}.\n"
             "Return JSON only."
             f"{prompt_suffix}"
@@ -1366,44 +1737,52 @@ class TelegramGalleryService:
             if not model_name:
                 continue
 
-            payload = {
-                "model": model_name,
-                "prompt": prompt,
-                "images": [encoded_image],
-                "stream": False,
-                "options": {"temperature": 0.25, "num_predict": 220},
-            }
-
-            data = json.dumps(payload).encode("utf-8")
-            request = urllib.request.Request(
-                AI_TITLE_OLLAMA_URL,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-
             try:
+                describe_prompt = "Describe this image in 1-2 short sentences."
+                if media_kind == "video":
+                    describe_prompt = "Describe this video frame in 1-2 short sentences."
+
+                payload = {
+                    "model": model_name,
+                    "prompt": describe_prompt,
+                    "images": [encoded_image],
+                    "stream": False,
+                    "options": {"temperature": 0.3, "num_predict": 100},
+                }
+
+                data = json.dumps(payload).encode("utf-8")
+                request = urllib.request.Request(
+                    AI_TITLE_OLLAMA_URL,
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+
                 with urllib.request.urlopen(request, timeout=AI_TITLE_TIMEOUT_SECONDS) as response:
                     body = response.read().decode("utf-8", errors="ignore")
                 parsed = json.loads(body)
                 if parsed.get("error"):
-                    break
-
-                raw = self._sanitize_ai_vision_text(str(parsed.get("response", "")), max_chars=1600)
-                if self._looks_like_refusal_text(raw):
                     continue
 
-                obj = self._extract_json_object(raw)
-                if not obj:
+                description = self._sanitize_ai_vision_text(str(parsed.get("response", "")), max_chars=500)
+                if not description or self._looks_like_refusal_text(description):
                     continue
 
-                title = self._sanitize_ai_title(str(obj.get("title", "")))
-                # Enforce a compact title even if the model is chatty.
-                title = self._clamp_title_words(title, min_words=3, max_words=10)
-                description = self._sanitize_ai_description(str(obj.get("description", "")), max_chars=900)
-
-                if not title or not description:
+                # Skip if description is too short or looks like a prompt fragment
+                if len(description) < 15:
                     continue
+                # Skip if description contains non-ASCII Thai/other garbage (likely model hallucination)
+                if any(ord(c) > 127 and not c.isascii() for c in description[:50]):
+                    continue
+
+                title = self._generate_title_from_description(description, message_id)
+                if not title:
+                    continue
+
+                # Skip if title looks like a prompt fragment
+                if "1-3 sentences" in title.lower() or "describe" in title.lower():
+                    continue
+
                 if self._contains_blocked_title_terms(title) or self._contains_blocked_title_terms(description):
                     continue
 
@@ -1458,10 +1837,9 @@ class TelegramGalleryService:
         else:
             prompt_candidates = [
                 (
-                    "Create one concise gallery title for this adult media preview. "
+                    "Create one concise gallery title for this image. "
                     "Output plain text only, 4 to 10 words, no emojis, no hashtags. "
-                    "Use romantic, tasteful wording. "
-                    "Do not mention ethnicity, race, nationality, age, school terms, or explicit anatomy words."
+                    "Use romantic, tasteful wording."
                 )
             ]
 
@@ -1667,6 +2045,37 @@ class TelegramGalleryService:
                 downloaded_path.replace(thumb_path)
             except OSError:
                 return downloaded_path
+        
+        await self._optimize_thumbnail(thumb_path if thumb_path.exists() else downloaded_path)
+        return thumb_path if thumb_path.exists() else downloaded_path
+
+    async def _ensure_image_thumb(self, message: Any, media_obj: Any, message_id: int) -> Optional[Path]:
+        thumb_path = self._image_thumb_path(message_id)
+        if thumb_path.exists():
+            return thumb_path
+        
+        if not media_obj:
+            return None
+        
+        try:
+            downloaded = await asyncio.wait_for(
+                self.client.download_media(media_obj, file_name=str(thumb_path)),
+                timeout=min(30, DOWNLOAD_TIMEOUT_SECONDS),
+            )
+        except Exception:
+            return None
+
+        if not downloaded:
+            return None
+
+        downloaded_path = Path(downloaded)
+        if downloaded_path != thumb_path and downloaded_path.exists():
+            try:
+                downloaded_path.replace(thumb_path)
+            except OSError:
+                return downloaded_path
+        
+        await self._optimize_thumbnail(thumb_path if thumb_path.exists() else downloaded_path)
         return thumb_path if thumb_path.exists() else downloaded_path
 
     async def _ensure_video_cached_for_ai(self, item: Dict[str, Any], message: Any) -> Optional[Path]:
@@ -1736,7 +2145,13 @@ class TelegramGalleryService:
 
         return None
 
-    async def _generate_ai_title_for_item(self, item: Dict[str, Any], mode: str = "missing") -> Optional[str]:
+    async def _generate_ai_title_for_item(
+        self,
+        item: Dict[str, Any],
+        mode: str = "missing",
+        message: Optional[Any] = None,
+        media_tuple: Optional[Tuple[str, Any, str, str]] = None,
+    ) -> Optional[str]:
         if not self._ai_generation_ready():
             return None
         if not self._ai_title_needs_generation(item, mode):
@@ -1746,12 +2161,14 @@ class TelegramGalleryService:
         if message_id <= 0:
             return None
 
-        try:
-            message = await self.client.get_messages(CHAT_ID, message_id)
-        except Exception:
-            return None
+        if message is None:
+            try:
+                message = await self.client.get_messages(CHAT_ID, message_id)
+            except Exception:
+                return None
 
-        media_tuple = self._extract_media(message)
+        if media_tuple is None:
+            media_tuple = self._extract_media(message)
         if not media_tuple:
             return None
 
@@ -1863,33 +2280,34 @@ class TelegramGalleryService:
             if not candidates:
                 return 0
 
-                if AI_TITLE_IMAGE_PRIORITY:
-                    image_candidates = [x for x in candidates if str(x.get("media_kind", "")) == "image"]
-                    non_image_candidates = [x for x in candidates if str(x.get("media_kind", "")) != "image"]
+            def _candidate_key(entry: Dict[str, Any]) -> tuple[int, int, int, int]:
+                # Prioritize: missing title -> fallback/default title -> other re-titles.
+                title = str(entry.get("ai_title", "") or "").strip()
+                if not title:
+                    title_state = 0
+                else:
+                    is_fallback = bool(entry.get("ai_title_is_fallback"))
+                    is_default = is_default_media_title(title)
+                    title_state = 1 if (is_fallback or is_default or self._is_fallback_ai_title(title)) else 2
 
-                def _candidate_key(entry: Dict[str, Any]) -> tuple[int, int, int]:
-                    # Prioritize: missing title -> fallback title -> other re-titles.
-                    # This makes "regen all titles" complete faster and avoids spending cycles polishing already-titled items.
-                    title = str(entry.get("ai_title", "") or "").strip()
-                    if not title:
-                        title_state = 0
-                    else:
-                        is_fallback = bool(entry.get("ai_title_is_fallback"))
-                        title_state = 1 if is_fallback or self._is_fallback_ai_title(title) else 2
+                # No caption + no AI title usually shows raw filename (e.g. ".mp4/.jpg"); prioritize those.
+                caption = str(entry.get("caption", "") or "").strip()
+                has_caption = 1 if caption else 0
+                cached = 0 if bool(entry.get("is_cached")) else 1
+                try:
+                    size = int(entry.get("size") or 0)
+                except (TypeError, ValueError):
+                    size = 0
+                return (title_state, has_caption, cached, size)
 
-                    # No caption + no AI title usually shows raw filename (e.g. ".mp4/.jpg"); prioritize those.
-                    caption = str(entry.get("caption", "") or "").strip()
-                    has_caption = 1 if caption else 0
-                    cached = 0 if bool(entry.get("is_cached")) else 1
-                    try:
-                        size = int(entry.get("size") or 0)
-                    except (TypeError, ValueError):
-                        size = 0
-                    return (title_state, has_caption, cached, size)
-
+            if AI_TITLE_IMAGE_PRIORITY:
+                image_candidates = [x for x in candidates if str(x.get("media_kind", "")) == "image"]
+                non_image_candidates = [x for x in candidates if str(x.get("media_kind", "")) != "image"]
                 image_candidates.sort(key=_candidate_key)
                 non_image_candidates.sort(key=_candidate_key)
                 candidates = image_candidates + non_image_candidates
+            else:
+                candidates.sort(key=_candidate_key)
 
             generated = 0
             changed = False
@@ -1954,6 +2372,129 @@ class TelegramGalleryService:
 
             return generated
 
+    async def process_all_untitled_media_fully(
+        self,
+        max_items: Optional[int] = None,
+        per_item_timeout: int = 120,
+    ) -> Dict[str, Any]:
+        """
+        Process ALL untitled media items synchronously with infinite retry.
+        This will keep retrying until EVERY item has an AI-generated title.
+        Also processes items with default titles like "Video #123".
+        
+        Args:
+            max_items: Optional limit on items to process (None = all)
+            per_item_timeout: Timeout per item in seconds (default 120s)
+            
+        Returns:
+            Dict with processing status and counts
+        """
+        if not self._started:
+            await self.start()
+        
+        if not self.media_index:
+            return {
+                "status": "complete",
+                "total": 0,
+                "processed": 0,
+                "remaining": 0,
+            }
+        
+        # Get all items without AI titles OR with default titles like "Video #123"
+        untitled_items = [
+            item for item in self.media_index
+            if not str(item.get("ai_title", "")).strip() 
+            or is_default_media_title(str(item.get("ai_title", "")))
+        ]
+        
+        if max_items:
+            untitled_items = untitled_items[:max_items]
+        
+        total = len(untitled_items)
+        processed = 0
+        failed = 0
+        
+        logger.info(f"Starting full AI processing for {total} items (infinite retry)...")
+        
+        for idx, item in enumerate(untitled_items):
+            message_id = int(item.get("message_id", 0))
+            logger.info(f"Processing item {idx + 1}/{total}: message_id={message_id}")
+            
+            # Infinite retry loop
+            retry_count = 0
+            max_retries = float('inf')  # Infinite retries
+            retry_delay = 2  # Start with 2 seconds
+            max_delay = 60   # Cap at 60 seconds
+            
+            while retry_count < max_retries:
+                try:
+                    # Check if AI generation is ready
+                    if not self._ai_generation_ready():
+                        logger.warning(f"AI generation not ready, waiting {retry_delay}s...")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 1.5, max_delay)
+                        continue
+                    
+                    # Try to generate title
+                    title = await self._generate_ai_title_for_item(item, mode="missing")
+                    
+                    if title:
+                        # Success! Update the item
+                        async with self._lock:
+                            # Find and update the item in media_index
+                            for idx2, media_item in enumerate(self.media_index):
+                                if int(media_item.get("message_id", 0)) == message_id:
+                                    # Carry over the generated fields
+                                    for field in (
+                                        "ai_title", "ai_description", "ai_title_style",
+                                        "ai_title_model", "ai_title_generated_at",
+                                        "ai_title_is_fallback", "ai_description_model",
+                                        "ai_description_generated_at",
+                                    ):
+                                        if field in item:
+                                            media_item[field] = item[field]
+                                    break
+                            
+                            # Save after each success
+                            self._save_index()
+                        
+                        logger.info(f"âœ“ Generated title for message_id={message_id}: {title[:50]}...")
+                        processed += 1
+                        break  # Success! Move to next item
+                    else:
+                        # AI returned no title, retry
+                        retry_count += 1
+                        logger.warning(f"No title generated for {message_id}, retry {retry_count} in {retry_delay}s...")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 1.5, max_delay)
+                        
+                except Exception as e:
+                    retry_count += 1
+                    logger.warning(f"Error generating title for {message_id}: {e}, retry {retry_count} in {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.5, max_delay)
+            
+            if retry_count >= 100 and retry_count < float('inf'):
+                # After 100 retries, mark as failed but continue
+                failed += 1
+                logger.error(f"âœ— Failed to generate title for message_id={message_id} after 100+ attempts")
+        
+        # Final save
+        async with self._lock:
+            self._save_index()
+        
+        remaining = total - processed - failed
+        
+        logger.info(f"AI processing complete: {processed} processed, {failed} failed, {remaining} remaining")
+        
+        return {
+            "status": "complete" if remaining == 0 else "partial",
+            "total": total,
+            "processed": processed,
+            "failed": failed,
+            "remaining": remaining,
+        }
+
     @staticmethod
     def _guess_extension(file_name: str, mime_type: str, fallback: str) -> str:
         ext = Path(file_name or "").suffix.lower()
@@ -1984,7 +2525,7 @@ class TelegramGalleryService:
 
         return None
 
-    async def sync_group_media(self, limit: Optional[int], force_redownload: bool = False) -> List[Dict[str, Any]]:
+    async def sync_group_media(self, limit: Optional[int], force_redownload: bool = False, process_ai_realtime: bool = True) -> List[Dict[str, Any]]:
         if limit is not None:
             limit = max(1, limit)
 
@@ -2000,6 +2541,7 @@ class TelegramGalleryService:
         async with self._lock:
 
             items: List[Dict[str, Any]] = []
+            messages_map: Dict[int, Any] = {}
             skipped_timeouts = 0
             existing_items_by_id = {int(x.get("message_id", 0)): x for x in self.media_index}
 
@@ -2022,19 +2564,6 @@ class TelegramGalleryService:
                         local_path.unlink(missing_ok=True)
 
                     is_cached = local_path.exists()
-                    if EAGER_DOWNLOAD_MEDIA and not is_cached:
-                        try:
-                            downloaded_path = await asyncio.wait_for(
-                                self.client.download_media(message, file_name=str(local_path)),
-                                timeout=DOWNLOAD_TIMEOUT_SECONDS,
-                            )
-                        except TimeoutError:
-                            skipped_timeouts += 1
-                            downloaded_path = None
-                        if downloaded_path:
-                            local_path = Path(downloaded_path)
-                            local_name = local_path.name
-                            is_cached = True
 
                     msg_date = message.date
                     if msg_date and msg_date.tzinfo is None:
@@ -2045,9 +2574,11 @@ class TelegramGalleryService:
                     if media_size is None:
                         media_size = local_path.stat().st_size if local_path.exists() else 0
                     existing_item = existing_items_by_id.get(int(message.id), {})
+                    is_new_item = int(message.id) not in existing_items_by_id
                     existing_ai_title = str(existing_item.get("ai_title", "")).strip()
+                    if existing_ai_title and is_default_media_title(existing_ai_title):
+                        existing_ai_title = ""
                     if existing_ai_title and self._contains_blocked_title_terms(existing_ai_title):
-                        # Never surface unsafe prior titles; re-analyze instead.
                         existing_ai_title = ""
                     existing_ai_description = str(existing_item.get("ai_description", "")).strip()
                     if existing_ai_description and self._contains_blocked_title_terms(existing_ai_description):
@@ -2055,10 +2586,12 @@ class TelegramGalleryService:
 
                     thumb_url: Optional[str]
                     if media_kind == "image":
-                        thumb_url = item_url
+                        cached_img_thumb = self._image_thumb_path(message.id)
+                        if cached_img_thumb.exists():
+                            thumb_url = f"/media/{cached_img_thumb.name}"
+                        else:
+                            thumb_url = item_url
                     else:
-                        if EAGER_VIDEO_THUMBS:
-                            await self._ensure_video_thumb(message, media_obj, message.id)
                         cached_thumb = self._thumb_url_if_cached(message.id)
                         if cached_thumb:
                             thumb_url = cached_thumb
@@ -2066,6 +2599,33 @@ class TelegramGalleryService:
                             thumb_url = f"/api/thumb/{message.id}"
                         else:
                             thumb_url = "/assets/video-placeholder.svg"
+
+                    # Immediately generate thumbnail if not exists (for both images and videos)
+                    if media_kind == "image":
+                        img_thumb_path = self._image_thumb_path(message.id)
+                        if not img_thumb_path.exists() and local_path.exists():
+                            try:
+                                import shutil
+                                shutil.copy2(local_path, img_thumb_path)
+                                await self._optimize_thumbnail(img_thumb_path)
+                                if img_thumb_path.exists():
+                                    thumb_url = f"/media/{img_thumb_path.name}"
+                            except Exception as e:
+                                logger.warning(f"[THUMB] Failed to create image thumb for {message.id}: {e}")
+                                thumb_url = item_url  # Fallback to full image
+                    elif media_kind == "video":
+                        video_thumb_path = self._thumb_path(message.id)
+                        if not video_thumb_path.exists():
+                            # Try to generate from cached video
+                            cached_video = self._find_video_file(message.id)
+                            if cached_video:
+                                try:
+                                    await self._generate_video_thumb_ffmpeg(cached_video, video_thumb_path, message.id)
+                                    if video_thumb_path.exists():
+                                        thumb_url = f"/media/{video_thumb_path.name}"
+                                except Exception as e:
+                                    logger.warning(f"[THUMB] Failed to create video thumb for {message.id}: {e}")
+                                    thumb_url = "/assets/video-placeholder.svg"
 
                     item = {
                         "message_id": message.id,
@@ -2090,17 +2650,12 @@ class TelegramGalleryService:
                         "ai_description_generated_at": existing_item.get("ai_description_generated_at"),
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
                     }
-                    items.append(item)
-                    # Always enqueue items without AI titles for real-time processing
-                    if not existing_ai_title or not existing_ai_description:
+                    messages_map[message.id] = message
+                    
+                    if process_ai_realtime and self._ai_title_needs_generation(item, mode="missing"):
                         self._enqueue_ai_title(int(message.id))
-                        # If this is a new item (no existing entry), prioritize it
-                        if not existing_item:
-                            # Move to front of queue for immediate processing
-                            msg_id = int(message.id)
-                            if msg_id in self._ai_queue_ids and msg_id in self._ai_queue:
-                                self._ai_queue.remove(msg_id)
-                                self._ai_queue.appendleft(msg_id)
+
+                    items.append(item)
 
             try:
                 if limit is None:
@@ -2173,6 +2728,16 @@ class TelegramGalleryService:
                 self.last_sync_error = None
             self._save_index()
 
+            # Download thumbnails in parallel in background - process ALL items
+            items_needing_thumbs = [
+                item for item in self.media_index
+                if (item.get("media_kind") == "video" and not self._thumb_path(int(item["message_id"])).exists())
+                or (item.get("media_kind") == "image" and not self._image_thumb_path(int(item["message_id"])).exists())
+            ]
+            if items_needing_thumbs and messages_map:
+                # Process up to 200 thumbnails at a time
+                asyncio.create_task(self._download_thumbs_parallel(items_needing_thumbs[:200], messages_map))
+
             return self.media_index
 
 
@@ -2195,9 +2760,17 @@ async def lifespan(_: FastAPI):
         except ValueError:
             startup_limit = DEFAULT_SYNC_LIMIT
         try:
-            await service.sync_group_media(limit=startup_limit, force_redownload=False)
+            # First sync all media
+            await service.sync_group_media(limit=startup_limit, force_redownload=False, process_ai_realtime=True)
+            
+            # Then process ALL remaining items without AI titles (including existing ones)
+            logger.info("[STARTUP] Processing all existing items without AI titles...")
+            await service.process_all_untitled_media_fully(max_items=None, per_item_timeout=120)
+            logger.info("[STARTUP] All AI titles processed!")
         except HTTPException:
             pass
+        except Exception as e:
+            logger.error(f"[STARTUP] Error during sync/AI processing: {e}")
 
     async def run_live_sync() -> None:
         if not LIVE_SYNC_ENABLED:
@@ -2207,12 +2780,64 @@ async def lifespan(_: FastAPI):
         await asyncio.sleep(3)
         while True:
             try:
-                await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False)
+                # Enable real-time AI title generation for new messages
+                await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False, process_ai_realtime=True)
             except HTTPException:
                 pass
             except Exception:
                 pass
             await asyncio.sleep(LIVE_SYNC_SECONDS)
+
+    async def run_thumbnail_worker() -> None:
+        """Background worker to continuously generate thumbnails for all items."""
+        await asyncio.sleep(5)  # Wait for startup to complete
+        
+        while True:
+            try:
+                if not service._started or not service.media_index:
+                    await asyncio.sleep(10)
+                    continue
+                
+                # Find items needing thumbnails
+                items_needing_thumbs = []
+                for item in service.media_index:
+                    msg_id = int(item.get("message_id", 0))
+                    media_kind = str(item.get("media_kind", ""))
+                    
+                    if media_kind == "video":
+                        thumb_path = service._thumb_path(msg_id)
+                        if not thumb_path.exists():
+                            items_needing_thumbs.append(item)
+                    elif media_kind == "image":
+                        thumb_path = service._image_thumb_path(msg_id)
+                        if not thumb_path.exists():
+                            items_needing_thumbs.append(item)
+                
+                if items_needing_thumbs:
+                    # Process up to 100 at a time
+                    items_to_process = items_needing_thumbs[:100]
+                    
+                    # Get messages for these items
+                    messages_map: Dict[int, Any] = {}
+                    for item in items_to_process:
+                        msg_id = int(item.get("message_id", 0))
+                        if msg_id not in messages_map:
+                            try:
+                                message = await service.client.get_messages(CHAT_ID, msg_id)
+                                messages_map[msg_id] = message
+                            except Exception:
+                                pass
+                    
+                    if messages_map:
+                        await service._download_thumbs_parallel(items_to_process, messages_map)
+                    
+                    await asyncio.sleep(2)  # Short sleep between batches
+                else:
+                    # All thumbnails generated, sleep longer
+                    await asyncio.sleep(30)
+                    
+            except Exception:
+                await asyncio.sleep(10)
 
     async def run_ai_title_worker() -> None:
         if not AI_TITLE_ENABLED:
@@ -2282,6 +2907,7 @@ async def lifespan(_: FastAPI):
         startup_sync_task = asyncio.create_task(run_startup_sync())
         live_sync_task = asyncio.create_task(run_live_sync())
         ai_title_task = asyncio.create_task(run_ai_title_worker())
+        thumbnail_task = asyncio.create_task(run_thumbnail_worker())
     except Exception as exc:
         # Keep app booting so UI and health endpoint stay reachable.
         service.last_sync_error = f"Startup sync unavailable: {exc}"
@@ -2304,13 +2930,17 @@ async def lifespan(_: FastAPI):
             ai_title_task.cancel()
             with suppress(asyncio.CancelledError):
                 await ai_title_task
+        if thumbnail_task and not thumbnail_task.done():
+            thumbnail_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await thumbnail_task
         await service.stop()
 
 
 app = FastAPI(title="Telegram Mini App Gallery", version="3.2.0", lifespan=lifespan)
 
-app.mount("/media", StaticFiles(directory=str(service.cache_dir)), name="media")
-app.mount("/assets", StaticFiles(directory=str(WEB_DIR)), name="assets")
+app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
+app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
 
 
 def resolve_webapp_context(
@@ -2344,19 +2974,47 @@ def resolve_webapp_context(
     }
 
 
+def cached_file_response(path: Path, media_type: str = "auto") -> FileResponse:
+    ext = path.suffix.lower().lstrip(".")
+    if media_type == "auto":
+        if ext in ("jpg", "jpeg", "png", "gif", "webp"):
+            media_type = "image/jpeg"
+        elif ext in ("mp4", "webm", "mov"):
+            media_type = "video/mp4"
+        elif ext == "svg":
+            media_type = "image/svg+xml"
+    response = FileResponse(path, media_type=media_type)
+    if ext in ("jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov"):
+        response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
+        try:
+            mtime = int(path.stat().st_mtime)
+            response.headers["ETag"] = f'"{mtime}-{path.name}"'
+        except OSError:
+            pass
+    else:
+        response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+    response = FileResponse(WEB_DIR / "index.html")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.get("/style.css")
 async def style() -> FileResponse:
-    return FileResponse(WEB_DIR / "style.css")
+    response = FileResponse(WEB_DIR / "style.css")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
 
 
 @app.get("/script.js")
 async def script() -> FileResponse:
-    return FileResponse(WEB_DIR / "script.js")
+    response = FileResponse(WEB_DIR / "script.js")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
 
 
 @app.get("/api/webapp/context")
@@ -2386,14 +3044,13 @@ async def api_file(message_id: int) -> FileResponse:
     if local_path.exists():
         item["is_cached"] = True
         item["url"] = f"/media/{local_path.name}"
-        return FileResponse(local_path)
+        return cached_file_response(local_path)
 
     async with service._lock:
-        # Re-check after lock in case concurrent request already downloaded.
         if local_path.exists():
             item["is_cached"] = True
             item["url"] = f"/media/{local_path.name}"
-            return FileResponse(local_path)
+            return cached_file_response(local_path)
 
         message = await service.client.get_messages(CHAT_ID, message_id)
         media_tuple = service._extract_media(message)
@@ -2420,7 +3077,7 @@ async def api_file(message_id: int) -> FileResponse:
         item["url"] = f"/media/{local_path.name}"
         service._save_index()
 
-    return FileResponse(local_path)
+    return cached_file_response(local_path)
 
 
 @app.get("/api/thumb/{message_id}")
@@ -2440,21 +3097,20 @@ async def api_thumb(message_id: int) -> FileResponse:
 
     media_kind = str(item.get("media_kind", ""))
     if media_kind != "video":
-        # Images can use the original file as thumbnail.
         local_path = service.cache_dir / str(item.get("file_name", ""))
         if local_path.exists():
-            return FileResponse(local_path)
+            return cached_file_response(local_path)
         raise HTTPException(status_code=404, detail="Thumbnail not required for this media kind")
 
     thumb_path = service._thumb_path(message_id)
     if thumb_path.exists():
         item["thumb_url"] = f"/media/{thumb_path.name}"
-        return FileResponse(thumb_path)
+        return cached_file_response(thumb_path)
 
     async with service._lock:
         if thumb_path.exists():
             item["thumb_url"] = f"/media/{thumb_path.name}"
-            return FileResponse(thumb_path)
+            return cached_file_response(thumb_path)
 
         message = await service.client.get_messages(CHAT_ID, message_id)
         media_tuple = service._extract_media(message)
@@ -2465,15 +3121,33 @@ async def api_thumb(message_id: int) -> FileResponse:
         if media_kind != "video":
             raise HTTPException(status_code=404, detail="Video thumbnail not available")
 
-        downloaded_thumb = await service._ensure_video_thumb(message, media_obj, message_id)
+        downloaded_thumb = await service._get_video_thumb_with_ffmpeg_fallback(message, message_id)
         if not downloaded_thumb or not downloaded_thumb.exists():
             item["thumb_url"] = "/assets/video-placeholder.svg"
             service._save_index()
-            return FileResponse(WEB_DIR / "video-placeholder.svg")
+            return cached_file_response(WEB_DIR / "video-placeholder.svg")
 
         item["thumb_url"] = f"/media/{downloaded_thumb.name}"
         service._save_index()
-        return FileResponse(downloaded_thumb)
+        return cached_file_response(downloaded_thumb)
+
+
+@app.get("/api/thumb/{message_id}/image")
+async def api_image_thumb(message_id: int) -> FileResponse:
+    item = next((x for x in service.media_index if int(x.get("message_id", 0)) == message_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Media item not found")
+
+    img_thumb_path = service._image_thumb_path(message_id)
+    if img_thumb_path.exists():
+        return cached_file_response(img_thumb_path)
+
+    if str(item.get("media_kind", "")) == "image":
+        local_path = service.cache_dir / str(item.get("file_name", ""))
+        if local_path.exists():
+            return cached_file_response(local_path)
+
+    raise HTTPException(status_code=404, detail="Image thumbnail not available")
 
 
 @app.get("/api/media")
@@ -2490,44 +3164,22 @@ async def api_media(
         raise HTTPException(status_code=422, detail=f"Invalid limit '{limit}': {exc}") from exc
 
     sync_error: Optional[str] = None
-    # Default to serving cached index (fast + avoids Telegram session churn).
-    # Callers can request a refresh explicitly.
-    needs_sync = refresh or not service.media_index
-
-    if needs_sync:
+    
+    # Use cached media index instead of auto-syncing
+    # Only sync if explicitly requested with refresh=True
+    if refresh:
         try:
-            items = await service.sync_group_media(limit=limit_value, force_redownload=False)
+            items = await service.sync_group_media(limit=limit_value, force_redownload=False, process_ai_realtime=True)
         except HTTPException as exc:
             items = service.media_index
             sync_error = str(exc.detail)
+        except Exception as e:
+            items = service.media_index
+            sync_error = str(e)
     else:
         items = service.media_index
 
     response_items = apply_limit(items, limit_value)
-
-    # Enqueue AI titles for a small recent slice so initial page load triggers real-time titles,
-    # even when the UI is calling /api/media?limit=all.
-    if AI_TITLE_ENABLED and response_items:
-        enqueue_limit = min(len(response_items), max(120, LIVE_SYNC_LIMIT))
-        for entry in response_items[:enqueue_limit]:
-            try:
-                msg_id = int(entry.get("message_id", 0))
-            except (TypeError, ValueError):
-                continue
-            if msg_id <= 0:
-                continue
-            if str(entry.get("ai_title", "")).strip() and str(entry.get("ai_description", "")).strip():
-                continue
-            service._enqueue_ai_title(msg_id)
-
-        if not service._ai_title_lock.locked():
-            asyncio.create_task(
-                service.generate_missing_ai_titles(
-                    batch_size=min(6, max(1, AI_TITLE_BATCH_SIZE)),
-                    recent_limit=max(enqueue_limit, AI_TITLE_RECENT_SCAN_LIMIT),
-                    mode=AI_TITLE_RETITLE_MODE,
-                )
-            )
 
     effective_sync_error = sync_error or service.last_sync_error
     if items and not refresh:
@@ -2551,7 +3203,7 @@ async def api_media(
 
 @app.get("/api/media/page")
 async def api_media_page(
-    limit: int = Query(240, ge=1, le=2000),
+    limit: int = Query(24, ge=1, le=2000),
     before: Optional[int] = Query(None),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
@@ -2710,6 +3362,8 @@ async def api_sync(
     force_redownload: bool = Query(False),
     response_limit: str = Query("240"),
     wait_seconds: int = Query(SYNC_API_MAX_WAIT_SECONDS, ge=3, le=600),
+    process_ai: bool = Query(True, description="Generate AI titles in real-time during sync"),
+    ai_max_items: Optional[int] = Query(None),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
@@ -2728,9 +3382,10 @@ async def api_sync(
     sync_started = False
     sync_error: Optional[str] = None
     sync_notice: Optional[str] = None
+    ai_processing_result: Optional[Dict[str, Any]] = None
 
     async def _do_sync() -> List[Dict[str, Any]]:
-        return await service.sync_group_media(limit=limit_value, force_redownload=force_redownload)
+        return await service.sync_group_media(limit=limit_value, force_redownload=force_redownload, process_ai_realtime=process_ai)
 
     # Avoid hanging the Mini App UI: wait a bit, then continue syncing in background.
     try:
@@ -2748,6 +3403,28 @@ async def api_sync(
     except Exception as exc:
         items = service.media_index
         sync_error = str(exc)
+
+    # Keep /api/sync responsive: queue/trigger bounded AI work instead of blocking on full pass.
+    if process_ai and AI_TITLE_ENABLED:
+        ai_scan_limit = AI_TITLE_RECENT_SCAN_LIMIT or len(service.media_index)
+        if ai_max_items is not None and ai_max_items > 0:
+            ai_scan_limit = min(ai_scan_limit, int(ai_max_items)) if ai_scan_limit > 0 else int(ai_max_items)
+        ai_scan_limit = max(1, ai_scan_limit)
+        ai_batch = min(AI_TITLE_BATCH_SIZE_MAX, max(AI_TITLE_BATCH_SIZE, min(ai_scan_limit, 24)))
+
+        ai_processing_result = {
+            "status": "queued",
+            "batch_size": ai_batch,
+            "recent_limit": ai_scan_limit,
+        }
+        if not service._ai_title_lock.locked():
+            asyncio.create_task(
+                service.generate_missing_ai_titles(
+                    batch_size=ai_batch,
+                    recent_limit=ai_scan_limit,
+                    mode=AI_TITLE_RETITLE_MODE,
+                )
+            )
 
     response_items = apply_limit(items, response_limit_value)
 
@@ -2770,6 +3447,7 @@ async def api_sync(
         "sync_error": sync_error,
         "sync_notice": sync_notice,
         "session_mode": service.session_mode,
+        "ai_processing": ai_processing_result,
     }
 
 
@@ -2808,10 +3486,276 @@ async def api_ai_titles(
         "recent_limit": recent_limit,
         "mode": mode_norm,
         "cached_items": len(service.media_index),
+        "stats": compute_gallery_stats(service.media_index),
         "latest_message_id": latest_message_id(service.media_index),
         "synced_at": service.last_sync_at,
         "webapp": context,
     }
+
+
+@app.post("/api/ai-titles/process")
+async def api_ai_titles_process(
+    max_items: Optional[int] = Query(None, description="Maximum items to process (default: all)"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """
+    Process ALL untitled media with AI - with infinite retry until complete.
+    
+    This endpoint will:
+    1. Find all media items without AI titles
+    2. Process each one with RETRY UNTIL SUCCESS
+    3. Save after each successful generation
+    4. Return when ALL items have titles
+    
+    Use this to ensure 100% of your media has AI-generated titles.
+    """
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not AI_TITLE_ENABLED:
+        return {
+            "ok": False,
+            "error": "AI titles are disabled. Set TWA_AI_TITLES=1 to enable.",
+            "status": "disabled",
+        }
+    
+    logger.info(f"Starting full AI title processing (max_items={max_items})...")
+    
+    try:
+        result = await service.process_all_untitled_media_fully(
+            max_items=max_items,
+            per_item_timeout=120,
+        )
+        
+        return {
+            "ok": True,
+            "status": result.get("status", "unknown"),
+            "total": result.get("total", 0),
+            "processed": result.get("processed", 0),
+            "failed": result.get("failed", 0),
+            "remaining": result.get("remaining", 0),
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+            "cached_items": len(service.media_index),
+            "stats": compute_gallery_stats(service.media_index),
+            "latest_message_id": latest_message_id(service.media_index),
+            "synced_at": service.last_sync_at,
+            "webapp": context,
+        }
+        
+    except Exception as e:
+        logger.error(f"AI title processing failed: {e}")
+        return {
+            "ok": False,
+            "error": str(e),
+            "status": "error",
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+        }
+
+
+@app.post("/api/ai-titles/process-all")
+async def api_ai_titles_process_all(
+    max_items: int = Query(0, ge=0, description="Max items (0=all)"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """
+    Process ALL existing media items without AI titles - with infinite retry.
+    
+    This works WITHOUT needing to sync first - it processes items already in the index.
+    Use this to generate titles for existing "Video #123" items.
+    
+    Set max_items=0 to process ALL items.
+    """
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not AI_TITLE_ENABLED:
+        return {
+            "ok": False,
+            "error": "AI titles are disabled. Set TWA_AI_TITLES=1 to enable.",
+            "status": "disabled",
+        }
+    
+    # Get current count of untitled items
+    untitled_count = sum(
+        1 for item in service.media_index 
+        if not str(item.get("ai_title", "")).strip()
+    )
+    
+    # 0 = all items
+    max_items_to_use = None if max_items == 0 else max_items
+    
+    logger.info(f"[PROCESS-ALL] Starting AI title processing for {untitled_count} existing items...")
+    
+    try:
+        result = await service.process_all_untitled_media_fully(
+            max_items=max_items_to_use,
+            per_item_timeout=120,
+        )
+        
+        return {
+            "ok": True,
+            "status": result.get("status", "unknown"),
+            "total_items_in_index": len(service.media_index),
+            "total_untitled_before": untitled_count,
+            "processed": result.get("processed", 0),
+            "failed": result.get("failed", 0),
+            "remaining": result.get("remaining", 0),
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+            "webapp": context,
+        }
+        
+    except Exception as e:
+        logger.error(f"[PROCESS-ALL] AI title processing failed: {e}")
+        return {
+            "ok": False,
+            "error": str(e),
+            "status": "error",
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+        }
+
+
+@app.post("/api/ai-titles/fix-defaults")
+async def api_fix_default_titles(
+    max_items: int = Query(0, ge=0, description="Max items (0=all)"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """
+    Fix ALL items with default titles like "Video #123" by generating proper AI titles.
+    This specifically targets items that have default/generic titles.
+    """
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not AI_TITLE_ENABLED:
+        return {
+            "ok": False,
+            "error": "AI titles are disabled. Set TWA_AI_TITLES=1 to enable.",
+            "status": "disabled",
+        }
+    
+    # Find all items with default titles
+    default_titled_items = [
+        item for item in service.media_index
+        if is_default_media_title(str(item.get("ai_title", "")))
+    ]
+    
+    count_before = len(default_titled_items)
+    
+    if max_items > 0:
+        default_titled_items = default_titled_items[:max_items]
+    
+    logger.info(f"[FIX-DEFAULTS] Processing {len(default_titled_items)} items with default titles...")
+    
+    # Enqueue all for processing
+    for item in default_titled_items:
+        msg_id = int(item.get("message_id", 0))
+        if msg_id > 0:
+            service._enqueue_ai_title(msg_id)
+    
+    # Process them with force mode
+    try:
+        result = await service.generate_missing_ai_titles(
+            batch_size=min(25, len(default_titled_items)),
+            recent_limit=0,
+            mode="force",
+        )
+        
+        # Count remaining
+        remaining = sum(
+            1 for item in service.media_index
+            if is_default_media_title(str(item.get("ai_title", "")))
+        )
+        
+        return {
+            "ok": True,
+            "status": "processed",
+            "total_default_titles_before": count_before,
+            "processed": len(default_titled_items),
+            "remaining_default_titles": remaining,
+            "generated_this_run": result,
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+            "webapp": context,
+        }
+    except Exception as e:
+        logger.error(f"[FIX-DEFAULTS] Failed: {e}")
+        return {
+            "ok": False,
+            "error": str(e),
+            "status": "error",
+            "total_default_titles_before": count_before,
+            "ai_titled_count": count_ai_titled_items(service.media_index),
+        }
+
+
+@app.post("/api/ai-titles/regenerate-all")
+async def api_regenerate_all_ai_titles(
+    max_items: int = Query(0, ge=0, description="Max items (0=all)"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """
+    Force regenerate ALL AI titles with EXPLICIT PORN STYLE.
+    This will override all existing titles with new explicit xxx-style titles.
+    Use this to regenerate all titles with maximum explicitness.
+    """
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not AI_TITLE_ENABLED:
+        return {
+            "ok": False,
+            "error": "AI titles are disabled. Set TWA_AI_TITLES=1 to enable.",
+            "status": "disabled",
+        }
+    
+    # Get all items that have any AI title (to regenerate them all)
+    all_items = list(service.media_index)
+    
+    if max_items > 0:
+        all_items = all_items[:max_items]
+    
+    logger.info(f"[REGENERATE-ALL] Regenerating AI titles for {len(all_items)} items with EXPLICIT mode...")
+    
+    # Clear any existing titles and enqueue for regeneration
+    for item in all_items:
+        msg_id = int(item.get("message_id", 0))
+        if msg_id > 0:
+            # Clear existing title to force regeneration
+            item["ai_title"] = ""
+            item["ai_description"] = ""
+            service._enqueue_ai_title(msg_id)
+    
+    service._save_index()
+    
+    # Process with force mode to regenerate all
+    try:
+        result = await service.generate_missing_ai_titles(
+            batch_size=min(30, len(all_items)),
+            recent_limit=0,
+            mode="force",
+        )
+        
+        # Count items with AI titles now
+        ai_titled = sum(
+            1 for item in service.media_index
+            if str(item.get("ai_title", "")).strip() and not is_default_media_title(str(item.get("ai_title", "")))
+        )
+        
+        return {
+            "ok": True,
+            "status": "regenerated",
+            "total_processed": len(all_items),
+            "generated": result,
+            "ai_titled_count": ai_titled,
+            "message": f"Regenerated {result} explicit titles",
+            "webapp": context,
+        }
+    except Exception as e:
+        logger.error(f"[REGENERATE-ALL] Failed: {e}")
+        return {
+            "ok": False,
+            "error": str(e),
+            "status": "error",
+        }
 
 
 @app.get("/api/media/{message_id}/ai-status")
@@ -2832,7 +3776,8 @@ async def api_media_ai_status(
     if not item:
         raise HTTPException(status_code=404, detail=f"Media item {message_id} not found")
     
-    has_title = bool(str(item.get("ai_title", "")).strip())
+    raw_title = str(item.get("ai_title", "")).strip()
+    has_title = bool(raw_title) and not is_default_media_title(raw_title)
     has_description = bool(str(item.get("ai_description", "")).strip())
     is_queued = message_id in service._ai_queue_ids
     
@@ -2855,7 +3800,7 @@ async def api_media_ai_status(
         "message_id": message_id,
         "has_ai_title": has_title,
         "has_ai_description": has_description,
-        "ai_title": item.get("ai_title", ""),
+        "ai_title": "" if is_default_media_title(raw_title) else raw_title,
         "ai_description": item.get("ai_description", ""),
         "ai_title_model": item.get("ai_title_model", ""),
         "ai_description_model": item.get("ai_description_model", ""),
@@ -2868,10 +3813,91 @@ async def api_media_ai_status(
     }
 
 
+@app.post("/api/thumbnails/fix-all")
+async def api_fix_all_thumbnails(
+    limit: int = Query(100, ge=1, le=500, description="Max thumbnails to fix"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Fix thumbnails for all items in media index - regenerate missing/broken thumbnails."""
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not service._started:
+        try:
+            await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
+        except TimeoutError:
+            return {"ok": False, "error": "Service not ready", "webapp": context}
+    
+    fixed = 0
+    failed = 0
+    items_checked = []
+    
+    # Find items with missing or broken thumbnails
+    for item in service.media_index[:limit]:
+        msg_id = int(item.get("message_id", 0))
+        media_kind = str(item.get("media_kind", ""))
+        
+        if media_kind == "video":
+            thumb_path = service._thumb_path(msg_id)
+            if not thumb_path.exists():
+                # Try to find cached video and generate thumb
+                cached_video = service._find_video_file(msg_id)
+                if cached_video:
+                    try:
+                        await service._generate_video_thumb_ffmpeg(cached_video, thumb_path, msg_id)
+                        if thumb_path.exists():
+                            item["thumb_url"] = f"/media/{thumb_path.name}"
+                            fixed += 1
+                        else:
+                            failed += 1
+                            item["thumb_url"] = "/assets/video-placeholder.svg"
+                    except Exception as e:
+                        failed += 1
+                        item["thumb_url"] = "/assets/video-placeholder.svg"
+                else:
+                    failed += 1
+            items_checked.append(msg_id)
+                
+        elif media_kind == "image":
+            thumb_path = service._image_thumb_path(msg_id)
+            if not thumb_path.exists():
+                # Try to find cached image
+                cached_image = service._find_image_file(msg_id)
+                if cached_image and cached_image.exists():
+                    try:
+                        import shutil
+                        shutil.copy2(cached_image, thumb_path)
+                        await service._optimize_thumbnail(thumb_path)
+                        if thumb_path.exists():
+                            item["thumb_url"] = f"/media/{thumb_path.name}"
+                            fixed += 1
+                        else:
+                            failed += 1
+                    except Exception:
+                        failed += 1
+                        # Use original as fallback
+                        item["thumb_url"] = item.get("url", "")
+                else:
+                    failed += 1
+            items_checked.append(msg_id)
+    
+    service._save_index()
+    
+    return {
+        "ok": True,
+        "fixed": fixed,
+        "failed": failed,
+        "checked": len(items_checked),
+        "message": f"Fixed {fixed} thumbnails, {failed} failed",
+        "webapp": context,
+    }
+
+
 @app.post("/api/media/{message_id}/generate-ai")
 async def api_generate_ai_for_item(
     message_id: int,
     priority: bool = Query(True),
+    mode: str = Query("force", description="Generation mode: missing, fallback, style, force"),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
@@ -2880,6 +3906,10 @@ async def api_generate_ai_for_item(
     
     if not AI_TITLE_ENABLED:
         raise HTTPException(status_code=503, detail="AI titles are disabled")
+    
+    # Validate mode
+    if mode not in {"missing", "fallback", "style", "force"}:
+        mode = "force"
     
     async with service._lock:
         item = next(
@@ -2903,28 +3933,30 @@ async def api_generate_ai_for_item(
     # Generate immediately
     try:
         title = await asyncio.wait_for(
-            service._generate_ai_title_for_item(item, mode="force"),
+            service._generate_ai_title_for_item(item, mode=mode),
             timeout=30,
         )
         
-        async with service._lock:
-            current = next(
-                (x for x in service.media_index if int(x.get("message_id", 0)) == message_id),
-                None,
-            )
-            if current and title:
-                current["ai_title"] = title
-                current["ai_title_model"] = item.get("ai_title_model", "")
-                current["ai_title_generated_at"] = item.get("ai_title_generated_at")
-                current["ai_description"] = item.get("ai_description", "")
-                current["ai_description_model"] = item.get("ai_description_model", "")
-                current["ai_description_generated_at"] = item.get("ai_description_generated_at")
-                service._save_index()
+        # Save to index if title was generated
+        if title:
+            async with service._lock:
+                current = next(
+                    (x for x in service.media_index if int(x.get("message_id", 0)) == message_id),
+                    None,
+                )
+                if current:
+                    current["ai_title"] = title
+                    current["ai_title_model"] = item.get("ai_title_model", "")
+                    current["ai_title_generated_at"] = item.get("ai_title_generated_at")
+                    current["ai_description"] = item.get("ai_description", "")
+                    current["ai_description_model"] = item.get("ai_description_model", "")
+                    current["ai_description_generated_at"] = item.get("ai_description_generated_at")
+                    service._save_index()
         
         return {
             "ok": True,
             "message_id": message_id,
-            "generated": True,
+            "generated": title is not None,
             "ai_title": title,
             "ai_description": item.get("ai_description", ""),
             "webapp": context,
@@ -2942,13 +3974,108 @@ async def api_generate_ai_for_item(
         raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
 
 
+@app.post("/api/thumbnails/regenerate")
+async def api_regenerate_thumbnails(
+    limit: int = Query(0, ge=0, le=5000, description="Max thumbnails (0=all)"),
+    force: bool = Query(False, description="Force regenerate even if exists"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Regenerate missing thumbnails for ALL videos and images using ffmpeg."""
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    if not service._started:
+        try:
+            await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
+        except TimeoutError as exc:
+            raise HTTPException(status_code=504, detail="Service not ready") from exc
+    
+    items_needing_thumbs = []
+    for item in service.media_index:
+        msg_id = int(item.get("message_id", 0))
+        media_kind = str(item.get("media_kind", ""))
+        
+        if media_kind == "video":
+            thumb_path = service._thumb_path(msg_id)
+            if force or not thumb_path.exists():
+                items_needing_thumbs.append(item)
+        elif media_kind == "image":
+            thumb_path = service._image_thumb_path(msg_id)
+            if force or not thumb_path.exists():
+                items_needing_thumbs.append(item)
+    
+    # 0 = all items
+    if limit > 0:
+        items_needing_thumbs = items_needing_thumbs[:limit]
+    
+    if not items_needing_thumbs:
+        return {
+            "ok": True,
+            "message": "No thumbnails needed",
+            "processed": 0,
+            "webapp": context,
+        }
+    
+    logger.info(f"[THUMB] Regenerating {len(items_needing_thumbs)} thumbnails...")
+    
+    messages_map: Dict[int, Any] = {}
+    for item in items_needing_thumbs:
+        msg_id = int(item.get("message_id", 0))
+        if msg_id not in messages_map:
+            try:
+                message = await service.client.get_messages(CHAT_ID, msg_id)
+                messages_map[msg_id] = message
+            except Exception as e:
+                logger.warning(f"[THUMB] Failed to fetch message {msg_id}: {e}")
+    
+    await service._download_thumbs_parallel(items_needing_thumbs, messages_map)
+    
+    generated = 0
+    for item in items_needing_thumbs:
+        msg_id = int(item.get("message_id", 0))
+        media_kind = str(item.get("media_kind", ""))
+        
+        if media_kind == "video":
+            thumb_path = service._thumb_path(msg_id)
+            if thumb_path.exists():
+                generated += 1
+        elif media_kind == "image":
+            thumb_path = service._image_thumb_path(msg_id)
+            if thumb_path.exists():
+                generated += 1
+    
+    return {
+        "ok": True,
+        "processed": len(items_needing_thumbs),
+        "generated": generated,
+        "message": f"Generated {generated}/{len(items_needing_thumbs)} thumbnails",
+        "webapp": context,
+    }
+
+
 @app.get("/api/health")
 async def api_health() -> Dict[str, Any]:
+    stats = compute_gallery_stats(service.media_index)
+    
+    thumb_stats = {"videos": 0, "images": 0, "total": 0}
+    for item in service.media_index:
+        msg_id = int(item.get("message_id", 0))
+        media_kind = str(item.get("media_kind", ""))
+        if media_kind == "video":
+            if service._thumb_path(msg_id).exists():
+                thumb_stats["videos"] += 1
+        elif media_kind == "image":
+            if service._image_thumb_path(msg_id).exists():
+                thumb_stats["images"] += 1
+    thumb_stats["total"] = thumb_stats["videos"] + thumb_stats["images"]
+    
     return {
         "ok": True,
         "started": service._started,
         "cached_items": len(service.media_index),
         "synced_at": service.last_sync_at,
+        "stats": stats,
+        "thumb_stats": thumb_stats,
         "strict_twa_verify": STRICT_TWA_VERIFY,
         "session_mode": service.session_mode,
         "last_sync_error": service.last_sync_error,
@@ -2978,5 +4105,63 @@ async def api_health() -> Dict[str, Any]:
     }
 
 
+@app.post("/api/reset-cache")
+async def api_reset_cache(
+    clear_thumbnails: bool = Query(True, description="Clear thumbnail cache"),
+    clear_media: bool = Query(False, description="Clear media files"),
+    clear_index: bool = Query(False, description="Clear media index"),
+    resync: bool = Query(True, description="Resync after reset"),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Reset cache and optionally resync from Telegram."""
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    results = {"ok": True, "actions": []}
+    
+    if clear_thumbnails:
+        count = 0
+        for f in service.cache_dir.iterdir():
+            if f.is_file() and ("_thumb.jpg" in f.name or "_image_thumb.jpg" in f.name):
+                try:
+                    f.unlink()
+                    count += 1
+                except Exception:
+                    pass
+        results["actions"].append(f"Cleared {count} thumbnails")
+    
+    if clear_media:
+        count = 0
+        for f in service.cache_dir.iterdir():
+            if f.is_file() and ("_video" in f.name or "_image" in f.name):
+                try:
+                    f.unlink()
+                    count += 1
+                except Exception:
+                    pass
+        results["actions"].append(f"Cleared {count} media files")
+    
+    if clear_index:
+        try:
+            service.index_path.unlink(missing_ok=True)
+            service.media_index = []
+            results["actions"].append("Cleared media index")
+        except Exception as e:
+            results["actions"].append(f"Failed to clear index: {e}")
+    
+    results["media_index_count"] = len(service.media_index)
+    
+    if resync and not clear_index:
+        try:
+            await service.sync_group_media(limit=200, force_redownload=False, process_ai_realtime=True)
+            results["actions"].append("Synced 200 items from Telegram")
+        except Exception as e:
+            results["actions"].append(f"Sync failed: {e}")
+    
+    results["webapp"] = context
+    return results
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
+

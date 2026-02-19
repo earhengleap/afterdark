@@ -520,6 +520,7 @@ input[type="search"]::-webkit-search-cancel-button {
 .media-slot {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .media-slot img,
@@ -528,8 +529,9 @@ input[type="search"]::-webkit-search-cancel-button {
   height: 100%;
   display: block;
   object-fit: cover;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.3s ease, transform 0.5s ease;
+  pointer-events: none;
 }
 
 .thumb.loaded .media-slot img,
@@ -548,13 +550,34 @@ input[type="search"]::-webkit-search-cancel-button {
   background: linear-gradient(110deg, var(--bg-2) 0%, var(--bg-3) 40%, var(--bg-2) 80%);
   background-size: 200% 100%;
   animation: shimmer 1.2s linear infinite;
+  pointer-events: none;
+  display: none;
 }
 
-.thumb.loaded .thumb-skeleton { display: none; }
+.thumb.loaded .thumb-skeleton { display: block; }
 
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Lazy loading placeholder styles */
+.thumb-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+.lazy-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+  border-radius: var(--radius-md);
 }
 
 .thumb-overlay {
