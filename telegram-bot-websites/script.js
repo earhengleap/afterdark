@@ -188,7 +188,7 @@ async function fetchContext() {
   }
 }
 
-async function loadMedia(limit = 24, offset = 0, refresh = false) {
+async function loadMedia(limit = "all", offset = 0, refresh = false) {
   try {
     state.isLoading = true;
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
@@ -460,10 +460,8 @@ function loadMore() {
     renderBatch(state.renderedCount, nextBatch);
     updateLoadMoreButton();
   } else if (hasMoreOnServer && !state.isLoading) {
-    // Load more items (50 at a time for faster experience)
-    const remaining = state.totalItems - state.items.length;
-    const loadCount = remaining > 100 ? 100 : (remaining > 50 ? 50 : remaining);
-    loadMedia(loadCount, state.items.length);
+    // Load all remaining items
+    loadMedia("all", state.items.length);
   }
 }
 
@@ -795,10 +793,8 @@ function bindEvents() {
       // Client-side: load more rendered items
       loadMore();
     } else if (!state.isLoading) {
-      // Server-side: fetch more from API (load 100 at a time)
-      const remaining = state.totalItems - state.items.length;
-      const loadCount = remaining > 100 ? 100 : remaining;
-      loadMedia(loadCount, state.items.length);
+      // Server-side: fetch all remaining items
+      loadMedia("all", state.items.length);
     }
   });
   
@@ -809,19 +805,29 @@ function bindEvents() {
     
     scrollTimeout = setTimeout(() => {
       if (state.isLoading) return;
-      if (state.items.length >= state.totalItems) return;
+      
+      // Check if we have more filtered items to render locally OR more items on server
+      const hasMoreToRender = state.renderedCount < state.filtered.length;
+      const hasMoreOnServer = state.items.length < state.totalItems;
+      
+      // If nothing more to do, return early
+      if (!hasMoreToRender && !hasMoreOnServer) return;
       
       const scrollY = window.scrollY;
       const viewportHeight = window.innerHeight;
       const docHeight = document.documentElement.scrollHeight;
       
-      // Trigger when user scrolls to 50% of page (earlier for faster loading)
+      // Trigger when user scrolls to 50% of page
       if (scrollY + viewportHeight >= docHeight * 0.5) {
-        // Load more items - load 100 at a time
-        const remaining = state.totalItems - state.items.length;
-        const loadCount = remaining > 100 ? 100 : remaining;
-        console.log("Auto-loading more items:", loadCount, "offset:", state.items.length);
-        loadMedia(loadCount, state.items.length, false);
+        if (hasMoreToRender) {
+          // Render more items from already-fetched list
+          console.log("Rendering more items locally:", state.renderedCount, "->", Math.min(state.renderedCount + state.renderBatchSize, state.filtered.length));
+          loadMore();
+        } else if (hasMoreOnServer) {
+          // Fetch more items from server
+          console.log("Auto-loading from server, offset:", state.items.length);
+          loadMedia("all", state.items.length, false);
+        }
       }
     }, 100); // Debounce 100ms
   });
@@ -890,7 +896,7 @@ async function init() {
     const shouldRefresh = cachedItems === 0;
     
     // Load all cached items at once for fast experience
-    const limit = cachedItems > 0 && cachedItems <= 500 ? "all" : 120;
+    const limit = "all";
     await loadMedia(limit, 0, shouldRefresh);
     
     console.log("Final state - items:", state.items.length, "filtered:", state.filtered.length);

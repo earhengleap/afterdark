@@ -4393,6 +4393,6 @@ async def api_reset_cache(
 
 if __name__ == "__main__":
     if CDN_ONLY_MODE:
-        print(f"🚀 CDN MODE ENABLED - Media will stream from Telegram CDN")
+        print(f"CDN MODE ENABLED - Media will stream from Telegram CDN")
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
 
