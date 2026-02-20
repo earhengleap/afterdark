@@ -65,12 +65,16 @@ def _is_twa_public_url_healthy(url: str) -> bool:
 
 def _discover_twa_public_url() -> str | None:
     explicit_url = os.getenv("TWA_PUBLIC_URL", "").strip()
-    if explicit_url.startswith("https://") and _is_twa_public_url_healthy(explicit_url):
-        return explicit_url.rstrip("/") + "/"
+    if explicit_url.startswith("https://"):
+        if _is_twa_public_url_healthy(explicit_url):
+            return explicit_url.rstrip("/") + "/"
+        logger.warning(f"Ignoring unhealthy explicit TWA_PUBLIC_URL: {explicit_url[:50]}...")
 
     cached_url = _read_cached_twa_public_url()
-    if cached_url and _is_twa_public_url_healthy(cached_url):
-        return cached_url
+    if cached_url:
+        if _is_twa_public_url_healthy(cached_url):
+            return cached_url
+        logger.warning(f"Ignoring unhealthy cached TWA_PUBLIC_URL: {cached_url[:50]}...")
 
     return None
 

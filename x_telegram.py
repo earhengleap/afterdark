@@ -436,6 +436,18 @@ def _persist_twa_public_url(root_dir: Path, public_url: str) -> None:
         logger.warning(f"Failed to persist TWA public URL to {target}: {e}")
 
 
+def _read_persisted_twa_public_url(root_dir: Path) -> str | None:
+    target = root_dir / "data" / "twa_public_url.txt"
+    try:
+        if target.exists():
+            content = target.read_text(encoding="utf-8").strip()
+            if content:
+                return content.rstrip("/")
+    except Exception:
+        pass
+    return None
+
+
 def _is_public_url_healthy(public_url: str) -> bool:
     normalized = public_url.strip().rstrip("/")
     if not normalized.startswith("https://"):
@@ -622,6 +634,9 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
     tunnel_target = _localhostrun_target()
     command = [
         ssh_executable,
+        "-F",
+        "/dev/null",
+        "-v",
         "-o",
         "StrictHostKeyChecking=accept-new",
         "-o",
@@ -638,31 +653,23 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
     stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
     stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
     try:
-        if os.name == "nt":
-            tunnel_proc = subprocess.Popen(
-                command,
-                cwd=str(root_dir),
-                env=os.environ.copy(),
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                stdout=stdout_handle,
-                stderr=stderr_handle,
-            )
-        else:
-            tunnel_proc = subprocess.Popen(
-                command,
-                cwd=str(root_dir),
-                env=os.environ.copy(),
-                stdout=stdout_handle,
-                stderr=stderr_handle,
-            )
+        tunnel_proc = subprocess.Popen(
+            command,
+            cwd=str(root_dir),
+            env=os.environ.copy(),
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+        )
     finally:
         stdout_handle.close()
         stderr_handle.close()
 
     _aux_processes.append(tunnel_proc)
-    time.sleep(2)
+    time.sleep(3)
     if tunnel_proc.poll() is not None:
-        logger.warning("localhost.run tunnel exited early. Check localhost.run output terminal.")
+        stdout_content = stdout_log.read_text(encoding="utf-8", errors="ignore") if stdout_log.exists() else ""
+        stderr_content = stderr_log.read_text(encoding="utf-8", errors="ignore") if stderr_log.exists() else ""
+        logger.warning(f"localhost.run tunnel exited early. stdout: {stdout_content[:200]}, stderr: {stderr_content[:200]}")
         _terminate_process(tunnel_proc)
         return False
 
@@ -700,6 +707,126 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
     else:
         logger.warning(
             f"localhost.run started, but no public URL was found in {stdout_log} or {stderr_log}. "
+            "Set TWA_PUBLIC_URL manually if needed."
+        )
+        _terminate_process(tunnel_proc)
+        return False
+
+
+def _lhr_life_target() -> str:
+    return os.getenv("TWA_LHR_LIFE_TARGET", "lhr.life").strip() or "lhr.life"
+
+
+def _lhr_life_remote_port() -> str:
+    raw = os.getenv("TWA_LHR_LIFE_REMOTE_PORT", "80").strip() or "80"
+    return raw if raw.isdigit() else "80"
+
+
+def _lhr_life_log_paths(root_dir: Path) -> tuple[Path, Path]:
+    stdout_custom = os.getenv("TWA_LHR_LIFE_STDOUT_LOG", "").strip()
+    stderr_custom = os.getenv("TWA_LHR_LIFE_STDERR_LOG", "").strip()
+
+    stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "lhr_life.stdout.log")
+    stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "lhr_life.stderr.log")
+    return stdout_path, stderr_path
+
+
+def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
+    ssh_executable = _resolve_ssh_executable()
+    if not ssh_executable:
+        logger.warning(
+            "Mini App backend started, but ssh client was not found on PATH. "
+            "Install OpenSSH client or set TWA_SSH_BIN."
+        )
+        return False
+
+    stdout_log, stderr_log = _lhr_life_log_paths(root_dir)
+    try:
+        stdout_log.parent.mkdir(parents=True, exist_ok=True)
+        stderr_log.parent.mkdir(parents=True, exist_ok=True)
+        if _is_true(os.getenv("TWA_LHR_LIFE_TRUNCATE_LOG", "1")):
+            stdout_log.write_text("", encoding="utf-8")
+            stderr_log.write_text("", encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Unable to initialize lhr.life log files: {e}")
+
+    remote_port = _lhr_life_remote_port()
+    tunnel_target = _lhr_life_target()
+    command = [
+        ssh_executable,
+        "-F",
+        "/dev/null",
+        "-v",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ExitOnForwardFailure=yes",
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=3",
+        "-R",
+        f"{remote_port}:127.0.0.1:{twa_port}",
+        tunnel_target,
+    ]
+
+    stdout_handle = open(stdout_log, "a", encoding="utf-8", errors="ignore")
+    stderr_handle = open(stderr_log, "a", encoding="utf-8", errors="ignore")
+    try:
+        tunnel_proc = subprocess.Popen(
+            command,
+            cwd=str(root_dir),
+            env=os.environ.copy(),
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+        )
+    finally:
+        stdout_handle.close()
+        stderr_handle.close()
+
+    _aux_processes.append(tunnel_proc)
+    time.sleep(3)
+    if tunnel_proc.poll() is not None:
+        stdout_content = stdout_log.read_text(encoding="utf-8", errors="ignore") if stdout_log.exists() else ""
+        stderr_content = stderr_log.read_text(encoding="utf-8", errors="ignore") if stderr_log.exists() else ""
+        logger.warning(f"lhr.life tunnel exited early. stdout: {stdout_content[:200]}, stderr: {stderr_content[:200]}")
+        _terminate_process(tunnel_proc)
+        return False
+
+    timeout_raw = os.getenv("TWA_LHR_LIFE_URL_TIMEOUT", "120").strip()
+    try:
+        timeout_seconds = max(5, int(timeout_raw))
+    except ValueError:
+        timeout_seconds = 120
+
+    public_url = _wait_for_localhostrun_public_url(root_dir, timeout_seconds)
+    if public_url:
+        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+        try:
+            health_timeout = max(3, int(health_timeout_raw))
+        except ValueError:
+            health_timeout = 18
+
+        if not _wait_for_public_url_health(public_url, health_timeout):
+            logger.warning(
+                f"lhr.life URL is not healthy after {health_timeout}s: {public_url}. "
+                "Trying fallback provider."
+            )
+            try:
+                if tunnel_proc.poll() is None:
+                    tunnel_proc.terminate()
+            except Exception:
+                pass
+            return False
+
+        logger.info(f"TWA lhr.life tunnel active: {public_url}")
+        _persist_twa_public_url(root_dir, public_url)
+        _sync_twa_menu_button(public_url, root_dir)
+        _send_tunnel_notification(public_url)
+        return True
+    else:
+        logger.warning(
+            f"lhr.life started, but no public URL was found in {stdout_log} or {stderr_log}. "
             "Set TWA_PUBLIC_URL manually if needed."
         )
         _terminate_process(tunnel_proc)
@@ -805,10 +932,18 @@ def _start_twa_stack() -> None:
         if not _resolve_ssh_executable():
             logger.info("TWA Mini App started without public tunnel (ssh client not found).")
             return
+        persisted_url = _read_persisted_twa_public_url(root_dir)
+        if persisted_url and _is_public_url_healthy(persisted_url):
+            logger.info(f"Using existing persisted TWA URL: {persisted_url}")
+            _sync_twa_menu_button(persisted_url, root_dir)
+            return
         if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
             return
         logger.warning("serveo tunnel failed in auto mode, trying localhost.run...")
         if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return
+        logger.warning("localhost.run tunnel failed, trying lhr.life...")
+        if _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")) and _start_lhr_life_tunnel(root_dir, twa_port):
             return
         logger.warning("No tunnel provider succeeded in auto mode.")
         return
@@ -839,9 +974,20 @@ def _start_twa_stack() -> None:
             return
         return
 
+    if provider == "lhrlife":
+        if not _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. lhr.life autostart disabled by TWA_LHR_LIFE_AUTOSTART.")
+            return
+        if _start_lhr_life_tunnel(root_dir, twa_port):
+            return
+        logger.warning("lhr.life failed, falling back to localhost.run...")
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return
+        return
+
     logger.warning(
         f"Unknown TWA_TUNNEL_PROVIDER='{provider_raw}'. "
-        "Valid values: auto, serveo, localhostrun, none, off, disabled."
+        "Valid values: auto, serveo, localhostrun, lhrlife, none, off, disabled."
     )
 
 

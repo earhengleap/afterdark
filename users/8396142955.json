@@ -551,5 +551,26 @@
     "status": "failed",
     "content_type": "unknown",
     "timestamp": "2026-02-19 18:49:27"
+  },
+  {
+    "username": "Vuploads_bot",
+    "url": "https://abc123.lhr.life",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-20 15:14:18"
+  },
+  {
+    "username": "Vuploads_bot",
+    "url": "https://abc123.lhr.life",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-20 15:14:25"
+  },
+  {
+    "username": "Vuploads_bot",
+    "url": "https://abc123.lhr.life",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-20 15:28:25"
   }
 ]

@@ -211,7 +211,10 @@ async function loadMedia(limit = 24, offset = 0, refresh = false) {
     if (offset === 0) {
       state.items = data.items || [];
     } else {
-      state.items = [...state.items, ...(data.items || [])];
+      // Deduplicate by message_id before appending
+      const existingIds = new Set(state.items.map(item => item.message_id));
+      const newItems = (data.items || []).filter(item => !existingIds.has(item.message_id));
+      state.items = [...state.items, ...newItems];
     }
     
     console.log("state.items:", state.items.length);
@@ -812,12 +815,12 @@ function bindEvents() {
       const viewportHeight = window.innerHeight;
       const docHeight = document.documentElement.scrollHeight;
       
-      // Trigger when user scrolls to 70% of page (earlier for faster loading)
-      if (scrollY + viewportHeight >= docHeight * 0.7) {
+      // Trigger when user scrolls to 50% of page (earlier for faster loading)
+      if (scrollY + viewportHeight >= docHeight * 0.5) {
         // Load more items - load 100 at a time
         const remaining = state.totalItems - state.items.length;
         const loadCount = remaining > 100 ? 100 : remaining;
-        console.log("Auto-loading more items:", loadCount);
+        console.log("Auto-loading more items:", loadCount, "offset:", state.items.length);
         loadMedia(loadCount, state.items.length, false);
       }
     }, 100); // Debounce 100ms
