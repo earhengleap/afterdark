@@ -178,7 +178,10 @@ async function requestHeaders() {
 
 async function fetchContext() {
   try {
-    const res = await fetch("/api/health", { headers: await requestHeaders() });
+    const res = await fetch(`/api/health?_=${Date.now()}`, { 
+      headers: await requestHeaders(),
+      cache: 'no-store' 
+    });
     const data = await res.json();
     updateDashboardStats(data.stats || {}, data.ai_titled_count || 0);
     return data;
@@ -193,7 +196,12 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
     state.isLoading = true;
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (refresh) params.set("refresh", "true");
-    const res = await fetch(`/api/media?${params}`, { headers: await requestHeaders() });
+    params.set("_", String(Date.now()));  // Cache busting
+    console.log("loadMedia: fetching with params", params.toString());
+    const res = await fetch(`/api/media?${params}`, { 
+      headers: await requestHeaders(),
+      cache: 'no-store'
+    });
     
     if (!res.ok) {
       const errText = await res.text();
@@ -204,6 +212,14 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
     
     const data = await res.json();
     console.log("API response:", data.items?.length, "items, total:", data.total, "stats:", data.stats);
+    
+    if (!data.items || data.items.length === 0) {
+      console.log("No items returned from API");
+      state.items = [];
+      state.filtered = [];
+      updateUI();
+      return data;
+    }
     
     // Store total for pagination
     state.totalItems = data.total || 0;
@@ -460,8 +476,8 @@ function loadMore() {
     renderBatch(state.renderedCount, nextBatch);
     updateLoadMoreButton();
   } else if (hasMoreOnServer && !state.isLoading) {
-    // Load all remaining items
-    loadMedia("all", state.items.length);
+    // Load more items in batches for better performance over slow connections
+    loadMedia(50, state.items.length);
   }
 }
 
@@ -750,14 +766,14 @@ function bindEvents() {
     elements.syncBtn.disabled = true;
     showToast("Syncing all media from Telegram...", "info");
     try {
-      const res = await fetch("/api/sync?limit=all&wait_seconds=30", {
+      const res = await fetch("/api/sync?limit=200&wait_seconds=30", {
         method: "POST",
         headers: await requestHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
         showToast(`Synced ${data.total || 0} items!`, "success");
-        await loadMedia();
+        await loadMedia(50, 0, false);  // Reload initial batch
       } else {
         const errData = await res.json().catch(() => ({}));
         showToast(errData.detail || "Sync failed", "error");
@@ -793,8 +809,8 @@ function bindEvents() {
       // Client-side: load more rendered items
       loadMore();
     } else if (!state.isLoading) {
-      // Server-side: fetch all remaining items
-      loadMedia("all", state.items.length);
+      // Server-side: fetch more items in batches
+      loadMedia(50, state.items.length);
     }
   });
   
@@ -824,9 +840,9 @@ function bindEvents() {
           console.log("Rendering more items locally:", state.renderedCount, "->", Math.min(state.renderedCount + state.renderBatchSize, state.filtered.length));
           loadMore();
         } else if (hasMoreOnServer) {
-          // Fetch more items from server
+          // Fetch more items from server in batches
           console.log("Auto-loading from server, offset:", state.items.length);
-          loadMedia("all", state.items.length, false);
+          loadMedia(50, state.items.length, false);
         }
       }
     }, 100); // Debounce 100ms
@@ -882,24 +898,34 @@ function debounce(fn, delay) {
 
 async function init() {
   console.log("Initializing gallery app...");
-  initElements();
-  bindEvents();
-  
-  console.log("Elements initialized:", Object.keys(elements).filter(k => elements[k]).length, "found");
   
   try {
+    initElements();
+    console.log("Elements initialized:", Object.keys(elements).filter(k => elements[k]).length, "found");
+    
+    bindEvents();
+    console.log("Events bound");
+    
     console.log("Fetching context...");
     const context = await fetchContext();
+    console.log("Context fetched:", context ? "OK" : "null");
     
     console.log("Loading media...");
     const cachedItems = context?.cached_items || 0;
     const shouldRefresh = cachedItems === 0;
+    console.log("Cached items:", cachedItems, "shouldRefresh:", shouldRefresh);
     
-    // Load all cached items at once for fast experience
-    const limit = "all";
-    await loadMedia(limit, 0, shouldRefresh);
+    // Load initial batch for fast experience (don't load all at once over slow tunnels)
+    const initialLimit = 50;
+    const mediaResult = await loadMedia(initialLimit, 0, shouldRefresh);
+    console.log("Media loaded:", mediaResult ? "OK" : "failed/null");
     
     console.log("Final state - items:", state.items.length, "filtered:", state.filtered.length);
+    
+    // Make sure grid is visible
+    if (elements.grid) {
+      elements.grid.style.display = "";
+    }
     
     if (window.location.hash) {
       setTimeout(() => {
@@ -915,8 +941,30 @@ async function init() {
     showToast("Gallery loaded successfully", "success", 2000);
   } catch (error) {
     console.error("Init error:", error);
-    showToast("Failed to initialize", "error");
+    showToast("Failed to initialize: " + error.message, "error", 10000);
   }
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// Global error handler to prevent white screen
+window.onerror = function(msg, url, line, col, error) {
+  console.error("Global error:", msg, "at line", line);
+  const container = document.getElementById("toastContainer") || document.body;
+  const errorDiv = document.createElement("div");
+  errorDiv.className = "toast error";
+  errorDiv.textContent = "Error: " + msg;
+  container.appendChild(errorDiv);
+  setTimeout(() => errorDiv.remove(), 10000);
+  return false;
+};
+
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("Unhandled rejection:", event.reason);
+  const container = document.getElementById("toastContainer") || document.body;
+  const errorDiv = document.createElement("div");
+  errorDiv.className = "toast error";
+  errorDiv.textContent = "Error: " + (event.reason?.message || event.reason);
+  container.appendChild(errorDiv);
+  setTimeout(() => errorDiv.remove(), 10000);
+});

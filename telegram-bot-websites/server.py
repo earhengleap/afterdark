@@ -36,10 +36,10 @@ import urllib.request
 
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import URL
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 from pyrogram import Client
 from pyrogram.errors import RPCError
 try:
@@ -1789,10 +1789,12 @@ class TelegramGalleryService:
     ) -> Optional[Tuple[str, str, str]]:
         """Analyze an image (or extracted video frame) and return (title, description, model)."""
         if not image_path.exists():
+            logger.debug(f"Image path does not exist: {image_path}")
             return None
 
         image_bytes = self._prepare_ai_image_bytes(image_path)
         if not image_bytes:
+            logger.debug(f"Failed to prepare image bytes for: {image_path}")
             return None
 
         # User requested analysis driven by the media itself. Captions are accepted but not used by default.
@@ -1869,9 +1871,11 @@ class TelegramGalleryService:
                     continue
 
                 return title, description, model_name
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Ollama API error: {e}")
                 continue
 
+        logger.debug(f"All models failed for message_id={message_id}")
         return None
 
     def _ollama_title_from_image_path(
@@ -2199,13 +2203,16 @@ class TelegramGalleryService:
             local_image = self.cache_dir / str(item.get("file_name", ""))
             if local_image.exists():
                 return local_image
+            logger.debug(f"No local image for {message_id}, trying to download thumb...")
             thumb_image = await self._ensure_image_thumb_for_ai(media_obj, message_id)
             if thumb_image and thumb_image.exists():
                 return thumb_image
             # Full downloads can be slow; only fall back to caching the full image if we couldn't get a thumb.
+            logger.debug(f"No thumb for {message_id}, trying full image download...")
             cached_image = await self._ensure_image_cached_for_ai(item, message)
             if cached_image and cached_image.exists():
                 return cached_image
+            logger.debug(f"Failed to get any image for {message_id}")
             return None
 
         if media_kind == "video":
@@ -2213,17 +2220,21 @@ class TelegramGalleryService:
             if thumb_path.exists():
                 return thumb_path
 
+            logger.debug(f"No video thumb for {message_id}, trying to download...")
             downloaded_thumb = await self._ensure_video_thumb(message, media_obj, message_id)
             if downloaded_thumb and downloaded_thumb.exists():
                 return downloaded_thumb
 
             local_video = self.cache_dir / str(item.get("file_name", ""))
             if not local_video.exists():
+                logger.debug(f"No local video for {message_id}, downloading...")
                 downloaded_video = await self._ensure_video_cached_for_ai(item, message)
                 if downloaded_video:
                     local_video = downloaded_video
             if local_video.exists():
                 return await asyncio.to_thread(self._extract_video_frame, local_video, message_id)
+            
+            logger.debug(f"Failed to get video frame for {message_id}")
 
         return None
 
@@ -2235,8 +2246,10 @@ class TelegramGalleryService:
         media_tuple: Optional[Tuple[str, Any, str, str]] = None,
     ) -> Optional[str]:
         if not self._ai_generation_ready():
+            logger.debug(f"AI generation not ready for {item.get('message_id')}")
             return None
         if not self._ai_title_needs_generation(item, mode):
+            logger.debug(f"AI title not needed for {item.get('message_id')}")
             return None
 
         message_id = int(item.get("message_id", 0))
@@ -2246,17 +2259,20 @@ class TelegramGalleryService:
         if message is None:
             try:
                 message = await self.client.get_messages(CHAT_ID, message_id)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to get message {message_id}: {e}")
                 return None
 
         if media_tuple is None:
             media_tuple = self._extract_media(message)
         if not media_tuple:
+            logger.debug(f"No media found for {message_id}")
             return None
 
         media_kind, media_obj, _, _ = media_tuple
         source_image = await self._resolve_ai_source_image(item, message, media_obj)
         if not source_image:
+            logger.debug(f"No source image for {message_id} (media_kind={media_kind})")
             return None
 
         caption_text = str(item.get("caption") or message.caption or "").strip()
@@ -2301,6 +2317,7 @@ class TelegramGalleryService:
                     result = None
 
         if not result:
+            logger.debug(f"No result from AI analysis for {message_id}")
             return None
         title, description, used_model = result
         if not title:
@@ -2502,11 +2519,11 @@ class TelegramGalleryService:
             message_id = int(item.get("message_id", 0))
             logger.info(f"Processing item {idx + 1}/{total}: message_id={message_id}")
             
-            # Infinite retry loop
+            # Limited retry loop - give up after 10 attempts per item
             retry_count = 0
-            max_retries = float('inf')  # Infinite retries
+            max_retries = 10  # Give up after 10 tries per item
             retry_delay = 2  # Start with 2 seconds
-            max_delay = 60   # Cap at 60 seconds
+            max_delay = 30   # Cap at 30 seconds
             
             while retry_count < max_retries:
                 try:
@@ -2556,10 +2573,11 @@ class TelegramGalleryService:
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 1.5, max_delay)
             
-            if retry_count >= 100 and retry_count < float('inf'):
-                # After 100 retries, mark as failed but continue
+            if retry_count >= max_retries:
+                # Give up on this item after max retries
+                logger.warning(f"Giving up on message_id={message_id} after {max_retries} attempts")
                 failed += 1
-                logger.error(f"âœ— Failed to generate title for message_id={message_id} after 100+ attempts")
+                continue
         
         # Final save
         async with self._lock:
@@ -3109,7 +3127,13 @@ async def lifespan(_: FastAPI):
         await service.stop()
 
 
-app = FastAPI(title="Telegram Mini App Gallery", version="3.2.0", lifespan=lifespan)
+app = FastAPI(
+    title="Telegram Mini App Gallery", 
+    version="3.2.0", 
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
 app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
 app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
@@ -3253,7 +3277,7 @@ async def api_file(message_id: int) -> FileResponse:
 
 
 @app.get("/api/cdn/{message_id}")
-async def api_cdn_file(message_id: int) -> RedirectResponse:
+async def api_cdn_file(message_id: int) -> Response:
     """Redirect to Telegram CDN for direct media access (no local cache needed)."""
     try:
         if not service._started:
