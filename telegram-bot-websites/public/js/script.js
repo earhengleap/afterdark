@@ -11,7 +11,7 @@ const state = {
   isTouch: "ontouchstart" in window || navigator.maxTouchPoints > 0,
   totalItems: 0,
   loadedCount: 120,  // Load more items for faster experience
-  renderBatchSize: 24,  // Render items in batches
+  renderBatchSize: 12,  // Render items in smaller batches for smoother scrolling
   renderedCount: 0,
   lazyObserver: null,
 };
@@ -226,20 +226,28 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
 
     if (offset === 0) {
       state.items = data.items || [];
+      console.log("state.items:", state.items.length);
+      applyFilter();
+      console.log("state.filtered:", state.filtered.length);
+      updateUI();
     } else {
       // Deduplicate by message_id before appending
       const existingIds = new Set(state.items.map(item => item.message_id));
       const newItems = (data.items || []).filter(item => !existingIds.has(item.message_id));
       state.items = [...state.items, ...newItems];
+      console.log("state.items:", state.items.length);
+      applyFilter();
+      console.log("state.filtered:", state.filtered.length);
+
+      // Remove skeleton placeholders without wiping the grid
+      document.querySelectorAll(".load-more-skeleton").forEach(el => el.remove());
+
+      // Append only the new batch of cards (no full re-render)
+      const prevCount = state.renderedCount;
+      const nextEnd = Math.min(prevCount + newItems.length, state.filtered.length);
+      renderBatch(prevCount, nextEnd);
+      updateLoadMoreButton();
     }
-
-    console.log("state.items:", state.items.length);
-
-    applyFilter();
-
-    console.log("state.filtered:", state.filtered.length);
-
-    updateUI();
 
     const total = data.total || state.totalItems || 0;
     const loaded = state.items.length;
@@ -375,6 +383,11 @@ function renderBatch(start, end) {
 
     article.dataset.index = index;
     if (hasAI(item)) article.classList.add("ai-enhanced");
+    // Staggered fade-in for paginated cards
+    if (start > 0) {
+      article.classList.add("card-enter");
+      article.style.animationDelay = `${(index - start) * 40}ms`;
+    }
 
     // Use data-src for lazy loading
     const mediaSlot = card.querySelector(".media-slot");
@@ -847,19 +860,15 @@ function bindEvents() {
       const viewportHeight = window.innerHeight;
       const docHeight = document.documentElement.scrollHeight;
 
-      // Trigger when user scrolls to 50% of page
-      if (scrollY + viewportHeight >= docHeight * 0.5) {
-        if (hasMoreToRender) {
-          // Render more items from already-fetched list
-          console.log("Rendering more items locally:", state.renderedCount, "->", Math.min(state.renderedCount + state.renderBatchSize, state.filtered.length));
+      // Trigger when user scrolls to 80% of page for smoother experience
+      if (scrollY + viewportHeight >= docHeight * 0.8) {
+        if (hasMoreToRender || hasMoreOnServer) {
+          // Use loadMore() for both local and server fetching
+          // This ensures skeletons are shown and append-only rendering
           loadMore();
-        } else if (hasMoreOnServer) {
-          // Fetch more items from server in batches
-          console.log("Auto-loading from server, offset:", state.items.length);
-          loadMedia(50, state.items.length, false);
         }
       }
-    }, 100); // Debounce 100ms
+    }, 50); // Faster debounce for smoother response
   });
 
   // Top button
@@ -953,10 +962,50 @@ async function init() {
     }
 
     showToast("Gallery loaded successfully", "success", 2000);
+
+    // Start auto-sync in background
+    startAutoSync();
   } catch (error) {
     console.error("Init error:", error);
     showToast("Failed to initialize: " + error.message, "error", 10000);
   }
+}
+
+// ============================================
+// Auto Sync (realtime background polling)
+// ============================================
+
+let _autoSyncInterval = null;
+
+async function autoSync() {
+  if (state.isLoading) return;
+  try {
+    const res = await fetch("/api/sync?limit=200&wait_seconds=10", {
+      method: "POST",
+      headers: await requestHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const newTotal = data.total || 0;
+      const oldTotal = state.items.length;
+      if (newTotal > oldTotal) {
+        console.log(`Auto-sync: found ${newTotal - oldTotal} new items`);
+        await loadMedia(50, 0, false);
+        showToast(`${newTotal - oldTotal} new items synced`, "success", 2000);
+      }
+    }
+  } catch (e) {
+    console.debug("Auto-sync error:", e);
+  }
+}
+
+function startAutoSync() {
+  // Run first auto-sync after a short delay (let the page settle)
+  setTimeout(autoSync, 3000);
+
+  // Then repeat every 30 seconds
+  _autoSyncInterval = setInterval(autoSync, 30000);
+  console.log("Auto-sync started (every 30s)");
 }
 
 document.addEventListener("DOMContentLoaded", init);

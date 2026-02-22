@@ -144,9 +144,9 @@ AI_TITLE_RETITLE_MODE = os.getenv("TWA_AI_RETITLE_MODE", "missing").strip().lowe
 if AI_TITLE_RETITLE_MODE not in {"missing", "fallback", "style", "force"}:
     AI_TITLE_RETITLE_MODE = "missing"
 try:
-    AI_TITLE_TIMEOUT_SECONDS = max(20, int(os.getenv("TWA_AI_TIMEOUT_SECONDS", "240").strip() or "240"))
+    AI_TITLE_TIMEOUT_SECONDS = max(20, int(os.getenv("TWA_AI_TIMEOUT_SECONDS", "120").strip() or "120"))
 except ValueError:
-    AI_TITLE_TIMEOUT_SECONDS = 240
+    AI_TITLE_TIMEOUT_SECONDS = 120
 try:
     _per_item_raw = int(os.getenv("TWA_AI_PER_ITEM_TIMEOUT_SECONDS", "0").strip() or "0")
     # 0 disables extra per-item timeout; we still rely on AI_TITLE_TIMEOUT_SECONDS for the HTTP request.
@@ -160,9 +160,9 @@ except ValueError:
 # Keep this bounded so a misconfig doesn't accidentally hang the server.
 AI_TITLE_BATCH_SIZE_MAX = max(1, min(AI_TITLE_BATCH_SIZE_MAX, 5000))
 try:
-    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "3").strip() or "3"), AI_TITLE_BATCH_SIZE_MAX))
+    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "10").strip() or "10"), AI_TITLE_BATCH_SIZE_MAX))
 except ValueError:
-    AI_TITLE_BATCH_SIZE = 3
+    AI_TITLE_BATCH_SIZE = 10
 try:
     # 0 means scan full cached index (backfill titles for older media).
     _scan_raw = int(os.getenv("TWA_AI_RECENT_SCAN_LIMIT", "0").strip() or "0")
@@ -170,9 +170,9 @@ try:
 except ValueError:
     AI_TITLE_RECENT_SCAN_LIMIT = 0
 try:
-    AI_TITLE_POLL_SECONDS = max(5, int(os.getenv("TWA_AI_POLL_SECONDS", "12").strip() or "12"))
+    AI_TITLE_POLL_SECONDS = max(5, int(os.getenv("TWA_AI_POLL_SECONDS", "5").strip() or "5"))
 except ValueError:
-    AI_TITLE_POLL_SECONDS = 12
+    AI_TITLE_POLL_SECONDS = 5
 try:
     AI_TITLE_FAILURE_COOLDOWN_SECONDS = max(5, int(os.getenv("TWA_AI_FAILURE_COOLDOWN_SECONDS", "45").strip() or "45"))
 except ValueError:
@@ -539,6 +539,9 @@ class TelegramGalleryService:
             self._started = True
             self._load_index()
 
+            # Register realtime message handler for instant media detection
+            self._register_realtime_handler()
+
     async def stop(self) -> None:
         if self._started:
             await self.client.stop()
@@ -546,6 +549,111 @@ class TelegramGalleryService:
         if self._session_clone_name and SESSION_CLONE_CLEANUP:
             self._cleanup_session_artifacts(self._session_clone_name)
             self._session_clone_name = None
+
+    def _register_realtime_handler(self) -> None:
+        """Register a Pyrogram handler that fires instantly when new media arrives in the source group."""
+        from pyrogram import filters
+        from pyrogram.handlers import MessageHandler
+
+        async def _on_new_media(client: Any, message: Any) -> None:
+            """Called instantly when a new message with media is posted in the source group."""
+            try:
+                media_tuple = self._extract_media(message)
+                if not media_tuple:
+                    return
+
+                media_kind, media_obj, mime_type, ext = media_tuple
+                message_id = message.id
+
+                # Skip if already in index
+                existing_ids = {int(x.get("message_id", 0)) for x in self.media_index}
+                if message_id in existing_ids:
+                    return
+
+                local_name = f"{message_id}_{media_kind}{ext}"
+
+                msg_date = message.date
+                if msg_date and msg_date.tzinfo is None:
+                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+
+                # Get CDN URL if available
+                cdn_url: Optional[str] = None
+                if CDN_ONLY_MODE:
+                    try:
+                        cdn_url = await self._get_telegram_cdn_url(message, media_kind)
+                    except Exception:
+                        pass
+
+                # Build URL
+                if cdn_url:
+                    item_url = cdn_url
+                else:
+                    item_url = f"/api/file/{message_id}"
+
+                # Build thumb URL
+                if media_kind == "image":
+                    thumb_url = cdn_url or item_url
+                else:
+                    thumb_obj = self._pick_best_thumb(media_obj)
+                    if thumb_obj:
+                        thumb_url = f"/api/thumb/{message_id}"
+                    else:
+                        thumb_url = "/assets/video-placeholder.svg"
+
+                media_size = getattr(media_obj, "file_size", None) or 0
+
+                new_item: Dict[str, Any] = {
+                    "message_id": message_id,
+                    "media_kind": media_kind,
+                    "mime_type": mime_type or "",
+                    "file_name": local_name,
+                    "url": item_url,
+                    "cdn_url": cdn_url or "",
+                    "thumb_url": thumb_url,
+                    "size": media_size,
+                    "date": msg_date.isoformat() if msg_date else "",
+                    "caption": str(message.caption or ""),
+                    "is_cached": False,
+                    "ai_title": "",
+                    "ai_description": "",
+                    "duration": getattr(media_obj, "duration", None) or 0,
+                    "width": getattr(media_obj, "width", None) or 0,
+                    "height": getattr(media_obj, "height", None) or 0,
+                }
+
+                # Add to index (newest first)
+                self.media_index.insert(0, new_item)
+                logger.info(f"[REALTIME] New {media_kind} detected: message_id={message_id}")
+
+                # Queue AI title generation
+                self._enqueue_ai_title(message_id)
+
+                # Try to get thumbnail in background
+                try:
+                    if media_kind == "video":
+                        thumb = await self._ensure_video_thumb(message, media_obj, message_id)
+                        if thumb and thumb.exists():
+                            new_item["thumb_url"] = f"/media/{thumb.name}"
+                    elif media_kind == "image":
+                        thumb = await self._ensure_image_thumb(message, media_obj, message_id)
+                        if thumb and thumb.exists():
+                            new_item["thumb_url"] = f"/media/{thumb.name}"
+                except Exception as e:
+                    logger.debug(f"[REALTIME] Thumb error for {message_id}: {e}")
+
+                # Persist index to disk so it survives restarts
+                self._save_index()
+
+            except Exception as e:
+                logger.warning(f"[REALTIME] Error processing new message: {e}")
+
+        # Filter: only messages in the source group that contain media
+        media_filter = (
+            filters.chat(int(CHAT_ID))
+            & (filters.photo | filters.video | filters.document | filters.animation)
+        )
+
+        self.client.add_handler(MessageHandler(_on_new_media, media_filter))
 
     def _load_index(self) -> None:
         if not self.index_path.exists():
