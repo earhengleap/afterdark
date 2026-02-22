@@ -3194,24 +3194,17 @@ def cached_file_response(path: Path, media_type: str = "auto") -> FileResponse:
 
 @app.get("/")
 async def index() -> FileResponse:
-    response = FileResponse(WEB_DIR / "index.html")
+    response = FileResponse(WEB_DIR / "public" / "index.html")
     response.headers["Cache-Control"] = "no-cache"
     return response
 
 
-@app.get("/style.css")
-async def style() -> FileResponse:
-    response = FileResponse(WEB_DIR / "style.css")
-    response.headers["Cache-Control"] = "public, max-age=3600"
-    return response
+app.mount("/css", CachedStaticFiles(directory=str(WEB_DIR / "public" / "css")), name="css")
+app.mount("/js", CachedStaticFiles(directory=str(WEB_DIR / "public" / "js")), name="js")
+app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR / "public" / "assets")), name="assets")
 
-
-@app.get("/script.js")
-async def script() -> FileResponse:
-    response = FileResponse(WEB_DIR / "script.js")
-    response.headers["Cache-Control"] = "public, max-age=3600"
-    return response
-
+# We no longer need individual @app.get("/style.css") handles 
+# since app.mount handles the entire directories automatically.
 
 @app.get("/api/webapp/context")
 async def api_webapp_context(
