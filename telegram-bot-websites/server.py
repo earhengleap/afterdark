@@ -4408,6 +4408,32 @@ async def api_reset_cache(
     return results
 
 
+@app.get("/view/{message_id}", include_in_schema=False)
+async def serve_view_page(message_id: int):
+    view_path = WEB_DIR / "public" / "view.html"
+    if not view_path.exists():
+        return Response("view.html not found", status_code=404)
+    return FileResponse(view_path, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/media/{message_id}")
+async def get_single_media(
+    message_id: int,
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    context = resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    
+    item = next((x for x in service.media_index if int(x.get("message_id", 0)) == message_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Media item not found")
+        
+    return {
+        "ok": True,
+        "item": item,
+        "webapp": context,
+    }
+
 if __name__ == "__main__":
     if CDN_ONLY_MODE:
         print(f"CDN MODE ENABLED - Media will stream from Telegram CDN")

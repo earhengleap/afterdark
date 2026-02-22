@@ -31,7 +31,7 @@ function initElements() {
   elements.layoutDenseBtn = document.getElementById("layoutDenseBtn");
   elements.layoutComfortBtn = document.getElementById("layoutComfortBtn");
   elements.loadingIndicator = document.getElementById("loadingIndicator");
-  
+
   // Viewer
   elements.viewer = document.getElementById("viewer");
   elements.viewerMedia = document.getElementById("viewerMedia");
@@ -49,7 +49,7 @@ function initElements() {
   elements.closeViewer = document.getElementById("closeViewer");
   elements.suggestedGrid = document.getElementById("suggestedGrid");
   elements.suggestedSection = document.getElementById("suggestedSection");
-  
+
   // Stats
   elements.statTotal = document.getElementById("statTotal");
   elements.statVideos = document.getElementById("statVideos");
@@ -92,12 +92,12 @@ function fmtRelative(iso) {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor(diff / (1000 * 60));
-  
+
   // Handle future dates or invalid dates
   if (isNaN(date.getTime()) || diff < 0) {
     return date.toLocaleDateString();
   }
-  
+
   if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
@@ -126,16 +126,16 @@ function updateDashboardStats(stats, aiTitledCount) {
   const videos = stats.videos || 0;
   const images = stats.images || 0;
   const aiTitled = aiTitledCount || 0;
-  
+
   if (elements.statTotal) elements.statTotal.textContent = total.toLocaleString();
   if (elements.statVideos) elements.statVideos.textContent = videos.toLocaleString();
   if (elements.statImages) elements.statImages.textContent = images.toLocaleString();
   if (elements.statSize) elements.statSize.textContent = fmtBytes(stats.bytes || 0);
-  
+
   if (total > 0) {
     const videoPct = Math.round((videos / total) * 100);
     const imagePct = Math.round((images / total) * 100);
-    
+
     if (elements.videoProgressBar) elements.videoProgressBar.style.width = videoPct + "%";
     if (elements.imageProgressBar) elements.imageProgressBar.style.width = imagePct + "%";
     if (elements.statVideoRatio) elements.statVideoRatio.textContent = videoPct + "%";
@@ -146,7 +146,7 @@ function updateDashboardStats(stats, aiTitledCount) {
     if (elements.statVideoRatio) elements.statVideoRatio.textContent = "0%";
     if (elements.statImageRatio) elements.statImageRatio.textContent = "0%";
   }
-  
+
   if (elements.statAITitled) elements.statAITitled.textContent = aiTitled.toLocaleString();
   if (elements.sessionText) elements.sessionText.textContent = `Vault: ${total} items`;
 }
@@ -178,9 +178,9 @@ async function requestHeaders() {
 
 async function fetchContext() {
   try {
-    const res = await fetch(`/api/health?_=${Date.now()}`, { 
+    const res = await fetch(`/api/health?_=${Date.now()}`, {
       headers: await requestHeaders(),
-      cache: 'no-store' 
+      cache: 'no-store'
     });
     const data = await res.json();
     updateDashboardStats(data.stats || {}, data.ai_titled_count || 0);
@@ -198,21 +198,21 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
     if (refresh) params.set("refresh", "true");
     params.set("_", String(Date.now()));  // Cache busting
     console.log("loadMedia: fetching with params", params.toString());
-    const res = await fetch(`/api/media?${params}`, { 
+    const res = await fetch(`/api/media?${params}`, {
       headers: await requestHeaders(),
       cache: 'no-store'
     });
-    
+
     if (!res.ok) {
       const errText = await res.text();
       console.error("API error:", res.status, errText);
       showToast(`Error ${res.status}: ${res.statusText}`, "error");
       return null;
     }
-    
+
     const data = await res.json();
     console.log("API response:", data.items?.length, "items, total:", data.total, "stats:", data.stats);
-    
+
     if (!data.items || data.items.length === 0) {
       console.log("No items returned from API");
       state.items = [];
@@ -220,10 +220,10 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
       updateUI();
       return data;
     }
-    
+
     // Store total for pagination
     state.totalItems = data.total || 0;
-    
+
     if (offset === 0) {
       state.items = data.items || [];
     } else {
@@ -232,23 +232,23 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
       const newItems = (data.items || []).filter(item => !existingIds.has(item.message_id));
       state.items = [...state.items, ...newItems];
     }
-    
+
     console.log("state.items:", state.items.length);
-    
+
     applyFilter();
-    
+
     console.log("state.filtered:", state.filtered.length);
-    
+
     updateUI();
-    
+
     const total = data.total || state.totalItems || 0;
     const loaded = state.items.length;
-    
+
     if (elements.countText) elements.countText.textContent = `${loaded} of ${total} items`;
     if (elements.syncText) elements.syncText.textContent = data.synced_at ? `Synced: ${fmtRelative(data.synced_at)}` : '';
-    
+
     updateDashboardStats(data.stats || {}, data.ai_titled_count || 0);
-    
+
     return data;
   } catch (error) {
     console.error("Failed to load media:", error);
@@ -265,18 +265,18 @@ async function loadMedia(limit = "all", offset = 0, refresh = false) {
 
 function applyFilter() {
   let items = [...state.items];
-  
+
   console.log("applyFilter: starting with", items.length, "items");
-  
+
   // Filter by type
   const activeFilter = document.querySelector(".tab.active")?.dataset.filter || "all";
   console.log("applyFilter: activeFilter =", activeFilter);
-  
+
   if (activeFilter !== "all") {
     items = items.filter(item => item.media_kind === activeFilter);
     console.log("applyFilter: after type filter =", items.length);
   }
-  
+
   // Search
   const search = (elements.searchInput?.value || "").toLowerCase().trim();
   if (search) {
@@ -288,7 +288,7 @@ function applyFilter() {
     });
     console.log("applyFilter: after search filter =", items.length);
   }
-  
+
   // Sort
   const sort = elements.sortSelect?.value || "newest";
   switch (sort) {
@@ -305,7 +305,7 @@ function applyFilter() {
       items.sort((a, b) => (hasAI(b) ? 1 : 0) - (hasAI(a) ? 1 : 0));
       break;
   }
-  
+
   state.filtered = items;
   console.log("applyFilter: final filtered =", state.filtered.length);
 }
@@ -318,7 +318,7 @@ function updateUI() {
 function updateLoadMoreButton() {
   // Auto-load is enabled - hide the button and load automatically on scroll
   if (!elements.loadMoreBtn) return;
-  
+
   // Hide the button - auto-loading is always on
   elements.loadMoreBtn.classList.add("hidden");
 }
@@ -332,28 +332,28 @@ function renderGrid() {
   if (elements.loadingIndicator) {
     elements.loadingIndicator.style.display = "none";
   }
-  
+
   if (!elements.grid) {
     console.error("Grid element not found!");
     return;
   }
-  
+
   elements.grid.innerHTML = "";
   state.renderedCount = 0;
-  
+
   console.log("renderGrid: state.filtered.length =", state.filtered.length);
-  
+
   if (state.filtered.length === 0) {
     elements.emptyState?.classList.remove("hidden");
     console.log("No items to render, showing empty state");
     return;
   }
-  
+
   elements.emptyState?.classList.add("hidden");
-  
+
   // Render all visible items
   renderBatch(0, Math.min(state.renderBatchSize, state.filtered.length));
-  
+
   // Show load more button if there are more items
   updateLoadMoreButton();
 }
@@ -407,17 +407,19 @@ function renderBatch(start, end) {
       cardBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openViewer(state.filtered[index]);
+        window.location.href = `/view/${item.message_id}`;
       });
     } else {
-      article.addEventListener("click", () => openViewer(state.filtered[index]));
+      article.addEventListener("click", () => {
+        window.location.href = `/view/${item.message_id}`;
+      });
     }
 
     fragment.appendChild(article);
 
     // Observe this image for lazy loading
     const img = card.querySelector(".lazy-image");
-    
+
     // Handle image errors - show placeholder
     if (img) {
       img.onerror = () => {
@@ -470,7 +472,7 @@ function initLazyObserver() {
 function loadMore() {
   const hasMoreToRender = state.renderedCount < state.filtered.length;
   const hasMoreOnServer = state.items.length < state.totalItems;
-  
+
   if (hasMoreToRender) {
     const nextBatch = Math.min(state.renderedCount + state.renderBatchSize, state.filtered.length);
     renderBatch(state.renderedCount, nextBatch);
@@ -502,32 +504,32 @@ function openViewer(item, recomputeIndex = true) {
     showToast("Error: No item to display", "error");
     return;
   }
-  
+
   if (!elements.viewer) {
     console.error("openViewer: viewer element not found");
     showToast("Error: Viewer not found", "error");
     return;
   }
-  
+
   if (!elements.viewerMedia) {
     console.error("openViewer: viewerMedia element not found");
     showToast("Error: Media container not found", "error");
     return;
   }
-  
+
   console.log("Opening viewer for:", item.message_id, item.media_kind, "cached:", item.is_cached, "url:", item.url);
-  
+
   if (recomputeIndex) setViewerIndexForItem(item);
   updateViewerNav();
-  
+
   window.location.hash = `page/${item.message_id}`;
-  
+
   elements.viewerMedia.innerHTML = "";
-  
+
   const mediaUrl = item.url || `/media/${item.file_name}`;
   const thumbUrl = item.thumb_url || `/media/${item.file_name}`;
   const fallbackUrl = `/api/file/${item.message_id}`;
-  
+
   if (item.media_kind === "video") {
     const video = document.createElement("video");
     video.poster = thumbUrl;
@@ -536,11 +538,11 @@ function openViewer(item, recomputeIndex = true) {
     video.playsInline = true;
     video.preload = "metadata";
     video.muted = false;
-    
+
     let retryCount = 0;
     const maxRetries = 2;
     const tryUrls = [mediaUrl, fallbackUrl];
-    
+
     const tryLoadVideo = (urlIndex) => {
       if (urlIndex >= tryUrls.length) {
         elements.viewerMedia.innerHTML = `
@@ -554,7 +556,7 @@ function openViewer(item, recomputeIndex = true) {
       }
       video.src = tryUrls[urlIndex];
     };
-    
+
     video.addEventListener("error", (e) => {
       console.error("Video load error:", e, video.error, "trying next URL");
       retryCount++;
@@ -562,20 +564,20 @@ function openViewer(item, recomputeIndex = true) {
         tryLoadVideo(retryCount);
       }
     });
-    
+
     video.addEventListener("loadedmetadata", () => {
       console.log("Video loaded:", video.videoWidth, "x", video.videoHeight);
     });
-    
+
     tryLoadVideo(0);
     elements.viewerMedia.appendChild(video);
   } else {
     const img = document.createElement("img");
     img.alt = titleFor(item);
-    
+
     let retryCount = 0;
     const tryUrls = [mediaUrl, thumbUrl, fallbackUrl];
-    
+
     const tryLoadImage = (urlIndex) => {
       if (urlIndex >= tryUrls.length) {
         img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%231a1a1d'/%3E%3Ctext x='100' y='100' font-family='Arial' font-size='14' fill='%23666' text-anchor='middle' dy='.3em'%3EImage not available%3C/text%3E%3C/svg%3E";
@@ -583,17 +585,17 @@ function openViewer(item, recomputeIndex = true) {
       }
       img.src = tryUrls[urlIndex];
     };
-    
+
     img.addEventListener("error", () => {
       console.error("Image load error:", img.src);
       retryCount++;
       tryLoadImage(retryCount);
     });
-    
+
     tryLoadImage(0);
     elements.viewerMedia.appendChild(img);
   }
-  
+
   // Update info panel
   if (elements.viewerTitle) elements.viewerTitle.textContent = titleFor(item);
   if (elements.viewerDescription) elements.viewerDescription.textContent = item.ai_description || "No description";
@@ -613,13 +615,13 @@ function openViewer(item, recomputeIndex = true) {
   if (elements.viewerDownload) {
     elements.viewerDownload.href = mediaUrl;
   }
-  
+
   // Show viewer
   elements.viewer.classList.remove("hidden");
   document.body.style.overflow = "hidden";
-  
+
   console.log("Viewer opened successfully");
-  
+
   // Render suggested videos
   renderSuggestedVideos(item);
 }
@@ -628,7 +630,7 @@ function closeViewer() {
   elements.viewer?.classList.add("hidden");
   document.body.style.overflow = "";
   state.viewerIndex = -1;
-  
+
   // Stop any playing video
   if (elements.viewerMedia) {
     const video = elements.viewerMedia.querySelector("video");
@@ -638,7 +640,7 @@ function closeViewer() {
     }
     elements.viewerMedia.innerHTML = "";
   }
-  
+
   // Clear URL hash
   if (window.location.hash) {
     history.pushState("", document.title, window.location.pathname);
@@ -658,23 +660,23 @@ function navigateViewer(direction) {
 function renderSuggestedVideos(currentItem) {
   const grid = elements.suggestedGrid;
   const section = elements.suggestedSection;
-  
+
   if (!grid || !section) return;
-  
+
   // Get random suggestions
   const suggested = state.items
     .filter(item => item.message_id !== currentItem.message_id)
     .sort(() => Math.random() - 0.5)
     .slice(0, 15);
-  
+
   if (suggested.length === 0) {
     section.classList.add("hidden");
     return;
   }
-  
+
   section.classList.remove("hidden");
   grid.innerHTML = "";
-  
+
   suggested.forEach(item => {
     const card = document.createElement("div");
     card.className = "suggested-card";
@@ -731,7 +733,7 @@ function bindEvents() {
     applyFilter();
     updateUI();
   }, 300));
-  
+
   // Filter tabs
   document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
@@ -741,26 +743,26 @@ function bindEvents() {
       updateUI();
     });
   });
-  
+
   // Sort
   elements.sortSelect?.addEventListener("change", () => {
     applyFilter();
     updateUI();
   });
-  
+
   // Layout
   elements.layoutDenseBtn?.addEventListener("click", () => {
     document.documentElement.removeAttribute("data-density");
     elements.layoutDenseBtn?.classList.add("active");
     elements.layoutComfortBtn?.classList.remove("active");
   });
-  
+
   elements.layoutComfortBtn?.addEventListener("click", () => {
     document.documentElement.setAttribute("data-density", "comfort");
     elements.layoutComfortBtn?.classList.add("active");
     elements.layoutDenseBtn?.classList.remove("active");
   });
-  
+
   // Sync
   elements.syncBtn?.addEventListener("click", async () => {
     elements.syncBtn.disabled = true;
@@ -784,7 +786,7 @@ function bindEvents() {
     }
     elements.syncBtn.disabled = false;
   });
-  
+
   // AI
   elements.retitleBtn?.addEventListener("click", async () => {
     elements.retitleBtn.disabled = true;
@@ -802,7 +804,7 @@ function bindEvents() {
     }
     elements.retitleBtn.disabled = false;
   });
-  
+
   // Load more
   elements.loadMoreBtn?.addEventListener("click", () => {
     if (state.renderedCount < state.filtered.length) {
@@ -813,26 +815,26 @@ function bindEvents() {
       loadMedia(50, state.items.length);
     }
   });
-  
+
   // Auto-load more when scrolling near bottom
   let scrollTimeout = null;
   window.addEventListener("scroll", () => {
     if (scrollTimeout) clearTimeout(scrollTimeout);
-    
+
     scrollTimeout = setTimeout(() => {
       if (state.isLoading) return;
-      
+
       // Check if we have more filtered items to render locally OR more items on server
       const hasMoreToRender = state.renderedCount < state.filtered.length;
       const hasMoreOnServer = state.items.length < state.totalItems;
-      
+
       // If nothing more to do, return early
       if (!hasMoreToRender && !hasMoreOnServer) return;
-      
+
       const scrollY = window.scrollY;
       const viewportHeight = window.innerHeight;
       const docHeight = document.documentElement.scrollHeight;
-      
+
       // Trigger when user scrolls to 50% of page
       if (scrollY + viewportHeight >= docHeight * 0.5) {
         if (hasMoreToRender) {
@@ -847,37 +849,37 @@ function bindEvents() {
       }
     }, 100); // Debounce 100ms
   });
-  
+
   // Top button
   elements.toTopBtn?.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
-  
+
   // Viewer navigation
   elements.viewerPrev?.addEventListener("click", () => navigateViewer(-1));
   elements.viewerNext?.addEventListener("click", () => navigateViewer(1));
   elements.closeViewer?.addEventListener("click", closeViewer);
-  
+
   // Copy link
   elements.viewerCopyLink?.addEventListener("click", () => {
     navigator.clipboard.writeText(window.location.href);
     showToast("Link copied!", "success");
   });
-  
+
   // Click on media side to close
   document.querySelector(".viewer-media-side")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeViewer();
   });
-  
+
   // Click on backdrop to close
   elements.viewer?.addEventListener("click", (e) => {
     if (e.target === elements.viewer) closeViewer();
   });
-  
+
   // Keyboard
   document.addEventListener("keydown", (e) => {
     if (elements.viewer?.classList.contains("hidden")) return;
-    
+
     if (e.key === "Escape") closeViewer();
     if (e.key === "ArrowLeft") navigateViewer(-1);
     if (e.key === "ArrowRight") navigateViewer(1);
@@ -898,35 +900,35 @@ function debounce(fn, delay) {
 
 async function init() {
   console.log("Initializing gallery app...");
-  
+
   try {
     initElements();
     console.log("Elements initialized:", Object.keys(elements).filter(k => elements[k]).length, "found");
-    
+
     bindEvents();
     console.log("Events bound");
-    
+
     console.log("Fetching context...");
     const context = await fetchContext();
     console.log("Context fetched:", context ? "OK" : "null");
-    
+
     console.log("Loading media...");
     const cachedItems = context?.cached_items || 0;
     const shouldRefresh = cachedItems === 0;
     console.log("Cached items:", cachedItems, "shouldRefresh:", shouldRefresh);
-    
+
     // Load initial batch for fast experience (don't load all at once over slow tunnels)
     const initialLimit = 50;
     const mediaResult = await loadMedia(initialLimit, 0, shouldRefresh);
     console.log("Media loaded:", mediaResult ? "OK" : "failed/null");
-    
+
     console.log("Final state - items:", state.items.length, "filtered:", state.filtered.length);
-    
+
     // Make sure grid is visible
     if (elements.grid) {
       elements.grid.style.display = "";
     }
-    
+
     if (window.location.hash) {
       setTimeout(() => {
         const hash = window.location.hash;
@@ -937,7 +939,7 @@ async function init() {
         }
       }, 1000);
     }
-    
+
     showToast("Gallery loaded successfully", "success", 2000);
   } catch (error) {
     console.error("Init error:", error);
@@ -948,7 +950,7 @@ async function init() {
 document.addEventListener("DOMContentLoaded", init);
 
 // Global error handler to prevent white screen
-window.onerror = function(msg, url, line, col, error) {
+window.onerror = function (msg, url, line, col, error) {
   console.error("Global error:", msg, "at line", line);
   const container = document.getElementById("toastContainer") || document.body;
   const errorDiv = document.createElement("div");
