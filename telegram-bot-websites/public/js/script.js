@@ -1015,10 +1015,11 @@ function startAutoSync() {
 }
 
 // ============================================
-// AI Chat Bubble Logic (Draggable)
+// AI Chat Bubble Logic (Draggable + History)
 // ============================================
 
-let _chatDrag = { active: false, startX: 0, startY: 0, fabX: 0, fabY: 0, moved: false };
+let _chatDrag = { active: false, startX: 0, startY: 0, fabX: 0, fabY: 0, moved: false, isTouch: false };
+let _chatHistory = []; // In-memory history — clears on page refresh
 
 function positionChatPanel() {
   const panel = elements.chatPanel;
@@ -1026,20 +1027,29 @@ function positionChatPanel() {
   if (!panel || !fab) return;
 
   const fabRect = fab.getBoundingClientRect();
-  const pw = 360, ph = 500;
   const vw = window.innerWidth, vh = window.innerHeight;
 
-  // Determine best panel position relative to FAB
+  // On small screens: full width panel above FAB
+  if (vw <= 480) {
+    panel.style.left = "8px";
+    panel.style.right = "8px";
+    panel.style.width = "auto";
+    panel.style.bottom = (vh - fabRect.top + 12) + "px";
+    panel.style.top = "auto";
+    return;
+  }
+
+  const pw = 360, ph = 500;
   let left = fabRect.left - pw + 56;
   let bottom = vh - fabRect.top + 12;
 
-  // Keep panel within viewport
   if (left < 8) left = 8;
   if (left + pw > vw - 8) left = vw - pw - 8;
   if (bottom + ph > vh - 8) bottom = vh - ph - 8;
   if (bottom < 8) bottom = 8;
 
   panel.style.right = "auto";
+  panel.style.width = pw + "px";
   panel.style.bottom = bottom + "px";
   panel.style.left = left + "px";
 }
@@ -1050,7 +1060,10 @@ function toggleChat() {
   if (!panel || !fab) return;
 
   const isOpen = panel.classList.contains("open");
-  if (!isOpen) positionChatPanel();
+  if (!isOpen) {
+    positionChatPanel();
+    _restoreChatHistory(); // Restore history after viewer or other navigation
+  }
   panel.classList.toggle("open");
   fab.classList.toggle("active");
 
@@ -1067,13 +1080,14 @@ function initChatDrag() {
     const t = e.touches ? e.touches[0] : e;
     _chatDrag.active = true;
     _chatDrag.moved = false;
+    _chatDrag.isTouch = !!e.touches;
     _chatDrag.startX = t.clientX;
     _chatDrag.startY = t.clientY;
     const rect = fab.getBoundingClientRect();
     _chatDrag.fabX = rect.left;
     _chatDrag.fabY = rect.top;
     fab.style.transition = "none";
-    e.preventDefault();
+    if (e.touches) e.preventDefault(); // prevent scroll on touch
   }
 
   function onMove(e) {
@@ -1082,12 +1096,13 @@ function initChatDrag() {
     const dx = t.clientX - _chatDrag.startX;
     const dy = t.clientY - _chatDrag.startY;
 
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _chatDrag.moved = true;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) _chatDrag.moved = true;
+
+    if (!_chatDrag.moved) return; // don't move until threshold
 
     let newX = _chatDrag.fabX + dx;
     let newY = _chatDrag.fabY + dy;
 
-    // Clamp to viewport
     const vw = window.innerWidth, vh = window.innerHeight;
     newX = Math.max(0, Math.min(newX, vw - 56));
     newY = Math.max(0, Math.min(newY, vh - 56));
@@ -1100,10 +1115,19 @@ function initChatDrag() {
     e.preventDefault();
   }
 
-  function onEnd() {
+  function onEnd(e) {
     if (!_chatDrag.active) return;
     _chatDrag.active = false;
     fab.style.transition = "";
+
+    if (!_chatDrag.moved) {
+      // It was a tap/click — toggle the chat
+      // (needed on mobile since preventDefault on touchstart kills click event)
+      if (_chatDrag.isTouch) {
+        toggleChat();
+      }
+      return;
+    }
 
     // Snap to nearest edge (left or right)
     const rect = fab.getBoundingClientRect();
@@ -1116,7 +1140,9 @@ function initChatDrag() {
       fab.style.right = "16px";
     }
 
-    // If panel is open, reposition it
+    fab.style.top = "auto";
+    fab.style.bottom = "24px";
+
     if (elements.chatPanel?.classList.contains("open")) {
       setTimeout(positionChatPanel, 50);
     }
@@ -1129,23 +1155,38 @@ function initChatDrag() {
   document.addEventListener("touchmove", onMove, { passive: false });
   document.addEventListener("touchend", onEnd);
 
-  // Click only if not dragged
+  // Desktop click (not touch)
   fab.addEventListener("click", (e) => {
-    if (_chatDrag.moved) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
+    if (_chatDrag.isTouch) return; // handled by touchend
+    if (_chatDrag.moved) return;
     toggleChat();
   });
 }
 
+function _restoreChatHistory() {
+  const container = elements.chatMessages;
+  if (!container) return;
+  // Only restore if panel is empty (avoids duplicating on re-open)
+  if (container.children.length > 0) return;
+  _chatHistory.forEach(({ text, type }) => {
+    const msg = document.createElement("div");
+    msg.className = `chat-msg ${type}`;
+    msg.textContent = text;
+    container.appendChild(msg);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
 function addChatMessage(text, type = "ai") {
+  // Save to in-session history (clears on page refresh)
+  if (type === "user" || type === "ai") {
+    _chatHistory.push({ text, type });
+  }
   const msg = document.createElement("div");
   msg.className = `chat-msg ${type}`;
   msg.textContent = text;
   elements.chatMessages?.appendChild(msg);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  if (elements.chatMessages) elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   return msg;
 }
 
@@ -1154,7 +1195,7 @@ function addTypingIndicator() {
   msg.className = "chat-msg ai";
   msg.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
   elements.chatMessages?.appendChild(msg);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  if (elements.chatMessages) elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   return msg;
 }
 
