@@ -16,7 +16,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=20260221a">
+  <link rel="stylesheet" href="/css/style.css?v=20260223a">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/cardio.js"></script>
 </head>
@@ -216,7 +216,39 @@
     </article>
   </template>
 
-  <script src="/js/script.js?v=20260221b"></script>
+  <!-- AI Chat Bubble Widget -->
+  <div id="chatPanel" class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-dot"></div>
+      <div>
+        <div class="chat-header-title">Vault AI Assistant</div>
+        <div class="chat-header-sub">Powered by Ollama</div>
+      </div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-msg ai">👋 Hey! I'm your Vault assistant. Ask me about your media, stats, or anything!</div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Ask me anything..." autocomplete="off">
+      <button class="chat-send-btn" id="chatSendBtn" aria-label="Send message">
+        <svg viewBox="0 0 24 24">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <button class="chat-fab" id="chatFab" aria-label="Open AI chat">
+    <svg class="chat-fab-icon" viewBox="0 0 24 24">
+      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" />
+      <path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z" />
+    </svg>
+    <svg class="chat-fab-close" viewBox="0 0 24 24">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+    </svg>
+  </button>
+
+  <script src="/js/script.js?v=20260223a"></script>
 </body>
 
 </html>

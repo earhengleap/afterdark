@@ -25,6 +25,11 @@ function initElements() {
   elements.loadMoreBtn = document.getElementById("loadMoreBtn");
   elements.searchInput = document.getElementById("searchInput");
   elements.syncBtn = document.getElementById("syncBtn");
+  elements.chatFab = document.getElementById("chatFab");
+  elements.chatPanel = document.getElementById("chatPanel");
+  elements.chatMessages = document.getElementById("chatMessages");
+  elements.chatInput = document.getElementById("chatInput");
+  elements.chatSendBtn = document.getElementById("chatSendBtn");
   elements.retitleBtn = document.getElementById("retitleBtn");
   elements.sortSelect = document.getElementById("sortSelect");
   elements.toTopBtn = document.getElementById("toTopBtn");
@@ -927,6 +932,7 @@ async function init() {
     console.log("Elements initialized:", Object.keys(elements).filter(k => elements[k]).length, "found");
 
     bindEvents();
+    bindChatEvents();
     console.log("Events bound");
 
     console.log("Fetching context...");
@@ -972,7 +978,7 @@ async function init() {
 }
 
 // ============================================
-// Auto Sync (realtime background polling)
+// Auto Sync (lightweight background polling)
 // ============================================
 
 let _autoSyncInterval = null;
@@ -980,18 +986,18 @@ let _autoSyncInterval = null;
 async function autoSync() {
   if (state.isLoading) return;
   try {
-    const res = await fetch("/api/sync?limit=200&wait_seconds=10", {
-      method: "POST",
+    // Lightweight check: only read cached data, no heavy Telegram sync
+    const res = await fetch("/api/media?limit=1&offset=0", {
       headers: await requestHeaders(),
     });
     if (res.ok) {
       const data = await res.json();
-      const newTotal = data.total || 0;
-      const oldTotal = state.items.length;
-      if (newTotal > oldTotal) {
-        console.log(`Auto-sync: found ${newTotal - oldTotal} new items`);
+      const serverTotal = data.total || 0;
+      const localTotal = state.totalItems || state.items.length;
+      if (serverTotal > localTotal) {
+        console.log(`Auto-sync: server has ${serverTotal - localTotal} new items`);
         await loadMedia(50, 0, false);
-        showToast(`${newTotal - oldTotal} new items synced`, "success", 2000);
+        showToast(`${serverTotal - localTotal} new items available`, "success", 2000);
       }
     }
   } catch (e) {
@@ -1000,12 +1006,212 @@ async function autoSync() {
 }
 
 function startAutoSync() {
-  // Run first auto-sync after a short delay (let the page settle)
-  setTimeout(autoSync, 3000);
+  // First check after 5 seconds (let page settle)
+  setTimeout(autoSync, 5000);
 
-  // Then repeat every 30 seconds
-  _autoSyncInterval = setInterval(autoSync, 30000);
-  console.log("Auto-sync started (every 30s)");
+  // Then check every 60 seconds (lightweight, no Telegram calls)
+  _autoSyncInterval = setInterval(autoSync, 60000);
+  console.log("Auto-sync started (every 60s, lightweight)");
+}
+
+// ============================================
+// AI Chat Bubble Logic (Draggable)
+// ============================================
+
+let _chatDrag = { active: false, startX: 0, startY: 0, fabX: 0, fabY: 0, moved: false };
+
+function positionChatPanel() {
+  const panel = elements.chatPanel;
+  const fab = elements.chatFab;
+  if (!panel || !fab) return;
+
+  const fabRect = fab.getBoundingClientRect();
+  const pw = 360, ph = 500;
+  const vw = window.innerWidth, vh = window.innerHeight;
+
+  // Determine best panel position relative to FAB
+  let left = fabRect.left - pw + 56;
+  let bottom = vh - fabRect.top + 12;
+
+  // Keep panel within viewport
+  if (left < 8) left = 8;
+  if (left + pw > vw - 8) left = vw - pw - 8;
+  if (bottom + ph > vh - 8) bottom = vh - ph - 8;
+  if (bottom < 8) bottom = 8;
+
+  panel.style.right = "auto";
+  panel.style.bottom = bottom + "px";
+  panel.style.left = left + "px";
+}
+
+function toggleChat() {
+  const panel = elements.chatPanel;
+  const fab = elements.chatFab;
+  if (!panel || !fab) return;
+
+  const isOpen = panel.classList.contains("open");
+  if (!isOpen) positionChatPanel();
+  panel.classList.toggle("open");
+  fab.classList.toggle("active");
+
+  if (!isOpen) {
+    setTimeout(() => elements.chatInput?.focus(), 300);
+  }
+}
+
+function initChatDrag() {
+  const fab = elements.chatFab;
+  if (!fab) return;
+
+  function onStart(e) {
+    const t = e.touches ? e.touches[0] : e;
+    _chatDrag.active = true;
+    _chatDrag.moved = false;
+    _chatDrag.startX = t.clientX;
+    _chatDrag.startY = t.clientY;
+    const rect = fab.getBoundingClientRect();
+    _chatDrag.fabX = rect.left;
+    _chatDrag.fabY = rect.top;
+    fab.style.transition = "none";
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!_chatDrag.active) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = t.clientX - _chatDrag.startX;
+    const dy = t.clientY - _chatDrag.startY;
+
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _chatDrag.moved = true;
+
+    let newX = _chatDrag.fabX + dx;
+    let newY = _chatDrag.fabY + dy;
+
+    // Clamp to viewport
+    const vw = window.innerWidth, vh = window.innerHeight;
+    newX = Math.max(0, Math.min(newX, vw - 56));
+    newY = Math.max(0, Math.min(newY, vh - 56));
+
+    fab.style.position = "fixed";
+    fab.style.left = newX + "px";
+    fab.style.top = newY + "px";
+    fab.style.right = "auto";
+    fab.style.bottom = "auto";
+    e.preventDefault();
+  }
+
+  function onEnd() {
+    if (!_chatDrag.active) return;
+    _chatDrag.active = false;
+    fab.style.transition = "";
+
+    // Snap to nearest edge (left or right)
+    const rect = fab.getBoundingClientRect();
+    const vw = window.innerWidth;
+    if (rect.left + 28 < vw / 2) {
+      fab.style.left = "16px";
+      fab.style.right = "auto";
+    } else {
+      fab.style.left = "auto";
+      fab.style.right = "16px";
+    }
+
+    // If panel is open, reposition it
+    if (elements.chatPanel?.classList.contains("open")) {
+      setTimeout(positionChatPanel, 50);
+    }
+  }
+
+  fab.addEventListener("mousedown", onStart);
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onEnd);
+  fab.addEventListener("touchstart", onStart, { passive: false });
+  document.addEventListener("touchmove", onMove, { passive: false });
+  document.addEventListener("touchend", onEnd);
+
+  // Click only if not dragged
+  fab.addEventListener("click", (e) => {
+    if (_chatDrag.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    toggleChat();
+  });
+}
+
+function addChatMessage(text, type = "ai") {
+  const msg = document.createElement("div");
+  msg.className = `chat-msg ${type}`;
+  msg.textContent = text;
+  elements.chatMessages?.appendChild(msg);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  return msg;
+}
+
+function addTypingIndicator() {
+  const msg = document.createElement("div");
+  msg.className = "chat-msg ai";
+  msg.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  elements.chatMessages?.appendChild(msg);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  return msg;
+}
+
+async function sendChatMessage() {
+  const input = elements.chatInput;
+  const sendBtn = elements.chatSendBtn;
+  if (!input || !sendBtn) return;
+
+  const message = input.value.trim();
+  if (!message) return;
+
+  addChatMessage(message, "user");
+  input.value = "";
+  sendBtn.disabled = true;
+
+  const typing = addTypingIndicator();
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await requestHeaders()),
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    const data = await res.json();
+    typing.remove();
+
+    if (data.ok) {
+      addChatMessage(data.reply, "ai");
+    } else {
+      const errMsg = addChatMessage(data.error || "Something went wrong", "ai");
+      errMsg.classList.add("error");
+    }
+  } catch (err) {
+    typing.remove();
+    const errMsg = addChatMessage("Network error — couldn't reach AI", "ai");
+    errMsg.classList.add("error");
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+function bindChatEvents() {
+  initChatDrag();
+
+  elements.chatSendBtn?.addEventListener("click", sendChatMessage);
+
+  elements.chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);

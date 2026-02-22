@@ -35,7 +35,8 @@ from urllib.parse import parse_qsl
 import urllib.request
 
 import uvicorn
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import URL
@@ -55,8 +56,11 @@ class CachedStaticFiles(StaticFiles):
             ext = path.lower().split(".")[-1] if "." in path else ""
             if ext in ("jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov"):
                 response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
+            elif ext in ("css", "js"):
+                # Short cache for CSS/JS so tunnel users get fresh files
+                response.headers["Cache-Control"] = "public, max-age=60, must-revalidate"
             else:
-                response.headers["Cache-Control"] = "public, max-age=86400"
+                response.headers["Cache-Control"] = "public, max-age=3600"
         return response
 
 if os.name == "nt":
@@ -160,9 +164,9 @@ except ValueError:
 # Keep this bounded so a misconfig doesn't accidentally hang the server.
 AI_TITLE_BATCH_SIZE_MAX = max(1, min(AI_TITLE_BATCH_SIZE_MAX, 5000))
 try:
-    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "10").strip() or "10"), AI_TITLE_BATCH_SIZE_MAX))
+    AI_TITLE_BATCH_SIZE = max(1, min(int(os.getenv("TWA_AI_BATCH_SIZE", "5").strip() or "5"), AI_TITLE_BATCH_SIZE_MAX))
 except ValueError:
-    AI_TITLE_BATCH_SIZE = 10
+    AI_TITLE_BATCH_SIZE = 5
 try:
     # 0 means scan full cached index (backfill titles for older media).
     _scan_raw = int(os.getenv("TWA_AI_RECENT_SCAN_LIMIT", "0").strip() or "0")
@@ -170,9 +174,9 @@ try:
 except ValueError:
     AI_TITLE_RECENT_SCAN_LIMIT = 0
 try:
-    AI_TITLE_POLL_SECONDS = max(5, int(os.getenv("TWA_AI_POLL_SECONDS", "5").strip() or "5"))
+    AI_TITLE_POLL_SECONDS = max(5, int(os.getenv("TWA_AI_POLL_SECONDS", "8").strip() or "8"))
 except ValueError:
-    AI_TITLE_POLL_SECONDS = 5
+    AI_TITLE_POLL_SECONDS = 8
 try:
     AI_TITLE_FAILURE_COOLDOWN_SECONDS = max(5, int(os.getenv("TWA_AI_FAILURE_COOLDOWN_SECONDS", "45").strip() or "45"))
 except ValueError:
@@ -540,7 +544,11 @@ class TelegramGalleryService:
             self._load_index()
 
             # Register realtime message handler for instant media detection
-            self._register_realtime_handler()
+            try:
+                self._register_realtime_handler()
+                logger.info("[REALTIME] Message handler registered successfully")
+            except Exception as e:
+                logger.warning(f"[REALTIME] Could not register handler (non-fatal): {e}")
 
     async def stop(self) -> None:
         if self._started:
@@ -3246,6 +3254,15 @@ app = FastAPI(
 app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
 app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
 
+# Allow all origins so the serveo tunnel and other hosts can call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def resolve_webapp_context(
     init_data: Optional[str],
@@ -3952,6 +3969,157 @@ async def api_ai_titles_process_all(
             "error": str(e),
             "status": "error",
             "ai_titled_count": count_ai_titled_items(service.media_index),
+        }
+
+
+@app.post("/api/chat")
+async def api_chat(
+    request: Request,
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """AI chat assistant powered by Ollama — scoped to the gallery."""
+    resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+
+    body = await request.json()
+    user_message = str(body.get("message", "")).strip()
+    if not user_message:
+        return {"ok": False, "error": "Empty message"}
+
+    # Build gallery context for the system prompt
+    total_items = len(service.media_index)
+    stats = compute_gallery_stats(service.media_index)
+    ai_titled = count_ai_titled_items(service.media_index)
+
+    # Gather recent media details (up to 50 items for better context)
+    recent_media_lines = []
+    for item in service.media_index[:50]:
+        title = item.get("ai_title") or item.get("caption") or ""
+        desc = item.get("ai_description", "")
+        kind = item.get("media_kind", "?")
+        mid = item.get("message_id", "?")
+        dur = item.get("duration", 0)
+        date_str = str(item.get("date", ""))[:10]
+        line = f"  #{mid}: [{kind}] \"{title}\""
+        if desc:
+            line += f" — {desc[:80]}"
+        if dur:
+            line += f" ({dur}s)"
+        if date_str:
+            line += f" [{date_str}]"
+        recent_media_lines.append(line)
+    recent_text = "\n".join(recent_media_lines) if recent_media_lines else "  No items yet."
+
+    # Gather category breakdown
+    untitled = sum(1 for x in service.media_index if not str(x.get("ai_title", "")).strip())
+
+    system_prompt = f"""You are AfterDark Vault Assistant — the built-in AI helper for this private media gallery website.
+You are knowledgeable, friendly, concise, and helpful. Use emojis occasionally.
+
+== ABOUT THIS WEBSITE ==
+AfterDark Vault is a self-hosted gallery app that mirrors media from a private Telegram group.
+It runs on the user's own computer with a Python/FastAPI backend and vanilla HTML/CSS/JS frontend.
+Media is served via localhost and also through a serveo.net SSH tunnel for remote access.
+
+== WHAT THE WEBSITE CAN DO ==
+- Browse all {total_items} media items (photos and videos) in a masonry grid
+- Filter by: All, Videos only, Images only
+- Sort by: Newest, Oldest, Largest, Smallest
+- Search by title, description, or caption using the search bar
+- Click any card to open the full viewer (video player or image viewer)
+- Sync button pulls latest media from the Telegram source group
+- AI button generates AI titles/descriptions for untitled media using Ollama vision
+- Layout options: Compact or Spacious grid
+- Scroll to top button, infinite scroll pagination
+- Real-time detection: new media posted in the Telegram group appears automatically
+
+== TELEGRAM SOURCE GROUP ==
+- Chat ID: {CHAT_ID}
+- Media is synced from this private Telegram group
+- The bot monitors for new messages and adds them to the gallery in real-time
+
+== GALLERY STATS ==
+- Total items: {total_items}
+- Videos: {stats.get('videos', 0)}
+- Images: {stats.get('images', 0)}
+- Total storage: {stats.get('total_size_mb', 0):.1f} MB ({stats.get('total_size_mb', 0) / 1024:.1f} GB)
+- AI-titled items: {ai_titled} ({(ai_titled / total_items * 100) if total_items else 0:.0f}%)
+- Untitled items: {untitled}
+- Last sync: {service.last_sync_at or 'never'}
+
+== RECENT MEDIA (newest first, up to 50) ==
+{recent_text}
+
+== HOW TO RESPOND ==
+- For stats questions: use the gallery stats above
+- For search questions: tell the user to use the search bar at the top and suggest keywords
+- For "find me X" requests: suggest search terms based on the media titles you know
+- For "how to" questions: explain the website features listed above
+- For media questions: reference the recent media list, cite message IDs when relevant
+- Keep answers concise (2-5 sentences). Be specific, not generic.
+- If asked about a specific video/image, look for it in the recent media list by title or ID."""
+
+    text_model = AI_TITLE_TEXT_MODEL
+    ollama_base = AI_TITLE_OLLAMA_URL.replace("/api/generate", "")
+
+    try:
+        payload = {
+            "model": text_model,
+            "prompt": user_message,
+            "system": system_prompt,
+            "stream": False,
+            "options": {"temperature": 0.7, "num_predict": 300},
+        }
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{ollama_base}/api/generate",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        loop = asyncio.get_event_loop()
+        response_body = await loop.run_in_executor(
+            None,
+            lambda: urllib.request.urlopen(req, timeout=60).read().decode("utf-8", errors="ignore"),
+        )
+
+        parsed = json.loads(response_body)
+        reply = parsed.get("response", "").strip()
+
+        if not reply:
+            return {"ok": False, "error": "AI returned empty response"}
+
+        return {"ok": True, "reply": reply, "model": text_model}
+
+    except Exception as e:
+        logger.warning(f"[CHAT] Ollama error: {e}")
+
+        for fallback_model in AI_TITLE_TEXT_FALLBACK_MODELS:
+            try:
+                payload["model"] = fallback_model
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(
+                    f"{ollama_base}/api/generate",
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                response_body = await loop.run_in_executor(
+                    None,
+                    lambda: urllib.request.urlopen(req, timeout=60).read().decode("utf-8", errors="ignore"),
+                )
+                parsed = json.loads(response_body)
+                reply = parsed.get("response", "").strip()
+                if reply:
+                    return {"ok": True, "reply": reply, "model": fallback_model}
+            except Exception:
+                continue
+
+        return {
+            "ok": False,
+            "error": f"AI is offline. Make sure Ollama is running with model '{text_model}'.",
         }
 
 
