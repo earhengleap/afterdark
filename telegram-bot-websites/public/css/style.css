@@ -8,8 +8,8 @@
   --text-muted: #666666;
   --line: rgba(255, 255, 255, 0.08);
   --line-soft: rgba(255, 255, 255, 0.04);
-  --accent: #ff4757;
-  --accent-2: #ff6b81;
+  --accent: #00ff41;
+  --accent-2: #00cc33;
   --good: #2ed573;
   --warning: #ffa502;
   --danger: #ff4757;
@@ -53,7 +53,7 @@ body {
 body {
   color: var(--text);
   background: var(--bg-0);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  font-family: "Fira Code", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI";
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -150,6 +150,30 @@ h1 {
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blinking-cursor {
+  display: inline-block;
+  width: 10px;
+  height: 22px;
+  background-color: var(--accent);
+  animation: blink 1s step-end infinite;
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
 }
 
 .session-text {

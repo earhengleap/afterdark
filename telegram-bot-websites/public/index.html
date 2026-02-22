@@ -1,8 +1,10 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>AfterDark Vault</title>
   <meta name="theme-color" content="#0d0d0d">
   <meta name="description" content="AI-powered Telegram media gallery">
@@ -11,15 +13,13 @@
   <meta name="format-detection" content="telephone=no">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="dns-prefetch" href="/media">
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="/api">
-  <link rel="preconnect" href="/media">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css?v=20260221a">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
   <div class="app">
     <div class="sticky-stack">
@@ -29,20 +29,13 @@
             <span class="pill age-pill">18+</span>
             <span class="pill live-pill">AI Vault</span>
           </div>
-          <p class="kicker">Intelligent Media Gallery</p>
-          <h1>AfterDark Vault</h1>
-          <p id="sessionText" class="session-text">Initializing...</p>
+          <h1>AfterDark Vault<span class="blinking-cursor"></span></h1>
         </div>
 
         <label class="search-wrap" for="searchInput">
           <span class="search-icon">Search</span>
-          <input 
-            id="searchInput" 
-            type="search" 
-            placeholder="Search titles, descriptions..."
-            autocomplete="off"
-            aria-label="Search media"
-          >
+          <input id="searchInput" type="search" placeholder="Search titles, descriptions..." autocomplete="off"
+            aria-label="Search media">
         </label>
 
         <div class="top-actions">
@@ -60,7 +53,8 @@
 
       <section class="controls surface" aria-label="Gallery filters">
         <div class="tabs" role="tablist" aria-label="Media type filter">
-          <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true" aria-controls="grid">
+          <button class="tab active" data-filter="all" type="button" role="tab" aria-selected="true"
+            aria-controls="grid">
             All
           </button>
           <button class="tab" data-filter="video" type="button" role="tab" aria-selected="false" aria-controls="grid">
@@ -82,10 +76,12 @@
             </select>
           </label>
           <div class="layout-wrap" role="group" aria-label="Layout density">
-            <button id="layoutDenseBtn" class="chip" type="button" aria-pressed="true" data-layout="dense" aria-label="Compact layout">
+            <button id="layoutDenseBtn" class="chip" type="button" aria-pressed="true" data-layout="dense"
+              aria-label="Compact layout">
               Compact
             </button>
-            <button id="layoutComfortBtn" class="chip" type="button" aria-pressed="false" data-layout="comfort" aria-label="Spacious layout">
+            <button id="layoutComfortBtn" class="chip" type="button" aria-pressed="false" data-layout="comfort"
+              aria-label="Spacious layout">
               Spacious
             </button>
           </div>
@@ -120,13 +116,13 @@
 
     <main role="main" aria-label="Media gallery">
       <div id="grid" class="grid" role="list" aria-label="Media items"></div>
-      
+
       <div id="emptyState" class="empty hidden" role="status" aria-live="polite">
         <div class="empty-icon">&#128269;</div>
         <p>No media found</p>
         <p style="font-size: 13px; margin-top: 8px; opacity: 0.6;">Try adjusting your search or sync new content</p>
       </div>
-      
+
       <button id="loadMoreBtn" class="btn load-more hidden" type="button" aria-label="Load more media">
         Load More
       </button>
@@ -137,24 +133,26 @@
     <div class="viewer-backdrop"></div>
     <div class="viewer-shell surface">
       <button id="closeViewer" class="viewer-close" type="button" aria-label="Close viewer">&#x2715;</button>
-      <button id="viewerPrev" class="viewer-nav viewer-prev" type="button" aria-label="Previous media" disabled>&#8249;</button>
-      <button id="viewerNext" class="viewer-nav viewer-next" type="button" aria-label="Next media" disabled>&#8250;</button>
-      
+      <button id="viewerPrev" class="viewer-nav viewer-prev" type="button" aria-label="Previous media"
+        disabled>&#8249;</button>
+      <button id="viewerNext" class="viewer-nav viewer-next" type="button" aria-label="Next media"
+        disabled>&#8250;</button>
+
       <div id="viewerMedia" class="viewer-media" role="img" aria-label="Media content"></div>
-      
+
       <div class="viewer-info" id="viewerInfoPanel" role="region" aria-label="Media details">
         <h2 id="viewerTitle" tabindex="-1">Media</h2>
-        
+
         <div class="viewer-section">
           <p class="label">AI Description</p>
           <p id="viewerDescription">No description</p>
         </div>
-        
+
         <div class="viewer-section">
           <p class="label">Caption</p>
           <p id="viewerCaption">No caption</p>
         </div>
-        
+
         <div id="aiInsightsPanel" class="ai-insights hidden" role="region" aria-label="AI Insights">
           <div class="ai-insights-title">
             <span>&#10024;</span>
@@ -162,20 +160,20 @@
           </div>
           <div id="aiInsightsContent" class="ai-insights-content"></div>
         </div>
-        
+
         <div class="chips" role="list" aria-label="Media metadata">
           <span id="viewerType" role="listitem">-</span>
           <span id="viewerSize" role="listitem">-</span>
           <span id="viewerDate" role="listitem">-</span>
           <span id="viewerResolution" role="listitem" class="hidden">-</span>
         </div>
-        
+
         <div class="viewer-actions" role="group" aria-label="Media actions">
           <button id="viewerCopyLink" class="btn btn-ghost" type="button">Copy Link</button>
           <button id="viewerCopyEmbed" class="btn btn-ghost" type="button">Embed</button>
           <a id="viewerDownload" class="btn btn-primary" href="#" download role="button">Download</a>
         </div>
-        
+
         <div class="suggested-section" id="suggestedSection">
           <h3 class="suggested-title">Up Next</h3>
           <div class="suggested-grid" id="suggestedGrid"></div>
@@ -213,4 +211,5 @@
 
   <script src="/js/script.js?v=20260221b"></script>
 </body>
+
 </html>
