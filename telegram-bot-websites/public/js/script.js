@@ -1173,7 +1173,8 @@ async function sendChatMessage() {
   const typing = addTypingIndicator();
 
   try {
-    const res = await fetch("/api/chat", {
+    // Step 1: Start the AI task — server returns task_id immediately (< 100ms)
+    const startRes = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1182,23 +1183,76 @@ async function sendChatMessage() {
       body: JSON.stringify({ message }),
     });
 
-    const data = await res.json();
-    typing.remove();
-
-    if (data.ok) {
-      addChatMessage(data.reply, "ai");
-    } else {
-      const errMsg = addChatMessage(data.error || "Something went wrong", "ai");
-      errMsg.classList.add("error");
+    if (!startRes.ok) {
+      throw new Error(`Server error ${startRes.status}`);
     }
+
+    const startData = await startRes.json();
+
+    if (!startData.ok) {
+      typing.remove();
+      const errMsg = addChatMessage(startData.error || "Something went wrong", "ai");
+      errMsg.classList.add("error");
+      sendBtn.disabled = false;
+      input.focus();
+      return;
+    }
+
+    // Step 2: Poll /api/chat/result/{task_id} every 2s until done
+    const taskId = startData.task_id;
+    let attempts = 0;
+    const maxAttempts = 30; // 30 * 2s = 60s max wait
+
+    const poll = async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        typing.remove();
+        const errMsg = addChatMessage("AI took too long to respond. Try again.", "ai");
+        errMsg.classList.add("error");
+        sendBtn.disabled = false;
+        input.focus();
+        return;
+      }
+
+      try {
+        const pollRes = await fetch(`/api/chat/result/${taskId}`, {
+          headers: await requestHeaders(),
+        });
+        const pollData = await pollRes.json();
+
+        if (pollData.status === "pending") {
+          // Still processing — poll again after 2s
+          setTimeout(poll, 2000);
+          return;
+        }
+
+        typing.remove();
+        if (pollData.ok && pollData.reply) {
+          addChatMessage(pollData.reply, "ai");
+        } else {
+          const errMsg = addChatMessage(pollData.error || "Something went wrong", "ai");
+          errMsg.classList.add("error");
+        }
+      } catch (pollErr) {
+        typing.remove();
+        const errMsg = addChatMessage("Network error during polling", "ai");
+        errMsg.classList.add("error");
+      }
+
+      sendBtn.disabled = false;
+      input.focus();
+    };
+
+    // Start polling after 2s (give server time to generate)
+    setTimeout(poll, 2000);
+
   } catch (err) {
     typing.remove();
     const errMsg = addChatMessage("Network error — couldn't reach AI", "ai");
     errMsg.classList.add("error");
+    sendBtn.disabled = false;
+    input.focus();
   }
-
-  sendBtn.disabled = false;
-  input.focus();
 }
 
 function bindChatEvents() {

@@ -235,6 +235,10 @@ def apply_limit(items: List[Dict[str, Any]], limit: Optional[int]) -> List[Dict[
         return items
     return items[:limit]
 
+# In-memory store for async AI chat tasks (tunnel-friendly polling)
+# {task_id: {"status": "pending"|"done"|"error", "reply": str, "model": str, "error": str}}
+_chat_tasks: Dict[str, Dict[str, Any]] = {}
+
 
 def latest_message_id(items: List[Dict[str, Any]]) -> int:
     if not items:
@@ -3251,17 +3255,18 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
-app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
-
-# Allow all origins so the serveo tunnel and other hosts can call the API
+# CORS: allow all origins (required for serveo tunnel and other cross-origin access)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
+app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
+
 
 
 def resolve_webapp_context(
@@ -3978,149 +3983,139 @@ async def api_chat(
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
-    """AI chat assistant powered by Ollama — scoped to the gallery."""
-    resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    """Start an AI chat task. Returns task_id immediately — poll /api/chat/result/{id} for result."""
+    try:
+        resolve_webapp_context(init_data=init_data, user_agent=user_agent)
+    except Exception:
+        pass
 
-    body = await request.json()
-    user_message = str(body.get("message", "")).strip()
+    try:
+        body = await request.json()
+        user_message = str(body.get("message", "")).strip()
+    except Exception:
+        return {"ok": False, "error": "Invalid request body"}
+
     if not user_message:
         return {"ok": False, "error": "Empty message"}
 
-    # Build gallery context for the system prompt
-    total_items = len(service.media_index)
-    stats = compute_gallery_stats(service.media_index)
-    ai_titled = count_ai_titled_items(service.media_index)
+    # Build gallery context safely
+    try:
+        total_items = len(service.media_index)
+        stats = compute_gallery_stats(service.media_index)
+        ai_titled = count_ai_titled_items(service.media_index)
+        untitled = sum(1 for x in service.media_index if not str(x.get("ai_title", "")).strip())
+        recent_media_lines = []
+        for item in service.media_index[:50]:
+            try:
+                title = item.get("ai_title") or item.get("caption") or ""
+                desc = item.get("ai_description", "")
+                kind = item.get("media_kind", "?")
+                mid = item.get("message_id", "?")
+                line = f"  #{mid}: [{kind}] \"{title}\""
+                if desc:
+                    line += f" — {desc[:60]}"
+                recent_media_lines.append(line)
+            except Exception:
+                continue
+        recent_text = "\n".join(recent_media_lines) if recent_media_lines else "  No items yet."
+    except Exception:
+        total_items = 0; stats = {}; ai_titled = 0; untitled = 0; recent_text = ""
 
-    # Gather recent media details (up to 50 items for better context)
-    recent_media_lines = []
-    for item in service.media_index[:50]:
-        title = item.get("ai_title") or item.get("caption") or ""
-        desc = item.get("ai_description", "")
-        kind = item.get("media_kind", "?")
-        mid = item.get("message_id", "?")
-        dur = item.get("duration", 0)
-        date_str = str(item.get("date", ""))[:10]
-        line = f"  #{mid}: [{kind}] \"{title}\""
-        if desc:
-            line += f" — {desc[:80]}"
-        if dur:
-            line += f" ({dur}s)"
-        if date_str:
-            line += f" [{date_str}]"
-        recent_media_lines.append(line)
-    recent_text = "\n".join(recent_media_lines) if recent_media_lines else "  No items yet."
+    system_prompt = f"""You are AfterDark Vault Assistant — the built-in AI helper for this private media gallery website. Be friendly, concise, helpful. Use emojis occasionally.
 
-    # Gather category breakdown
-    untitled = sum(1 for x in service.media_index if not str(x.get("ai_title", "")).strip())
+WHAT THE WEBSITE CAN DO: Browse {total_items} media items in a masonry grid, filter All/Videos/Images, sort Newest/Oldest/Largest/Smallest, search by title/description, click cards to open full viewer, Sync button to pull new Telegram media, AI button for auto-titles, Compact/Spacious layout, infinite scroll, realtime new media detection.
 
-    system_prompt = f"""You are AfterDark Vault Assistant — the built-in AI helper for this private media gallery website.
-You are knowledgeable, friendly, concise, and helpful. Use emojis occasionally.
+TELEGRAM: Chat ID {CHAT_ID} — media mirrors a private Telegram group in real-time.
 
-== ABOUT THIS WEBSITE ==
-AfterDark Vault is a self-hosted gallery app that mirrors media from a private Telegram group.
-It runs on the user's own computer with a Python/FastAPI backend and vanilla HTML/CSS/JS frontend.
-Media is served via localhost and also through a serveo.net SSH tunnel for remote access.
+GALLERY STATS: {total_items} total items | {stats.get('videos', 0)} videos | {stats.get('images', 0)} images | {stats.get('total_size_mb', 0):.0f} MB | {ai_titled} AI-titled | {untitled} untitled | Last sync: {service.last_sync_at or 'never'}
 
-== WHAT THE WEBSITE CAN DO ==
-- Browse all {total_items} media items (photos and videos) in a masonry grid
-- Filter by: All, Videos only, Images only
-- Sort by: Newest, Oldest, Largest, Smallest
-- Search by title, description, or caption using the search bar
-- Click any card to open the full viewer (video player or image viewer)
-- Sync button pulls latest media from the Telegram source group
-- AI button generates AI titles/descriptions for untitled media using Ollama vision
-- Layout options: Compact or Spacious grid
-- Scroll to top button, infinite scroll pagination
-- Real-time detection: new media posted in the Telegram group appears automatically
-
-== TELEGRAM SOURCE GROUP ==
-- Chat ID: {CHAT_ID}
-- Media is synced from this private Telegram group
-- The bot monitors for new messages and adds them to the gallery in real-time
-
-== GALLERY STATS ==
-- Total items: {total_items}
-- Videos: {stats.get('videos', 0)}
-- Images: {stats.get('images', 0)}
-- Total storage: {stats.get('total_size_mb', 0):.1f} MB ({stats.get('total_size_mb', 0) / 1024:.1f} GB)
-- AI-titled items: {ai_titled} ({(ai_titled / total_items * 100) if total_items else 0:.0f}%)
-- Untitled items: {untitled}
-- Last sync: {service.last_sync_at or 'never'}
-
-== RECENT MEDIA (newest first, up to 50) ==
+RECENT 50 ITEMS:
 {recent_text}
 
-== HOW TO RESPOND ==
-- For stats questions: use the gallery stats above
-- For search questions: tell the user to use the search bar at the top and suggest keywords
-- For "find me X" requests: suggest search terms based on the media titles you know
-- For "how to" questions: explain the website features listed above
-- For media questions: reference the recent media list, cite message IDs when relevant
-- Keep answers concise (2-5 sentences). Be specific, not generic.
-- If asked about a specific video/image, look for it in the recent media list by title or ID."""
+GUIDELINES: For stats questions use gallery stats above. For searches suggest the search bar. Keep answers to 2-4 sentences."""
+
+    # Generate a task ID and start background task immediately
+    task_id = base64.b64encode(os.urandom(12)).decode().replace("=", "").replace("/", "_").replace("+", "-")
+    _chat_tasks[task_id] = {"status": "pending"}
 
     text_model = AI_TITLE_TEXT_MODEL
     ollama_base = AI_TITLE_OLLAMA_URL.replace("/api/generate", "")
 
-    try:
-        payload = {
-            "model": text_model,
-            "prompt": user_message,
-            "system": system_prompt,
-            "stream": False,
-            "options": {"temperature": 0.7, "num_predict": 300},
-        }
+    async def _run_ollama():
+        import http.client, urllib.parse
+        parsed_url = urllib.parse.urlparse(f"{ollama_base}/api/generate")
+        host = parsed_url.hostname or "localhost"
+        port = parsed_url.port or 11434
+        path = parsed_url.path or "/api/generate"
+        models_to_try = [text_model] + list(AI_TITLE_TEXT_FALLBACK_MODELS)
 
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            f"{ollama_base}/api/generate",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-
-        loop = asyncio.get_event_loop()
-        response_body = await loop.run_in_executor(
-            None,
-            lambda: urllib.request.urlopen(req, timeout=60).read().decode("utf-8", errors="ignore"),
-        )
-
-        parsed = json.loads(response_body)
-        reply = parsed.get("response", "").strip()
-
-        if not reply:
-            return {"ok": False, "error": "AI returned empty response"}
-
-        return {"ok": True, "reply": reply, "model": text_model}
-
-    except Exception as e:
-        logger.warning(f"[CHAT] Ollama error: {e}")
-
-        for fallback_model in AI_TITLE_TEXT_FALLBACK_MODELS:
+        for model in models_to_try:
             try:
-                payload["model"] = fallback_model
-                data = json.dumps(payload).encode("utf-8")
-                req = urllib.request.Request(
-                    f"{ollama_base}/api/generate",
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                response_body = await loop.run_in_executor(
-                    None,
-                    lambda: urllib.request.urlopen(req, timeout=60).read().decode("utf-8", errors="ignore"),
-                )
-                parsed = json.loads(response_body)
-                reply = parsed.get("response", "").strip()
+                payload = json.dumps({
+                    "model": model,
+                    "prompt": user_message,
+                    "system": system_prompt,
+                    "stream": True,
+                    "options": {"temperature": 0.7, "num_predict": 100},
+                }).encode("utf-8")
+
+                def _do_stream():
+                    conn = http.client.HTTPConnection(host, port, timeout=90)
+                    try:
+                        conn.request("POST", path, body=payload,
+                                     headers={"Content-Type": "application/json"})
+                        resp = conn.getresponse()
+                        if resp.status != 200:
+                            return None
+                        tokens = []
+                        for raw in resp:
+                            raw = raw.decode("utf-8", errors="ignore").strip()
+                            if not raw:
+                                continue
+                            try:
+                                chunk = json.loads(raw)
+                                tok = chunk.get("response", "")
+                                if tok:
+                                    tokens.append(tok)
+                                if chunk.get("done"):
+                                    break
+                            except Exception:
+                                continue
+                        return "".join(tokens).strip() or None
+                    finally:
+                        conn.close()
+
+                loop = asyncio.get_event_loop()
+                reply = await loop.run_in_executor(None, _do_stream)
                 if reply:
-                    return {"ok": True, "reply": reply, "model": fallback_model}
-            except Exception:
+                    _chat_tasks[task_id] = {"status": "done", "reply": reply, "model": model}
+                    return
+            except Exception as e:
+                logger.warning(f"[CHAT] Model {model} error: {e}")
                 continue
 
-        return {
-            "ok": False,
-            "error": f"AI is offline. Make sure Ollama is running with model '{text_model}'.",
-        }
+        _chat_tasks[task_id] = {"status": "error", "error": f"AI offline — ensure Ollama is running with '{text_model}'."}
+
+    # Fire off background task and return task_id immediately (no waiting!)
+    asyncio.ensure_future(_run_ollama())
+    return {"ok": True, "task_id": task_id, "status": "pending"}
+
+
+@app.get("/api/chat/result/{task_id}")
+async def api_chat_result(task_id: str) -> Dict[str, Any]:
+    """Poll for AI chat result. Returns status: pending | done | error."""
+    task = _chat_tasks.get(task_id)
+    if not task:
+        return {"ok": False, "error": "Task not found or expired"}
+    if task["status"] == "done":
+        # Clean up after reading
+        _chat_tasks.pop(task_id, None)
+        return {"ok": True, "reply": task.get("reply", ""), "model": task.get("model", "")}
+    if task["status"] == "error":
+        _chat_tasks.pop(task_id, None)
+        return {"ok": False, "error": task.get("error", "Unknown error")}
+    return {"ok": True, "status": "pending"}
+
 
 
 @app.post("/api/ai-titles/fix-defaults")
