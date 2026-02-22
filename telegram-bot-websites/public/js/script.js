@@ -2,6 +2,9 @@
 // AFTERDARK - Gallery App
 // ============================================
 
+// Saved scroll position for viewer open/close
+let _savedScrollY = 0;
+
 // State
 const state = {
   items: [],
@@ -552,7 +555,9 @@ function openViewer(item, recomputeIndex = true) {
   if (recomputeIndex) setViewerIndexForItem(item);
   updateViewerNav();
 
-  window.location.hash = `page/${item.message_id}`;
+  // Save scroll position and push URL state — no hashchange, no reload
+  _savedScrollY = window.scrollY;
+  history.pushState({ viewer: item.message_id }, "", `#view/${item.message_id}`);
 
   elements.viewerMedia.innerHTML = "";
 
@@ -656,7 +661,7 @@ function openViewer(item, recomputeIndex = true) {
   renderSuggestedVideos(item);
 }
 
-function closeViewer() {
+function closeViewer(restoreHistory = true) {
   elements.viewer?.classList.add("hidden");
   document.body.style.overflow = "";
   state.viewerIndex = -1;
@@ -671,10 +676,15 @@ function closeViewer() {
     elements.viewerMedia.innerHTML = "";
   }
 
-  // Clear URL hash
-  if (window.location.hash) {
+  // Restore URL without hash
+  if (restoreHistory) {
     history.pushState("", document.title, window.location.pathname);
   }
+
+  // Restore scroll position so gallery looks exactly as left
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: _savedScrollY, behavior: "instant" });
+  });
 }
 
 function navigateViewer(direction) {
@@ -959,13 +969,21 @@ async function init() {
     if (window.location.hash) {
       setTimeout(() => {
         const hash = window.location.hash;
-        if (hash.startsWith("#page/")) {
-          const id = parseInt(hash.replace(/^#page\//, ""), 10);
+        if (hash.startsWith("#view/")) {
+          const id = parseInt(hash.replace(/^#view\//, ""), 10);
           const item = state.items.find(x => Number(x.message_id) === id);
           if (item) openViewer(item);
         }
-      }, 1000);
+      }, 500);
     }
+
+    // Browser back button: close viewer instead of navigating away
+    window.addEventListener("popstate", (e) => {
+      const isViewerOpen = elements.viewer && !elements.viewer.classList.contains("hidden");
+      if (isViewerOpen) {
+        closeViewer(false); // false = don't push state again (already handled by browser)
+      }
+    });
 
     showToast("Gallery loaded successfully", "success", 2000);
 
