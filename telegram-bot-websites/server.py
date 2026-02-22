@@ -4705,6 +4705,201 @@ async def get_single_media(
         "webapp": context,
     }
 
+
+# ============================================
+# Visitor Tracking
+# ============================================
+
+VISITORS_LOG = WEB_DIR / "media_cache" / "visitors.json"
+_visitors_lock = asyncio.Lock()
+
+
+def _parse_device(ua: str) -> Dict[str, str]:
+    """Very lightweight User-Agent parser — no deps needed."""
+    ua_lower = ua.lower()
+
+    # OS
+    if "android" in ua_lower:
+        os_name = "Android"
+    elif "iphone" in ua_lower or "ipad" in ua_lower:
+        os_name = "iOS"
+    elif "windows" in ua_lower:
+        os_name = "Windows"
+    elif "mac os" in ua_lower or "macintosh" in ua_lower:
+        os_name = "macOS"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+    else:
+        os_name = "Unknown OS"
+
+    # Browser
+    if "edg/" in ua_lower or "edge/" in ua_lower:
+        browser = "Edge"
+    elif "chrome/" in ua_lower and "chromium" not in ua_lower:
+        browser = "Chrome"
+    elif "firefox/" in ua_lower:
+        browser = "Firefox"
+    elif "safari/" in ua_lower and "chrome" not in ua_lower:
+        browser = "Safari"
+    elif "opera" in ua_lower or "opr/" in ua_lower:
+        browser = "Opera"
+    else:
+        browser = "Other"
+
+    # Device type
+    if any(x in ua_lower for x in ("mobile", "android", "iphone")):
+        device_type = "Mobile"
+    elif any(x in ua_lower for x in ("ipad", "tablet")):
+        device_type = "Tablet"
+    else:
+        device_type = "Desktop"
+
+    return {"os": os_name, "browser": browser, "device_type": device_type}
+
+
+def _get_client_ip(request: Request) -> str:
+    """Get real client IP even behind proxies / the serveo tunnel."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip", "")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+
+async def _geolocate(ip: str) -> Dict[str, str]:
+    """Fetch geolocation from ip-api.com (free, no API key needed)."""
+    if ip in ("127.0.0.1", "::1", "unknown", "localhost") or ip.startswith("192.168.") or ip.startswith("10."):
+        return {"country": "Local", "city": "Local", "isp": "Local Network"}
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org"
+        import urllib.request as _ur
+        req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        loop = asyncio.get_event_loop()
+        body = await loop.run_in_executor(
+            None, lambda: _ur.urlopen(req, timeout=5).read().decode()
+        )
+        data = json.loads(body)
+        if data.get("status") == "success":
+            return {
+                "country": data.get("country", "?"),
+                "region": data.get("regionName", ""),
+                "city": data.get("city", "?"),
+                "isp": data.get("isp") or data.get("org") or "?",
+            }
+    except Exception:
+        pass
+    return {"country": "?", "city": "?", "isp": "?"}
+
+
+def _load_visitors() -> List[Dict]:
+    try:
+        if VISITORS_LOG.exists():
+            return json.loads(VISITORS_LOG.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+
+def _save_visitors(visitors: List[Dict]) -> None:
+    try:
+        VISITORS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        VISITORS_LOG.write_text(json.dumps(visitors, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"[VISITORS] Could not save log: {e}")
+
+
+@app.post("/api/track")
+async def api_track(request: Request) -> Dict[str, Any]:
+    """Log a page visit — IP, geolocation, device, referrer, Telegram user."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    ip = _get_client_ip(request)
+    ua = request.headers.get("user-agent", "")
+    referrer = body.get("referrer") or request.headers.get("referer", "")
+    page = body.get("page", "/")
+    tg_user_id = body.get("tg_user_id")
+    tg_username = body.get("tg_username")
+
+    # Geo + device in parallel-ish
+    geo = await _geolocate(ip)
+    device = _parse_device(ua)
+
+    entry: Dict[str, Any] = {
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "ip": ip,
+        "country": geo.get("country", "?"),
+        "region": geo.get("region", ""),
+        "city": geo.get("city", "?"),
+        "isp": geo.get("isp", "?"),
+        "device_type": device["device_type"],
+        "os": device["os"],
+        "browser": device["browser"],
+        "referrer": referrer[:200] if referrer else "Direct",
+        "page": page,
+        "ua": ua[:300],
+    }
+    if tg_user_id:
+        entry["tg_user_id"] = tg_user_id
+    if tg_username:
+        entry["tg_username"] = tg_username
+
+    logger.info(f"[VISITOR] {ip} | {geo.get('country')} {geo.get('city')} | {device['device_type']} {device['browser']} | ref={referrer or 'direct'}")
+
+    async with _visitors_lock:
+        visitors = _load_visitors()
+        visitors.insert(0, entry)
+        visitors = visitors[:5000]  # Keep max 5000 entries
+        _save_visitors(visitors)
+
+    return {"ok": True}
+
+
+@app.get("/api/visitors")
+async def api_visitors(
+    limit: int = Query(100, ge=1, le=1000),
+    init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
+    user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
+) -> Dict[str, Any]:
+    """Return visitor log (newest first)."""
+    async with _visitors_lock:
+        visitors = _load_visitors()
+
+    total = len(visitors)
+    sliced = visitors[:limit]
+
+    # Summary stats
+    countries: Dict[str, int] = {}
+    devices: Dict[str, int] = {}
+    browsers: Dict[str, int] = {}
+    for v in visitors:
+        c = v.get("country", "?")
+        countries[c] = countries.get(c, 0) + 1
+        d = v.get("device_type", "?")
+        devices[d] = devices.get(d, 0) + 1
+        b = v.get("browser", "?")
+        browsers[b] = browsers.get(b, 0) + 1
+
+    top_countries = sorted(countries.items(), key=lambda x: -x[1])[:10]
+    top_devices = sorted(devices.items(), key=lambda x: -x[1])[:5]
+    top_browsers = sorted(browsers.items(), key=lambda x: -x[1])[:5]
+
+    return {
+        "ok": True,
+        "total": total,
+        "visitors": sliced,
+        "stats": {
+            "top_countries": [{"country": k, "count": v} for k, v in top_countries],
+            "devices": [{"type": k, "count": v} for k, v in top_devices],
+            "browsers": [{"browser": k, "count": v} for k, v in top_browsers],
+        },
+    }
+
+
 if __name__ == "__main__":
     if CDN_ONLY_MODE:
         print(f"CDN MODE ENABLED - Media will stream from Telegram CDN")

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visitor Analytics — AfterDark Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --card: #1c1c26;
+            --border: rgba(255, 255, 255, 0.08);
+            --purple: #8b5cf6;
+            --purple-dim: rgba(139, 92, 246, 0.15);
+            --text: #e8e8f0;
+            --muted: #6b7280;
+            --green: #22c55e;
+            --blue: #3b82f6;
+            --orange: #f97316;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        header a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: auto;
+        }
+
+        header a:hover {
+            color: var(--purple);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--purple);
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--purple);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 14px;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .bar-label {
+            width: 100px;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bar-bg {
+            flex: 1;
+            height: 8px;
+            background: var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: var(--purple);
+            transition: width 0.5s ease;
+        }
+
+        .bar-count {
+            width: 32px;
+            text-align: right;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .log-title {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .refresh-btn {
+            background: var(--purple-dim);
+            color: var(--purple);
+            border: 1px solid var(--purple);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .refresh-btn:hover {
+            background: var(--purple);
+            color: white;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: var(--surface);
+        }
+
+        thead th {
+            padding: 10px 14px;
+            text-align: left;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        tbody tr {
+            border-top: 1px solid var(--border);
+        }
+
+        tbody tr:hover {
+            background: rgba(139, 92, 246, 0.04);
+        }
+
+        tbody td {
+            padding: 10px 14px;
+            vertical-align: middle;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .badge.mobile {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--orange);
+        }
+
+        .badge.desktop {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--blue);
+        }
+
+        .badge.tablet {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--green);
+        }
+
+        .flag {
+            font-size: 16px;
+            margin-right: 4px;
+        }
+
+        .loading {
+            text-align: center;
+            color: var(--muted);
+            padding: 48px;
+        }
+
+        .ts {
+            color: var(--muted);
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="dot"></div>
+        <h1>Visitor Analytics</h1>
+        <a href="/">← Back to Gallery</a>
+    </header>
+
+    <main>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Total Visits</div>
+                <div class="stat-value" id="statTotal">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Countries</div>
+                <div class="stat-value" id="statCountries">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Mobile %</div>
+                <div class="stat-value" id="statMobile">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Top Browser</div>
+                <div class="stat-value" style="font-size:20px" id="statBrowser">—</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">🌍 Top Countries</div>
+                <div id="chartCountries">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📱 Device Types</div>
+                <div id="chartDevices">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🌐 Browsers</div>
+                <div id="chartBrowsers">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-header">
+            <span class="log-title">Recent Visitors</span>
+            <button class="refresh-btn" onclick="load()">↻ Refresh</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Location</th>
+                        <th>ISP</th>
+                        <th>Device</th>
+                        <th>OS / Browser</th>
+                        <th>Referrer</th>
+                        <th>Telegram</th>
+                    </tr>
+                </thead>
+                <tbody id="visitorLog">
+                    <tr>
+                        <td colspan="7" class="loading">Loading…</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        function fmtTime(ts) {
+            if (!ts) return '—';
+            const d = new Date(ts);
+            return d.toLocaleString();
+        }
+
+        function countryFlag(country) {
+            const flags = {
+                'United States': '🇺🇸', 'Cambodia': '🇰🇭', 'Thailand': '🇹🇭', 'Japan': '🇯🇵',
+                'China': '🇨🇳', 'India': '🇮🇳', 'Germany': '🇩🇪', 'France': '🇫🇷',
+                'United Kingdom': '🇬🇧', 'Australia': '🇦🇺', 'Canada': '🇨🇦', 'Brazil': '🇧🇷',
+                'Russia': '🇷🇺', 'South Korea': '🇰🇷', 'Singapore': '🇸🇬', 'Vietnam': '🇻🇳',
+                'Indonesia': '🇮🇩', 'Philippines': '🇵🇭', 'Malaysia': '🇲🇾', 'Netherlands': '🇳🇱',
+                'Local': '🏠',
+            };
+            return flags[country] || '🌐';
+        }
+
+        function renderBars(containerId, items, labelKey, countKey, max) {
+            const el = document.getElementById(containerId);
+            if (!items || items.length === 0) { el.innerHTML = '<div style="color:#6b7280;font-size:13px">No data yet</div>'; return; }
+            el.innerHTML = items.map(item => `
+        <div class="bar-row">
+          <div class="bar-label" title="${item[labelKey]}">${countryFlag(item[labelKey])} ${item[labelKey]}</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(item[countKey] / max * 100)}%"></div></div>
+          <div class="bar-count">${item[countKey]}</div>
+        </div>
+      `).join('');
+        }
+
+        async function load() {
+            try {
+                const res = await fetch('/api/visitors?limit=200');
+                const data = await res.json();
+                if (!data.ok) return;
+
+                // Stats
+                document.getElementById('statTotal').textContent = data.total;
+                document.getElementById('statCountries').textContent = data.stats.top_countries.length;
+                const mobileCount = data.stats.devices.find(d => d.type === 'Mobile')?.count || 0;
+                document.getElementById('statMobile').textContent = data.total > 0 ? Math.round(mobileCount / data.total * 100) + '%' : '0%';
+                document.getElementById('statBrowser').textContent = data.stats.browsers[0]?.browser || '—';
+
+                // Charts
+                const maxC = data.stats.top_countries[0]?.count || 1;
+                renderBars('chartCountries', data.stats.top_countries, 'country', 'count', maxC);
+                const maxD = data.stats.devices[0]?.count || 1;
+                renderBars('chartDevices', data.stats.devices.map(d => ({ country: d.type, count: d.count })), 'country', 'count', maxD);
+                const maxB = data.stats.browsers[0]?.count || 1;
+                renderBars('chartBrowsers', data.stats.browsers.map(b => ({ country: b.browser, count: b.count })), 'country', 'count', maxB);
+
+                // Table
+                const tbody = document.getElementById('visitorLog');
+                if (!data.visitors || data.visitors.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="loading">No visitors yet</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.visitors.map(v => `
+          <tr>
+            <td class="ts">${fmtTime(v.ts)}</td>
+            <td>${countryFlag(v.country)} ${v.country}${v.city && v.city !== v.country ? ', ' + v.city : ''}</td>
+            <td style="color:#6b7280;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.isp}">${v.isp || '—'}</td>
+            <td><span class="badge ${(v.device_type || '').toLowerCase()}">${v.device_type || '?'}</span></td>
+            <td>${v.os || '?'} / ${v.browser || '?'}</td>
+            <td style="color:#6b7280;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.referrer}">${v.referrer || 'Direct'}</td>
+            <td style="color:#8b5cf6">${v.tg_username ? '@' + v.tg_username : (v.tg_user_id ? '#' + v.tg_user_id : '—')}</td>
+          </tr>
+        `).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        load();
+        // Auto-refresh every 30s
+        setInterval(load, 30000);
+    </script>
+</body>
+
+</html>

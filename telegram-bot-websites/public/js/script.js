@@ -937,6 +937,21 @@ function debounce(fn, delay) {
 async function init() {
   console.log("Initializing gallery app...");
 
+  // Fire visitor tracking beacon (non-blocking, best-effort)
+  try {
+    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        referrer: document.referrer,
+        page: window.location.pathname,
+        tg_user_id: tgUser?.id ?? null,
+        tg_username: tgUser?.username ?? null,
+      }),
+    }).catch(() => { }); // Silent failure — never block page load
+  } catch (_) { }
+
   try {
     initElements();
     console.log("Elements initialized:", Object.keys(elements).filter(k => elements[k]).length, "found");
