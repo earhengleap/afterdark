@@ -572,5 +572,12 @@
     "status": "failed",
     "content_type": "unknown",
     "timestamp": "2026-02-20 15:28:25"
+  },
+  {
+    "username": "Vuploads_bot",
+    "url": "https://60d81ffe3e3045e5-43-245-32-183.serveousercontent.com",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-02-22 23:24:35"
   }
 ]

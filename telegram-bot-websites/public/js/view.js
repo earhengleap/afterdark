@@ -44,9 +44,36 @@ function renderMedia(item) {
       </video>
     `;
     } else {
-        wrapper.innerHTML = `
-      <img src="${url}" alt="Media Image" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
-    `;
+        // Image with fallback logic
+        const img = document.createElement("img");
+        img.alt = item.ai_title || "Media Image";
+        img.style.maxWidth = "100%";
+        img.style.maxHeight = "70vh";
+        img.style.objectFit = "contain";
+
+        let retryCount = 0;
+        const tryUrls = [
+            item.url,
+            item.thumb_url,
+            `/api/file/${item.message_id}`
+        ].filter(Boolean); // Remove empty URLs
+
+        const tryLoadImage = (urlIndex) => {
+            if (urlIndex >= tryUrls.length) {
+                img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' fill='%231a1a1d'/%3E%3Ctext x='100' y='100' font-family='Arial' font-size='14' fill='%23666' text-anchor='middle' dy='.3em'%3EImage not available%3C/text%3E%3C/svg%3E";
+                return;
+            }
+            img.src = tryUrls[urlIndex];
+        };
+
+        img.addEventListener("error", () => {
+            retryCount++;
+            tryLoadImage(retryCount);
+        });
+
+        tryLoadImage(0);
+        wrapper.innerHTML = "";
+        wrapper.appendChild(img);
     }
 
     // Populate Meta

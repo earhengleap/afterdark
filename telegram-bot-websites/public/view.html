@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/cardio.js"></script>
     <!-- Minimal inline styles to make the full-screen view fit perfectly -->
     <style>
         body {
@@ -163,8 +164,15 @@
             </div>
         </div>
 
-        <div id="mediaWrapper" class="media-container">
-            <div style="padding: 100px; color: var(--text-muted);">Loading Media...</div>
+        <div id="mediaWrapper" class="media-container" style="min-height: 50vh; position: relative;">
+            <div class="skeleton" style="position: absolute; inset: 0;" aria-hidden="true"></div>
+            <div id="viewLoadingIndicator"
+                style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10;">
+                <l-cardio size="50" stroke="4" speed="2" color="var(--accent)"></l-cardio>
+                <p
+                    style="color: var(--text-muted); font-size: 14px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px;">
+                    Loading Media...</p>
+            </div>
         </div>
 
         <div class="meta-panel" id="metaPanel">

@@ -478,6 +478,18 @@ function loadMore() {
     renderBatch(state.renderedCount, nextBatch);
     updateLoadMoreButton();
   } else if (hasMoreOnServer && !state.isLoading) {
+    // Inject skeletons during server fetch for smoother UX
+    if (elements.grid) {
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < 6; i++) {
+        const dummy = document.createElement("article");
+        dummy.className = "card skeleton load-more-skeleton";
+        dummy.innerHTML = '<div class="thumb"></div><div class="card-body"><p class="card-title">Loading</p></div>';
+        fragment.appendChild(dummy);
+      }
+      elements.grid.appendChild(fragment);
+    }
+
     // Load more items in batches for better performance over slow connections
     loadMedia(50, state.items.length);
   }
