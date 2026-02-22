@@ -428,11 +428,11 @@ function renderBatch(start, end) {
       cardBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        window.location.href = `/view/${item.message_id}`;
+        openViewer(item);
       });
     } else {
       article.addEventListener("click", () => {
-        window.location.href = `/view/${item.message_id}`;
+        openViewer(item);
       });
     }
 
