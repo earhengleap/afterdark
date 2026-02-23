@@ -31,9 +31,6 @@ logger = setup_logger("VideoDownloader")
 
 class VideoDownloader:
     """Handle video downloads from X (Twitter) - SUPPORTS MULTIPLE VIDEOS PER URL"""
-    
-    # Class variable to store progress state
-    _progress_data = {}
 
     @staticmethod
     def _format_bytes(num_bytes: int) -> str:
@@ -228,12 +225,6 @@ class VideoDownloader:
                                 progress_state['speed'] = speed
                                 progress_state['filename'] = filename
                                 progress_state['phase'] = 'Downloading media'
-                            else:
-                                # Backward compatibility for any legacy callers.
-                                VideoDownloader._progress_data['downloaded'] = downloaded
-                                VideoDownloader._progress_data['total'] = total_bytes
-                                VideoDownloader._progress_data['speed'] = speed
-                                VideoDownloader._progress_data['filename'] = filename
                         except Exception:
                             pass
                     elif progress_state is not None and d.get('status') == 'finished':
@@ -323,16 +314,10 @@ class VideoDownloader:
     @staticmethod
     async def download_multiple(urls: List[str], message: Message, user_id: int,
                         detection_msg: Optional[Message] = None) -> None:
-        """Download multiple videos with progress tracking - NOW HANDLES BOTH VIDEOS AND IMAGES"""
+        """Download multiple videos concurrently with progress tracking - NOW HANDLES BOTH VIDEOS AND IMAGES"""
         total = len(urls)
-        video_success_count = 0
-        image_success_count = 0
-        failed_count = 0
-        downloaded_video_paths = []
-        downloaded_image_paths = []
-        url_results = []
         
-        logger.info(f"Starting bulk download: {total} URLs (videos and images)")
+        logger.info(f"Starting async bulk download: {total} URLs (videos and images)")
         
         initial_text = (
             "📦 **Bulk Download Started**\n\n"
@@ -349,199 +334,140 @@ class VideoDownloader:
         
         overall_start = time.time()
         
-        # Download phase - try both video and image for each URL
-        for idx, url in enumerate(urls, 1):
-            try:
-                processed = idx - 1
-                remaining = total - processed
+        # Central state for UI updates
+        state = {
+            "processed": 0,
+            "video_success_count": 0,
+            "image_success_count": 0,
+            "failed_count": 0,
+            "url_progress": {url: "Waiting" for url in urls},
+            "done": False
+        }
+        
+        downloaded_video_paths = []
+        downloaded_image_paths = []
+        url_results = []
+
+        # UI Updater Task
+        async def ui_updater():
+            last_text = ""
+            while not state["done"]:
+                processed_pct = int((state["processed"] / total) * 100) if total > 0 else 0
                 
-                # Format URL for display
-                url_display = url.replace('https://', '').replace('http://', '')
-                if len(url_display) > 40:
-                    url_display = url_display[:37] + '...'
+                # Show up to 3 active URL statuses
+                active_statuses = []
+                for url, phase in state["url_progress"].items():
+                    if phase not in ["Waiting", "Done", "Failed"]:
+                        short_url = url.replace('https://', '').replace('http://', '')[:25] + '...'
+                        active_statuses.append(f"• {short_url}: {phase}")
+                        if len(active_statuses) >= 3:
+                            break
                 
-                processed_pct = int(((idx - 1) / total) * 100) if total > 0 else 0
-                await status_msg.edit_text(
-                    "📦 **Bulk Download In Progress**\n\n"
-                    f"📌 **Current Link:** `{idx}/{total}`\n"
-                    f"🔗 **Source:** `{url_display}`\n"
-                    f"🔍 **Stage:** Checking available media\n"
-                    f"📊 **Progress:** `{VideoDownloader._progress_bar(processed_pct)}` **{processed_pct}%**\n\n"
+                active_text = "\n".join(active_statuses) if active_statuses else "Finalizing..."
+                
+                text = (
+                    "📦 **Bulk Download In Progress (Concurrent)**\n\n"
+                    f"🏃 **Active Downloads:**\n{active_text}\n\n"
+                    f"📊 **Overall Progress:** `{VideoDownloader._progress_bar(processed_pct)}` **{processed_pct}%**\n\n"
                     "📈 **Live Summary**\n"
-                    f"🎬 Videos completed: {video_success_count}\n"
-                    f"🖼️ Images completed: {image_success_count}\n"
-                    f"❌ Failed: {failed_count}\n"
-                    f"⏳ Remaining: {remaining}"
+                    f"🎬 Videos completed: {state['video_success_count']}\n"
+                    f"🖼️ Images completed: {state['image_success_count']}\n"
+                    f"❌ Failed: {state['failed_count']}\n"
+                    f"⏳ Remaining: {total - state['processed']}"
                 )
                 
-                # Try video download first with live progress tracking
+                if text != last_text:
+                    try:
+                        await status_msg.edit_text(text)
+                        last_text = text
+                    except Exception:
+                        pass
+                
+                await asyncio.sleep(2.0)  # Polling interval to avoid FloodWait
+
+        ui_task = asyncio.create_task(ui_updater())
+
+        # Worker for a single URL
+        async def process_url(url: str, idx: int):
+            try:
+                state["url_progress"][url] = "Checking media..."
+                
+                # We do not pass status_msg to download_with_progress to prevent multiple 
+                # routines from fighting over editing the same Telegram message.
+                # It will run silently in the background while UI poller updates overall state.
                 video_paths, video_info = await VideoDownloader.download_with_progress(
                     url=url,
-                    status_msg=status_msg,
+                    status_msg=None, 
                     index=idx,
                     total=total,
                 )
                 
                 if video_paths and len(video_paths) > 0:
-                    video_success_count += 1
+                    state["video_success_count"] += 1
                     downloaded_video_paths.extend(video_paths)
                     
-                    # Track each video in history
                     source_username = extract_twitter_username(url)
                     for video_path in video_paths:
                         file_size = os.path.getsize(video_path)
                         filename = os.path.basename(video_path)
-                        
-                        # Add to history
                         history_db.add_entry(
-                            user_id=user_id,
-                            url=url,
-                            source_username=source_username,
-                            filename=filename,
-                            status='success',
-                            content_type='video',
-                            file_size=file_size
+                            user_id=user_id, url=url, source_username=source_username,
+                            filename=filename, status='success', content_type='video', file_size=file_size
                         )
-                        
-                        url_results.append(DownloadResult(
-                            url=url,
-                            status='success',
-                            filename=filename,
-                            size=file_size / (1024 * 1024),
-                            content_type='video'
-                        ))
-                    
-                    logger.info(f"Downloaded {len(video_paths)} video(s) from URL {idx}/{total}")
-                    
-                    # Show success message briefly
-                    processed_pct = int((idx / total) * 100) if total > 0 else 100
-                    success_msg = (
-                        "✅ **Link Processed Successfully**\n\n"
-                        f"📌 **Link:** `{idx}/{total}`\n"
-                        f"🎬 **Found:** {len(video_paths)} video file(s)\n"
-                        f"📊 **Progress:** `{VideoDownloader._progress_bar(processed_pct)}` **{processed_pct}%**\n\n"
-                        "📈 **Live Summary**\n"
-                        f"🎬 Videos completed: {video_success_count}\n"
-                        f"🖼️ Images completed: {image_success_count}\n"
-                        f"❌ Failed: {failed_count}\n\n"
-                        "⏭️ Continuing with the next link..."
-                    )
-                    await status_msg.edit_text(success_msg)
-                    await asyncio.sleep(0.5)
+                        url_results.append(DownloadResult(url=url, status='success', filename=filename, size=file_size / (1024 * 1024), content_type='video'))
+                    state["url_progress"][url] = "Done"
                 else:
-                    # Video download failed, try image download
-                    logger.debug(f"No video found, attempting image download for URL {idx}/{total}")
-                    async def image_progress_callback(percent: int, stage: str) -> None:
-                        try:
-                            overall_pct = int((((idx - 1) + (percent / 100.0)) / total) * 100) if total > 0 else percent
-                            await status_msg.edit_text(
-                                "📦 **Bulk Download In Progress**\n\n"
-                                f"📌 **Current Link:** `{idx}/{total}`\n"
-                                f"🧩 **Stage:** {stage}\n"
-                                f"🖼️ **Current Link Progress:** `{VideoDownloader._progress_bar(percent)}` **{percent}%**\n"
-                                f"📊 **Overall Progress:** `{VideoDownloader._progress_bar(overall_pct)}` **{overall_pct}%**\n\n"
-                                "📈 **Live Summary**\n"
-                                f"🎬 Videos completed: {video_success_count}\n"
-                                f"🖼️ Images completed: {image_success_count}\n"
-                                f"❌ Failed: {failed_count}"
-                            )
-                        except Exception:
-                            pass
-
+                    # Video failed, try Image
+                    state["url_progress"][url] = "Trying image..."
                     image_paths, image_info = await ImageDownloader.download(
-                        url,
-                        message,
-                        status_callback=image_progress_callback,
-                        index=idx,
-                        total=total,
+                        url, message=None, status_callback=None, index=idx, total=total
                     )
                     
                     if image_paths and len(image_paths) > 0:
-                        image_success_count += 1
+                        state["image_success_count"] += 1
                         downloaded_image_paths.extend(image_paths)
                         
-                        # Track image download in history
                         source_username = extract_twitter_username(url)
                         total_size = sum(os.path.getsize(img) for img in image_paths if os.path.exists(img))
-                        
-                        # Add to history
                         history_db.add_entry(
-                            user_id=user_id,
-                            url=url,
-                            source_username=source_username,
-                            filename=f"{len(image_paths)} images",
-                            status='success',
-                            content_type='image',
-                            file_size=total_size
+                            user_id=user_id, url=url, source_username=source_username,
+                            filename=f"{len(image_paths)} images", status='success', content_type='image', file_size=total_size
                         )
-                        
                         for img_path in image_paths:
-                            url_results.append(DownloadResult(
-                                url=url,
-                                status='success',
-                                filename=os.path.basename(img_path),
-                                size=os.path.getsize(img_path) / (1024 * 1024),
-                                content_type='image'
-                            ))
-                        
-                        logger.info(f"Downloaded {len(image_paths)} image(s) from URL {idx}/{total}")
-                        
-                        await status_msg.edit_text(
-                            f"✅ **Link Processed Successfully**\n\n"
-                            f"📌 **Link:** `{idx}/{total}`\n"
-                            f"🖼️ **Found:** {len(image_paths)} image file(s)\n\n"
-                            f"📈 **Live Summary**\n"
-                            f"🎬 Videos completed: {video_success_count}\n"
-                            f"🖼️ Images completed: {image_success_count}\n"
-                            f"❌ Failed: {failed_count}\n\n"
-                            f"⏭️ Continuing with the next link..."
-                        )
-                        await asyncio.sleep(0.5)
+                            url_results.append(DownloadResult(url=url, status='success', filename=os.path.basename(img_path), size=os.path.getsize(img_path) / (1024 * 1024), content_type='image'))
+                        state["url_progress"][url] = "Done"
                     else:
-                        # Both video and image download failed
-                        failed_count += 1
-                        url_results.append(DownloadResult(
-                            url=url,
-                            status='failed',
-                            error='Download failed - No video or images found',
-                            content_type='unknown'
-                        ))
-                        logger.warning(f"Failed to download from URL {idx}/{total}")
-                        
+                        state["failed_count"] += 1
+                        url_results.append(DownloadResult(url=url, status='failed', error='No video or images found', content_type='unknown'))
+                        state["url_progress"][url] = "Failed"
             except Exception as e:
                 error_msg = VideoDownloader._parse_error(str(e))
-                failed_count += 1
-                
-                # Track failed download in history
+                state["failed_count"] += 1
                 source_username = extract_twitter_username(url)
-                history_db.add_entry(
-                    user_id=user_id,
-                    url=url,
-                    source_username=source_username,
-                    filename=None,
-                    status='failed',
-                    content_type='unknown',
-                    file_size=0,
-                    error_message=error_msg
-                )
-                
-                url_results.append(DownloadResult(
-                    url=url,
-                    status='failed',
-                    error=error_msg,
-                    content_type='unknown'
-                ))
-                logger.error(f"Error downloading URL {idx}/{total}: {error_msg}")
+                history_db.add_entry(user_id=user_id, url=url, source_username=source_username, filename=None, status='failed', content_type='unknown', file_size=0, error_message=error_msg)
+                url_results.append(DownloadResult(url=url, status='failed', error=error_msg, content_type='unknown'))
+                state["url_progress"][url] = "Failed"
+            finally:
+                state["processed"] += 1
+
+        # Execute all tasks concurrently
+        tasks = [process_url(url, idx) for idx, url in enumerate(urls, 1)]
+        await asyncio.gather(*tasks)
+        
+        # Stop UI updater
+        state["done"] = True
+        with contextlib.suppress(Exception):
+            await ui_task
         
         total_time = time.time() - overall_start
-        total_success = video_success_count + image_success_count
+        total_success = state["video_success_count"] + state["image_success_count"]
         
         # Store both videos and images for bulk upload
         user_downloads[f"{user_id}_bulk_downloaded_videos"] = downloaded_video_paths
         user_downloads[f"{user_id}_bulk_downloaded_images"] = downloaded_image_paths
         user_downloads[f"{user_id}_bulk_downloaded_all"] = downloaded_video_paths + downloaded_image_paths
         
-        logger.info(f"Bulk download complete: {total_success} success ({video_success_count} videos, {image_success_count} images), {failed_count} failed")
+        logger.info(f"Bulk download complete: {total_success} success ({state['video_success_count']} videos, {state['image_success_count']} images), {state['failed_count']} failed")
         logger.info(f"Downloaded {len(downloaded_video_paths)} video files, {len(downloaded_image_paths)} image files")
         
         try:
@@ -555,8 +481,8 @@ class VideoDownloader:
             await VideoDownloader._send_downloaded_content(downloaded_video_paths, downloaded_image_paths, message, user_id)
         
         # Send summary
-        await VideoDownloader._send_summary(url_results, video_success_count, image_success_count, 
-                                    failed_count, total, total_time, message, user_id, 
+        await VideoDownloader._send_summary(url_results, state["video_success_count"], state["image_success_count"], 
+                                    state["failed_count"], total, total_time, message, user_id, 
                                     downloaded_video_paths, downloaded_image_paths)
     
     @staticmethod

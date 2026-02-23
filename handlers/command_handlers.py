@@ -261,15 +261,27 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     f"✅ X Video Downloader Bot"
                 )
             
-            sent_msg = await app.send_video(
-                chat_id=message.chat.id,
-                video=video_path,
-                width=width,
-                height=height,
-                supports_streaming=True,
-                caption=caption,
-                reply_markup=Keyboards.single_video_upload(video_key)
-            )
+            # Generate thumbnail for better UX
+            from utils.video_processor import VideoProcessor
+            thumb_path = VideoProcessor.generate_thumbnail(video_path)
+            
+            try:
+                sent_msg = await app.send_video(
+                    chat_id=message.chat.id,
+                    video=video_path,
+                    thumb=thumb_path,
+                    width=width,
+                    height=height,
+                    supports_streaming=True,
+                    caption=caption,
+                    reply_markup=Keyboards.single_video_upload(video_key)
+                )
+            finally:
+                if thumb_path and os.path.exists(thumb_path):
+                    try:
+                        os.remove(thumb_path)
+                    except Exception as e:
+                        logger.debug(f"Failed to cleanup thumbnail: {e}")
             
             # Track successful video send
             file_size_bytes = os.path.getsize(video_path)

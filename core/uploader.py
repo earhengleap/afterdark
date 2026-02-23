@@ -86,15 +86,24 @@ class VideoUploader:
                         progress_args=(progress_key, status_msg, video_name, start_time),
                     )
                 else:
-                    await upload_client.send_video(
-                        chat_id=CHAT_ID,
-                        video=video_path,
-                        width=width,
-                        height=height,
-                        supports_streaming=True,
-                        progress=ProgressTracker.callback,
-                        progress_args=(progress_key, status_msg, video_name, start_time),
-                    )
+                    thumb_path = VideoProcessor.generate_thumbnail(video_path)
+                    try:
+                        await upload_client.send_video(
+                            chat_id=CHAT_ID,
+                            video=video_path,
+                            thumb=thumb_path,
+                            width=width,
+                            height=height,
+                            supports_streaming=True,
+                            progress=ProgressTracker.callback,
+                            progress_args=(progress_key, status_msg, video_name, start_time),
+                        )
+                    finally:
+                        if thumb_path and os.path.exists(thumb_path):
+                            try:
+                                os.remove(thumb_path)
+                            except Exception:
+                                pass
 
                 from models.enums import upload_progress
 

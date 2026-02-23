@@ -104,15 +104,15 @@ class ImageDownloader:
                 if os.path.getsize(COOKIE_FILE) == 0:
                     logger.warning("Cookie file is empty")
             
-            # Try Method 1: Syndication API first (most reliable for public tweets)
-            logger.debug("Attempting Method 1: Syndication API")
+            # Run the single robust gallery-dl execution
+            logger.debug("Executing gallery-dl download process")
             await ImageDownloader._notify_status(
-                status_callback, 25, f"🛰️ Link {index}/{total} - Trying method 1/4"
+                status_callback, 50, f"🛰️ Link {index}/{total} - Downloading media"
             )
-            downloaded_files = await ImageDownloader._try_syndication_method(url, download_folder, existing_files)
+            downloaded_files = await ImageDownloader._run_gallery_dl(url, download_folder, existing_files)
             
             if downloaded_files:
-                logger.info(f"Method 1 success: Downloaded {len(downloaded_files)} images")
+                logger.info(f"Download success: Retrieved {len(downloaded_files)} images")
                 await ImageDownloader._notify_status(
                     status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
                 )
@@ -123,64 +123,7 @@ class ImageDownloader:
                 }
                 return downloaded_files, info
             
-            # Try Method 2: With detailed config
-            print("🔄 Method 1 failed, trying Method 2 (detailed config)...")
-            await ImageDownloader._notify_status(
-                status_callback, 45, f"🔄 Link {index}/{total} - Trying method 2/4"
-            )
-            downloaded_files = await ImageDownloader._try_config_method(url, download_folder, existing_files)
-            
-            if downloaded_files:
-                logger.info(f"Method 2 success: Downloaded {len(downloaded_files)} images")
-                await ImageDownloader._notify_status(
-                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
-                )
-                info = {
-                    'title': f"X Images - {len(downloaded_files)} files",
-                    'uploader': 'X (Twitter)',
-                    'upload_date': time.strftime('%Y%m%d')
-                }
-                return downloaded_files, info
-            
-            # Try Method 3: Simple fallback
-            print("🔄 Method 2 failed, trying Method 3 (simple method)...")
-            await ImageDownloader._notify_status(
-                status_callback, 65, f"🔄 Link {index}/{total} - Trying method 3/4"
-            )
-            downloaded_files = await ImageDownloader._try_simple_method(url, download_folder, existing_files)
-            
-            if downloaded_files:
-                logger.info(f"Method 3 success: Downloaded {len(downloaded_files)} images")
-                await ImageDownloader._notify_status(
-                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
-                )
-                info = {
-                    'title': f"X Images - {len(downloaded_files)} files",
-                    'uploader': 'X (Twitter)',
-                    'upload_date': time.strftime('%Y%m%d')
-                }
-                return downloaded_files, info
-            
-            # Try Method 4: Direct API method with aggressive settings
-            print("🔄 Method 3 failed, trying Method 4 (aggressive mode)...")
-            await ImageDownloader._notify_status(
-                status_callback, 85, f"🔄 Link {index}/{total} - Trying method 4/4"
-            )
-            downloaded_files = await ImageDownloader._try_aggressive_method(url, download_folder, existing_files)
-            
-            if downloaded_files:
-                logger.info(f"Method 4 success: Downloaded {len(downloaded_files)} images")
-                await ImageDownloader._notify_status(
-                    status_callback, 100, f"✅ Link {index}/{total} - Downloaded {len(downloaded_files)} image(s)"
-                )
-                info = {
-                    'title': f"X Images - {len(downloaded_files)} files",
-                    'uploader': 'X (Twitter)',
-                    'upload_date': time.strftime('%Y%m%d')
-                }
-                return downloaded_files, info
-            
-            logger.warning("All download methods failed - no images found")
+            logger.warning("Download failed - no images found")
             await ImageDownloader._notify_status(
                 status_callback, 100, f"⚠️ Link {index}/{total} - No images found"
             )
@@ -194,20 +137,34 @@ class ImageDownloader:
             return None, None
     
     @staticmethod
-    async def _try_syndication_method(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
-        """Try download using Twitter syndication API (works without authentication)"""
+    async def _run_gallery_dl(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
+        """Run gallery-dl with a comprehensive robust configuration once."""
         try:
             config_content = {
                 "extractor": {
                     "twitter": {
-                        "syndication": True,
-                        "api": None,
-                        "include": "media",
+                        "syndication": True,  # Uses fast public API if possible
+                        "api": "syndication",
+                        "include": "media,timeline",
                         "videos": False,
                         "retweets": True,
                         "quoted": True,
-                        "text-tweets": False
+                        "replies": False,
+                        "cards": True,
+                        "text-tweets": False,
+                        "conversations": True,
+                        "unique": True
                     }
+                },
+                "downloader": {
+                    "retries": 5,
+                    "timeout": 45.0,
+                    "rate": "2M",
+                    "part": False,
+                    "mtime": True
+                },
+                "output": {
+                    "mode": "terminal"
                 }
             }
             
@@ -225,92 +182,10 @@ class ImageDownloader:
                     url
                 ]
                 
-                logger.debug(f"Method 1 (Syndication): Downloading from syndication API")
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await process.communicate()
-                
-                if process.returncode != 0:
-                    logger.debug(f"Method 1 exit code: {process.returncode}")
-                
-                await asyncio.sleep(0.5)
-                
-                # Try normal file detection first
-                new_files = ImageDownloader._get_new_files(download_folder, existing_files)
-                
-                # If that fails, try parsing output
-                if not new_files and stdout:
-                    new_files = ImageDownloader._parse_gallery_dl_output(stdout.decode(), download_folder)
-                
-                return new_files
-                
-            finally:
-                try:
-                    os.unlink(config_path)
-                except:
-                    pass
-                    
-        except Exception as e:
-            logger.debug(f"Method 1 error: {e}")
-            return None
-    
-    @staticmethod
-    async def _try_config_method(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
-        """Try download with detailed configuration"""
-        try:
-            config_content = {
-                "extractor": {
-                    "twitter": {
-                        "include": "media",
-                        "retweets": True,
-                        "replies": False,
-                        "quoted": True,
-                        "cards": False,
-                        "conversations": False,
-                        "unique": True,
-                        "videos": False,
-                        "twitpic": False,
-                        "text-tweets": False,
-                        "syndication": True,
-                        "users": "user,author"
-                    },
-                    "base-directory": download_folder
-                },
-                "downloader": {
-                    "part": False,
-                    "mtime": True,
-                    "rate": "1M",
-                    "retries": 5,
-                    "timeout": 60.0
-                },
-                "output": {
-                    "mode": "terminal",
-                    "logfile": None,
-                    "unsupportedfile": None
-                },
-                "filename": "{category}_{tweet_id}_{num}.{extension}"
-            }
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as config_file:
-                json.dump(config_content, config_file, indent=2)
-                config_path = config_file.name
-            
-            try:
-                cmd = [
-                    sys.executable,
-                    "-m", "gallery_dl",
-                    "--config", config_path,
-                    "-d", download_folder,
-                    url
-                ]
-                
                 if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
                     cmd.extend(["--cookies", COOKIE_FILE])
                 
-                logger.debug(f"Method 2 (Config): Downloading with detailed config")
+                logger.debug(f"Executing robust gallery-dl configuration for {url}")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -319,9 +194,9 @@ class ImageDownloader:
                 stdout, stderr = await process.communicate()
                 
                 if process.returncode != 0:
-                    logger.debug(f"Method 2 exit code: {process.returncode}")
-                
-                await asyncio.sleep(0.5)
+                    logger.debug(f"gallery-dl exit code: {process.returncode}")
+                    if stderr:
+                        logger.debug(f"gallery-dl error: {stderr.decode()[:200]}")
                 
                 # Try normal file detection first
                 new_files = ImageDownloader._get_new_files(download_folder, existing_files)
@@ -339,123 +214,7 @@ class ImageDownloader:
                     pass
                     
         except Exception as e:
-            logger.debug(f"Method 2 error: {e}")
-            return None
-    
-    @staticmethod
-    async def _try_simple_method(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
-        """Try simple download without config"""
-        try:
-            cmd = [
-                sys.executable,
-                "-m", "gallery_dl",
-                "-d", download_folder,
-                "--no-part",
-                url
-            ]
-            
-            if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
-                cmd.extend(["--cookies", COOKIE_FILE])
-            
-            logger.debug(f"Method 3 (Simple): Downloading with simple method")
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                logger.debug(f"Method 3 exit code: {process.returncode}")
-            
-            await asyncio.sleep(0.5)
-            
-            # Try normal file detection first
-            new_files = ImageDownloader._get_new_files(download_folder, existing_files)
-            
-            # If that fails, try parsing output
-            if not new_files and stdout:
-                new_files = ImageDownloader._parse_gallery_dl_output(stdout.decode(), download_folder)
-            
-            return new_files
-            
-        except Exception as e:
-            logger.debug(f"Method 3 error: {e}")
-            return None
-    
-    @staticmethod
-    async def _try_aggressive_method(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
-        """Try aggressive download with all options enabled"""
-        try:
-            config_content = {
-                "extractor": {
-                    "twitter": {
-                        "syndication": True,
-                        "api": "syndication",
-                        "include": "media,timeline",
-                        "videos": False,
-                        "retweets": True,
-                        "quoted": True,
-                        "replies": True,
-                        "cards": True,
-                        "text-tweets": False,
-                        "conversations": True
-                    }
-                },
-                "downloader": {
-                    "retries": 10,
-                    "timeout": 90.0,
-                    "part": False
-                }
-            }
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as config_file:
-                json.dump(config_content, config_file, indent=2)
-                config_path = config_file.name
-            
-            try:
-                cmd = [
-                    sys.executable,
-                    "-m", "gallery_dl",
-                    "--config", config_path,
-                    "-d", download_folder,
-                    "-v",
-                    url
-                ]
-                
-                if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
-                    cmd.extend(["--cookies", COOKIE_FILE])
-                
-                logger.debug(f"Method 4 (Aggressive): Downloading with aggressive config")
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await process.communicate()
-                
-                if process.returncode != 0:
-                    logger.debug(f"Method 4 exit code: {process.returncode}")
-                
-                await asyncio.sleep(0.5)
-                
-                # Try normal file detection first
-                new_files = ImageDownloader._get_new_files(download_folder, existing_files)
-                
-                # If that fails, try parsing output
-                if not new_files and stdout:
-                    new_files = ImageDownloader._parse_gallery_dl_output(stdout.decode(), download_folder)
-                
-                return new_files
-                
-            finally:
-                try:
-                    os.unlink(config_path)
-                except:
-                    pass
-                    
-        except Exception as e:
-            logger.debug(f"Method 4 error: {e}")
+            logger.error(f"Error in robust gallery-dl execution: {e}")
             return None
     
     @staticmethod
@@ -466,15 +225,24 @@ class ImageDownloader:
             lines = output.split('\n')
             
             for line in lines:
-                if line.strip().startswith('#'):
-                    file_path = line.strip()[1:].strip()
-                    if os.path.exists(file_path) and os.path.isfile(file_path):
-                        if file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
-                            new_path = ImageDownloader._safe_rename_with_number(file_path)
-                            if new_path:
-                                downloaded_files.append(new_path)
-                            else:
-                                downloaded_files.append(file_path)
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Clean prefix if it exists (gallery-dl sometimes prefixes with '# ')
+                if line.startswith('#'):
+                    file_path = line[1:].strip()
+                else:
+                    file_path = line
+                    
+                # Only check if the path looks like it belongs to our download folder or a valid image
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    if file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
+                        new_path = ImageDownloader._safe_rename_with_number(file_path)
+                        if new_path:
+                            downloaded_files.append(new_path)
+                        else:
+                            downloaded_files.append(file_path)
             
             if downloaded_files:
                 return downloaded_files
@@ -512,40 +280,32 @@ class ImageDownloader:
 
     @staticmethod
     def _safe_rename_with_number(original_path: str) -> Optional[str]:
-        """Safely rename file with number prefix"""
+        """Safely rename file with a unique short hash prefix"""
         if not os.path.exists(original_path):
             return original_path
         directory = os.path.dirname(original_path)
         filename = os.path.basename(original_path)
-        # Prevent double-prefixing when a previous scan already renamed the file.
-        # Accept any leading digits + "-" prefix (e.g. "01-", "24-", "100-").
+        
+        # Prevent re-prefixing if a previous scan already renamed the file with a hash pattern.
+        # We look for a '-' separator and check if the prefix looks like a short hash (alphanumeric).
         prefix, sep, _rest = filename.partition("-")
-        if sep == "-" and prefix.isdigit():
+        if sep == "-" and prefix.isalnum() and len(prefix) >= 6:
             return original_path
+            
         try:
-            next_num = ImageDownloader._get_next_image_number()
-            new_filename = f"{next_num:02d}-{filename}"
+            import uuid
+            # Use an 8-character UUID hex string for uniqueness
+            short_hash = uuid.uuid4().hex[:8]
+            new_filename = f"{short_hash}-{filename}"
             new_path = os.path.join(directory, new_filename)
+            
+            # Unlikely collision, but check just in case
             if os.path.exists(new_path):
-                return original_path
+                # Fallback to current timestamp + hash
+                new_filename = f"{int(time.time())}-{short_hash}-{filename}"
+                new_path = os.path.join(directory, new_filename)
+                
             os.rename(original_path, new_path)
             return new_path
         except OSError:
             return original_path
-
-    @staticmethod
-    def _get_next_image_number() -> int:
-        """Get next sequential number for image file naming"""
-        try:
-            files = []
-            for root, dirs, filenames in os.walk(IMAGES_FOLDER):
-                for filename in filenames:
-                    if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
-                        files.append(filename)
-            numbers = []
-            for f in files:
-                if f[:2].isdigit() and f[2] == '-':
-                    numbers.append(int(f[:2]))
-            return max(numbers) + 1 if numbers else 1
-        except Exception:
-            return 1
