@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone
 
-CACHE_DIR = Path(__file__).parent / "media_cache"
+CACHE_DIR = Path(__file__).parent.parent / "media_cache"
 INDEX_PATH = CACHE_DIR / "media_index.json"
 
 

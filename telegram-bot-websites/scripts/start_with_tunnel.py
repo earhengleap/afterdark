@@ -23,7 +23,7 @@ from pathlib import Path
 
 def load_config():
     """Load configuration from tunnel_config.py if it exists."""
-    config_path = Path(__file__).parent / "tunnel_config.py"
+    config_path = Path(__file__).parent.parent / "tunnel_config.py"
     config = {"subdomain": "afterdark"}
     
     if config_path.exists():
@@ -70,8 +70,8 @@ def main():
     env["TWA_LOCALHOSTRUN_AUTOSTART"] = "0"
     env["TWA_TUNNEL_PROVIDER"] = "serveo"
     
-    # Change to script directory
-    script_dir = Path(__file__).parent
+    # Change to twa directory
+    script_dir = Path(__file__).parent.parent
     os.chdir(script_dir)
     
     # Start the server
