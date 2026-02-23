@@ -2397,24 +2397,33 @@ class TelegramGalleryService:
         if message_id <= 0:
             return None
 
+        def _apply_fallback(reason: str) -> str:
+            logger.debug(f"{reason} for {message_id} - using fallback title to prevent queue stall")
+            fallback_title = self._fallback_ai_title(str(item.get("media_kind", "video")), seed=message_id)
+            item["ai_title_style"] = AI_TITLE_STYLE
+            item["ai_title_model"] = "fallback"
+            item["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
+            item["ai_title_is_fallback"] = True
+            item["ai_description"] = ""
+            item["ai_description_model"] = "fallback"
+            item["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
+            return fallback_title
+
         if message is None:
             try:
                 message = await self.client.get_messages(CHAT_ID, message_id)
             except Exception as e:
-                logger.debug(f"Failed to get message {message_id}: {e}")
-                return None
+                return _apply_fallback(f"Failed to get message: {e}")
 
         if media_tuple is None:
             media_tuple = self._extract_media(message)
         if not media_tuple:
-            logger.debug(f"No media found for {message_id}")
-            return None
+            return _apply_fallback("No media found")
 
         media_kind, media_obj, _, _ = media_tuple
         source_image = await self._resolve_ai_source_image(item, message, media_obj)
         if not source_image:
-            logger.debug(f"No source image for {message_id} (media_kind={media_kind})")
-            return None
+            return _apply_fallback(f"No source image (media_kind={media_kind})")
 
         caption_text = str(item.get("caption") or message.caption or "").strip()
         result: Optional[Tuple[str, str, str]]
@@ -2431,7 +2440,7 @@ class TelegramGalleryService:
                     timeout=AI_TITLE_PER_ITEM_TIMEOUT_SECONDS,
                 )
             except TimeoutError:
-                return None
+                return _apply_fallback("Timeout during analysis")
         else:
             result = await asyncio.to_thread(
                 self._ollama_analyze_image_path,
@@ -2458,11 +2467,10 @@ class TelegramGalleryService:
                     result = None
 
         if not result:
-            logger.debug(f"No result from AI analysis for {message_id}")
-            return None
+            return _apply_fallback("No result from AI analysis")
         title, description, used_model = result
         if not title:
-            return None
+            return _apply_fallback("Empty title from AI analysis")
 
         # Metadata for future re-titling decisions.
         item["ai_title_style"] = AI_TITLE_STYLE
