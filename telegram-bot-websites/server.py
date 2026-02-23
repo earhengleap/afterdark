@@ -1348,6 +1348,7 @@ class TelegramGalleryService:
                 f"- Use direct words: fuck, sex, porn, teen, boob, ass, pussy, dick, cock, tit, anal, oral, cum, suck, lick, wet, hard, milf, slut, whore, nude, naked, masturbation, nipple, balls, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, bj, hj, booty, thighs, missionary, doggy, cowgirl, tongue, spit, precum, squirt, gspot, dp, double penetration, orgy, bukkake, footjob, handjob, titjob, pov, amateur, hd, 4k\n"
                 f"- Title must be 5-12 words in lowercase\n"
                 f"- Make it like xnxx/xvideos/pornhub title\n"
+                f"- Focus heavily on the physical acts and anatomy described above.\n"
                 f"- Use at least 2-3 explicit words\n"
                 f"- Return ONLY the title in lowercase, no caps, no quotes\n"
                 f"- ALWAYS include at least 2 explicit words like: SEX, Fuck, Pussy, Dick, Cum, Ass, Tits, etc.\n"
@@ -1858,6 +1859,7 @@ class TelegramGalleryService:
         prompt = (
             "REWRITE into EXTREME porn-site style title - NO LIMITS. "
             "Plain text only, 5-12 words, no emojis, no hashtags, no quotes. "
+            "Focus heavily on the physical acts and anatomy described.\n"
             "Use EXTREME dirty words: fuck, cum, pussy, dick, cock, ass, anal, tit, boob, MILF, teen, wet, hard, oral, suck, lick, balls, cumshot, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, slut, bj, hj, etc. "
             "For videos, include action verbs: fuck, suck, lick, ride, pound, thrust, cream, etc. "
             "Make it like xvideos/xnxx/pornhub premium titles. "
@@ -1942,9 +1944,17 @@ class TelegramGalleryService:
                 continue
 
             try:
-                describe_prompt = "Describe this image in 1-2 short sentences."
+                describe_prompt = (
+                    "Focus entirely on the people in this image. "
+                    "Ignore the background, lighting, and scenery completely. "
+                    "Describe their specific physical actions, poses, interactions, and any visible anatomy in 1-2 short sentences."
+                )
                 if media_kind == "video":
-                    describe_prompt = "Describe this video frame in 1-2 short sentences."
+                    describe_prompt = (
+                        "Focus entirely on the people in this video frame. "
+                        "Ignore the background, lighting, and scenery completely. "
+                        "Describe their specific physical actions, poses, interactions, and any visible anatomy in 1-2 short sentences."
+                    )
 
                 payload = {
                     "model": model_name,
@@ -4072,7 +4082,10 @@ GUIDELINES:
                     "prompt": user_message,
                     "system": system_prompt,
                     "stream": True,
-                    "options": {"temperature": 0.7, "num_predict": 100},
+                    "options": {
+                        "temperature": 0.8, 
+                        "num_ctx": 2048
+                    }
                 }).encode("utf-8")
 
                 def _do_stream():
