@@ -1020,17 +1020,41 @@ async function autoSync() {
   if (state.isLoading) return;
   try {
     // Lightweight check: only read cached data, no heavy Telegram sync
-    const res = await fetch("/api/media?limit=1&offset=0", {
+    const res = await fetch("/api/media?limit=50&offset=0", {
       headers: await requestHeaders(),
     });
     if (res.ok) {
       const data = await res.json();
       const serverTotal = data.total || 0;
       const localTotal = state.totalItems || state.items.length;
+
+      let needsRefresh = false;
+      let refreshReason = "";
+
       if (serverTotal > localTotal) {
-        console.log(`Auto-sync: server has ${serverTotal - localTotal} new items`);
+        needsRefresh = true;
+        refreshReason = `${serverTotal - localTotal} new items available`;
+      } else {
+        // Check if any visible untitled items got titles
+        const topServerItems = data.items || [];
+        for (const localItem of state.items.slice(0, 50)) {
+          const serverItem = topServerItems.find(x => x.message_id === localItem.message_id);
+          if (serverItem) {
+            const localHasTitle = localItem.ai_title && !localItem.ai_title.includes("Video #") && !localItem.ai_title.includes("Image #");
+            const serverHasTitle = serverItem.ai_title && !serverItem.ai_title.includes("Video #") && !serverItem.ai_title.includes("Image #");
+            if (!localHasTitle && serverHasTitle) {
+              needsRefresh = true;
+              refreshReason = "AI Titles Generated";
+              break;
+            }
+          }
+        }
+      }
+
+      if (needsRefresh) {
+        console.log(`Auto-sync triggering refresh: ${refreshReason}`);
         await loadMedia(50, 0, false);
-        showToast(`${serverTotal - localTotal} new items available`, "success", 2000);
+        showToast(refreshReason, "success", 2000);
       }
     }
   } catch (e) {

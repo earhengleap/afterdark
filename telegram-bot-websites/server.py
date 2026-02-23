@@ -1312,6 +1312,15 @@ class TelegramGalleryService:
         return cleaned
 
     @staticmethod
+    def _clamp_title_words(value: str, min_words: int = 3, max_words: int = 12) -> str:
+        words = str(value or "").split()
+        if len(words) < min_words:
+            return ""
+        if len(words) > max_words:
+            return " ".join(words[:max_words])
+        return " ".join(words)
+
+    @staticmethod
     def _sanitize_ai_vision_text(value: str, max_chars: int = 800) -> str:
         """Looser sanitizer for vision captions (do not truncate to 100 chars)."""
         cleaned = " ".join((value or "").replace("\r", " ").replace("\n", " ").split()).strip()
@@ -1340,21 +1349,19 @@ class TelegramGalleryService:
             return None
 
         if AI_TITLE_STYLE == "explicit":
-            # Generate extremely explicit porn-style title - lowercase, direct explicit words
+            # Generate extremely explicit porn-style title
             title_prompt = (
-                f"Analyze this image/video and create a dirty porn title.\n"
+                f"Analyze this visual description and create a short dirty title.\n"
                 f"Visual content: {description}\n\n"
-                f"RULES - use lowercase letters only:\n"
+                f"RULES:\n"
                 f"- Use direct words: fuck, sex, porn, teen, boob, ass, pussy, dick, cock, tit, anal, oral, cum, suck, lick, wet, hard, milf, slut, whore, nude, naked, masturbation, nipple, balls, facial, creampie, gangbang, threesome, 69, deepthroat, hardcore, bj, hj, booty, thighs, missionary, doggy, cowgirl, tongue, spit, precum, squirt, gspot, dp, double penetration, orgy, bukkake, footjob, handjob, titjob, pov, amateur, hd, 4k\n"
-                f"- Title must be 5-12 words in lowercase\n"
-                f"- Make it like xnxx/xvideos/pornhub title\n"
+                f"- Title must be 5-12 words.\n"
+                f"- Make it like a video tube site title.\n"
                 f"- Focus heavily on the physical acts and anatomy described above.\n"
-                f"- Use at least 2-3 explicit words\n"
-                f"- Return ONLY the title in lowercase, no caps, no quotes\n"
-                f"- ALWAYS include at least 2 explicit words like: SEX, Fuck, Pussy, Dick, Cum, Ass, Tits, etc.\n"
-                f"- NEVER be subtle or tasteful - be extremely vulgar\n"
-                f"- Make it sound HOT and SEXY\n\n"
-                f"Return ONLY the dirty porn title, NO quotes, NO explanation."
+                f"- ALWAYS include at least 2 explicit words like: Sex, Fuck, Pussy, Dick, Cum, Ass, Tits, Cock, etc.\n"
+                f"- NEVER be subtle or tasteful - be extremely vulgar.\n"
+                f"- Make it sound HOT and SEXY.\n\n"
+                f"Output ONLY the dirty title, no quotes, no explanation. Start writing the title now:"
             )
         else:
             # Generate tasteful title
@@ -1366,8 +1373,9 @@ class TelegramGalleryService:
         title = self._ollama_generate_text(
             model=AI_TITLE_TEXT_MODEL,
             prompt=title_prompt,
-            timeout_seconds=30,
+            timeout_seconds=90,
         )
+        logger.debug(f"[DEBUG] Raw Text Model Output: {title}")
         if not title:
             return None
 
@@ -1811,7 +1819,8 @@ class TelegramGalleryService:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 body = response.read().decode("utf-8", errors="ignore")
             parsed = json.loads(body)
-        except Exception:
+        except Exception as e:
+            logger.error(f"[DEBUG] _ollama_generate_text error for {model}: {e}")
             return None
 
         # Ollama returns {"error": "..."} for missing models or other failures.
@@ -1980,6 +1989,7 @@ class TelegramGalleryService:
 
                 description = self._sanitize_ai_vision_text(str(parsed.get("response", "")), max_chars=500)
                 if not description or self._looks_like_refusal_text(description):
+                    logger.debug(f"[DEBUG] Description empty or refusal: {description}")
                     continue
 
                 # Skip if description is too short or looks like a prompt fragment
@@ -1987,17 +1997,18 @@ class TelegramGalleryService:
                     continue
                 # Skip if description contains non-ASCII Thai/other garbage (likely model hallucination)
                 if any(ord(c) > 127 and not c.isascii() for c in description[:50]):
+                    logger.debug(f"[DEBUG] Description contained non-ASCII characters: {description}")
                     continue
 
                 title = self._generate_title_from_description(description, message_id)
                 if not title:
                     continue
 
-                # Skip if title looks like a prompt fragment
-                if "1-3 sentences" in title.lower() or "describe" in title.lower():
+                if self._contains_blocked_title_terms(title):
+                    logger.debug(f"[DEBUG] Title blocked: {title}")
                     continue
-
-                if self._contains_blocked_title_terms(title) or self._contains_blocked_title_terms(description):
+                if self._contains_blocked_title_terms(description):
+                    logger.debug(f"[DEBUG] Description blocked: {description}")
                     continue
 
                 return title, description, model_name
@@ -2549,7 +2560,8 @@ class TelegramGalleryService:
                 attempts += 1
                 try:
                     title = await self._generate_ai_title_for_item(item, mode=mode)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"[DEBUG] _generate_ai_title_for_item error for item {item.get('message_id')}: {e}")
                     continue
                 if not title:
                     continue
@@ -2871,7 +2883,7 @@ class TelegramGalleryService:
                     existing_ai_title = str(existing_item.get("ai_title", "")).strip()
                     if existing_ai_title and is_default_media_title(existing_ai_title):
                         existing_ai_title = ""
-                    if existing_ai_title and self._contains_blocked_title_terms(existing_ai_title):
+                    elif existing_ai_title and self._contains_blocked_title_terms(existing_ai_title):
                         existing_ai_title = ""
                     existing_ai_description = str(existing_item.get("ai_description", "")).strip()
                     if existing_ai_description and self._contains_blocked_title_terms(existing_ai_description):
