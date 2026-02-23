@@ -1082,17 +1082,32 @@ def handle_exception(loop, context):
 
 def print_banner():
     """Print a professional banner on startup"""
+    import sys
+    # Force UTF-8 encoding for standard output to prevent charmap errors on Windows
+    if sys.stdout.encoding.lower() != 'utf-8':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+            
     width = 60
     border = "━" * width
-    print(f"\n\033[1;36m┏{border}┓\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;33m{BOT_NAME.center(width-2)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;32m{'Production Ready • Stable Version'.center(width-2)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┣{border}┫\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:   {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-    print(f"\033[1;36m┗{border}┛\033[0m")
+    try:
+        print(f"\n\033[1;36m┏{border}┓\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;33m{BOT_NAME.center(width-2)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;32m{'Production Ready • Stable Version'.center(width-2)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┣{border}┫\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:   {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┗{border}┛\033[0m")
+    except UnicodeEncodeError:
+        # Fallback if reconfigure failed and terminal absolutely cannot print emojis
+        print("\n--- X Video Downloader Pro ---")
+        print(f"Version: {BOT_VERSION}")
+        print(f"Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("------------------------------\n")
 
 async def main():
     """Main bot entry point with enhanced error handling and monitoring"""
@@ -1140,7 +1155,8 @@ async def main():
                 BotCommand("help", "Get help instructions"),
                 BotCommand("stats", "View download statistics"),
                 BotCommand("version", "Check bot version"),
-                BotCommand("health", "System health status")
+                BotCommand("health", "System health status"),
+                BotCommand("chat", "Chat with the AI Assistant")
             ])
             
             logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")

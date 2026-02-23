@@ -18,8 +18,10 @@ from core.metrics import metrics
 from utils.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
+from core.database import history_db
 from core.uploader import safe_edit_text
 from utils.video_processor import VideoProcessor
+from handlers.ai_handler import AIHandler
 from ui.messages import Messages
 from ui.keyboards import Keyboards
 from users.users import log_user_action
@@ -526,6 +528,18 @@ def setup_command_handlers(app: Client):
         keyboard = Keyboards.back_to_main()
         await message.reply_text(text, reply_markup=keyboard)
 
+    @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
+    async def chat_handler(client: Client, message: Message) -> None:
+        """Handle explicit AI chat commands"""
+        # Remove the command part (e.g. "/chat ")
+        text = message.text.split(" ", 1)
+        if len(text) < 2 or not text[1].strip():
+            await message.reply_text("Please provide a message. Example: `/chat What can you do?`")
+            return
+            
+        user_prompt = text[1].strip()
+        await AIHandler.process_chat(client, message, user_prompt)
+
     @app.on_message(filters.private & filters.text)
     async def text_handler(client: Client, message: Message) -> None:
         """Handle text messages (URLs) - NOW SUPPORTS MULTIPLE VIDEOS PER URL"""
@@ -540,14 +554,8 @@ def setup_command_handlers(app: Client):
         urls = URLExtractor.extract(text)
         
         if not urls:
-            await message.reply_text(
-                "❌ Please send valid URL(s).\n\n"
-                "You can send:\n"
-                "• Single URL\n"
-                "• Multiple URLs separated by spaces, pipes (|), or newlines\n\n"
-                "Or use the menu buttons for specific actions."
-            )
-            await log_user_action(user_id, username, text, "invalid_input", "unknown")
+            # If there are no URLs, assume the user is trying to chat with the AI natively
+            await AIHandler.process_chat(client, message, text)
             return
             
         # Check for Bulk Mode (Global Setting)

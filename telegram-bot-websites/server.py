@@ -4021,18 +4021,34 @@ async def api_chat(
     except Exception:
         total_items = 0; stats = {}; ai_titled = 0; untitled = 0; recent_text = ""
 
-    system_prompt = f"""You are AfterDark Vault Assistant — the built-in AI helper for this private media gallery website. Be friendly, concise, helpful. Use emojis occasionally.
+    system_prompt = f"""You are the friendly and powerful "Vault Assistant" — the built-in AI for this private Telegram Bot and Web Gallery. 
+You are currently chatting directly with the Admin through the Telegram chat interface!
 
-WHAT THE WEBSITE CAN DO: Browse {total_items} media items in a masonry grid, filter All/Videos/Images, sort Newest/Oldest/Largest/Smallest, search by title/description, click cards to open full viewer, Sync button to pull new Telegram media, AI button for auto-titles, Compact/Spacious layout, infinite scroll, realtime new media detection.
+Be extremely welcoming, conversational, and helpful. Always use emojis to make your responses lively and fun.
 
-TELEGRAM: Chat ID {CHAT_ID} — media mirrors a private Telegram group in real-time.
+WHAT THE TELEGRAM BOT CAN DO:
+- The user can paste single or multiple X (Twitter) Video/Image URLs natively into the chat, and you will instantly download them in the highest quality.
+- The user can enable "Bulk Mode" to queue up dozens of URLs at once, saving time.
 
-GALLERY STATS: {total_items} total items | {stats.get('videos', 0)} videos | {stats.get('images', 0)} images | {stats.get('total_size_mb', 0):.0f} MB | {ai_titled} AI-titled | {untitled} untitled | Last sync: {service.last_sync_at or 'never'}
+WHAT THE COMPANION WEBSITE CAN DO: 
+- Browse {total_items} media items in a clean masonry grid.
+- Filter by All/Videos/Images, sort by Newest/Oldest/Largest/Smallest.
+- Search by AI-generated titles or descriptions.
+- Click cards to open the full media viewer.
+- The website auto-detects new media downloaded by the Telegram Bot!
 
-RECENT 50 ITEMS:
+GALLERY LIVE STATS: 
+{total_items} total items | {stats.get('videos', 0)} videos | {stats.get('images', 0)} images | {stats.get('total_size_mb', 0):.0f} MB
+AI Titles: {ai_titled} | Untitled: {untitled} | Last sync: {service.last_sync_at or 'never'}
+
+RECENTLY ADDED 50 ITEMS:
 {recent_text}
 
-GUIDELINES: For stats questions use gallery stats above. For searches suggest the search bar. Keep answers to 2-4 sentences."""
+GUIDELINES: 
+- Acknowledge that you are inside the Telegram bot when relevant!
+- If asked about stats, use the 'GALLERY LIVE STATS' above. 
+- If asked about recent downloads or "what do we have", use the 'RECENTLY ADDED' list above.
+- Ensure your responses are formatted nicely for Telegram (bold text with **, code blocks with `). Keep answers to 2-4 sentences max."""
 
     # Generate a task ID and start background task immediately
     task_id = base64.b64encode(os.urandom(12)).decode().replace("=", "").replace("/", "_").replace("+", "-")
@@ -4060,31 +4076,38 @@ GUIDELINES: For stats questions use gallery stats above. For searches suggest th
                 }).encode("utf-8")
 
                 def _do_stream():
-                    conn = http.client.HTTPConnection(host, port, timeout=90)
+                    import urllib.request, urllib.error
+                    req = urllib.request.Request(
+                        f"{ollama_base}/api/generate",
+                        data=payload,
+                        headers={"Content-Type": "application/json"}
+                    )
+                    
+                    tokens = []
                     try:
-                        conn.request("POST", path, body=payload,
-                                     headers={"Content-Type": "application/json"})
-                        resp = conn.getresponse()
-                        if resp.status != 200:
-                            return None
-                        tokens = []
-                        for raw in resp:
-                            raw = raw.decode("utf-8", errors="ignore").strip()
-                            if not raw:
-                                continue
-                            try:
-                                chunk = json.loads(raw)
-                                tok = chunk.get("response", "")
-                                if tok:
-                                    tokens.append(tok)
-                                if chunk.get("done"):
-                                    break
-                            except Exception:
-                                continue
-                        return "".join(tokens).strip() or None
-                    finally:
-                        conn.close()
+                        with urllib.request.urlopen(req, timeout=120) as response:
+                            for raw_line in response:
+                                line = raw_line.decode('utf-8', errors='ignore').strip()
+                                if not line:
+                                    continue
+                                try:
+                                    chunk = json.loads(line)
+                                    tok = chunk.get("response", "")
+                                    if tok:
+                                        tokens.append(tok)
+                                        # STREAMING FIX: Publish safely
+                                        if task_id in _chat_tasks:
+                                            _chat_tasks[task_id]["partial_reply"] = "".join(tokens).strip()
 
+                                    if chunk.get("done"):
+                                        break
+                                except json.JSONDecodeError:
+                                    continue
+                            return "".join(tokens).strip() or None
+                    except Exception as e:
+                        logger.error(f"[CHAT] urllib stream error: {e}")
+                        return None
+                        
                 loop = asyncio.get_event_loop()
                 reply = await loop.run_in_executor(None, _do_stream)
                 if reply:
@@ -4102,20 +4125,24 @@ GUIDELINES: For stats questions use gallery stats above. For searches suggest th
 
 
 @app.get("/api/chat/result/{task_id}")
-async def api_chat_result(task_id: str) -> Dict[str, Any]:
+async def api_chat_result(task_id: str) -> JSONResponse:
     """Poll for AI chat result. Returns status: pending | done | error."""
     task = _chat_tasks.get(task_id)
     if not task:
-        return {"ok": False, "error": "Task not found or expired"}
+        return JSONResponse({"ok": False, "error": "Task not found or expired"})
+    if task["status"] == "pending":
+        # STREAMING FIX: Return the partial text being generated so far
+        reply_so_far = task.get("partial_reply", "")
+        return JSONResponse({"ok": True, "status": "pending", "reply": reply_so_far})
     if task["status"] == "done":
         # Clean up after reading
         _chat_tasks.pop(task_id, None)
-        return {"ok": True, "reply": task.get("reply", ""), "model": task.get("model", "")}
+        return JSONResponse({"ok": True, "status": task["status"], "reply": task.get("reply", ""), "model": task.get("model", "")})
     if task["status"] == "error":
         _chat_tasks.pop(task_id, None)
-        return {"ok": False, "error": task.get("error", "Unknown error")}
-    return {"ok": True, "status": "pending"}
-
+        return JSONResponse({"ok": False, "error": task.get("error", "Unknown error")})
+    # This line should ideally not be reached if all statuses are handled
+    return JSONResponse({"ok": True, "status": "unknown"})
 
 
 @app.post("/api/ai-titles/fix-defaults")
