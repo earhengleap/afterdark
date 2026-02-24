@@ -265,7 +265,7 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
             
             # Generate thumbnail for better UX
             from utils.video_processor import VideoProcessor
-            thumb_path = VideoProcessor.generate_thumbnail(video_path)
+            thumb_path = await VideoProcessor.generate_thumbnail(video_path)
             
             try:
                 sent_msg = await app.send_video(
@@ -747,14 +747,8 @@ def setup_command_handlers(app: Client):
                             
                             await status_msg.delete()
                             
-                            # Send images individually to avoid Pyrogram media group bug
-                            for img_path in image_paths:
-                                try:
-                                    if os.path.exists(img_path):
-                                        await app.send_photo(chat_id=message.chat.id, photo=img_path)
-                                        await asyncio.sleep(0.5) # Avoid flood wait
-                                except Exception as e:
-                                    logger.error(f"Error sending image: {e}")
+                            # Send images in groups of 10
+                            await ImageDownloader.send_images_to_user(image_paths, message, user_id)
                             
                             try:
                                 sent_msg = await message.reply_text(

@@ -250,40 +250,53 @@ class VideoDownloader:
                     'progress_hooks': [progress_hook] if (status_msg or progress_state is not None) else [],
                 }
                 
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    
-                    downloaded_files = []
-                    
-                    # Check if this is a playlist/multiple videos
-                    if 'entries' in info:
-                        # Multiple videos found
-                        logger.info(f"Found {len(info['entries'])} videos in tweet")
-                        for entry in info['entries']:
-                            if entry and 'requested_downloads' in entry:
-                                for download in entry['requested_downloads']:
-                                    if 'filepath' in download:
-                                        downloaded_file = download['filepath']
-                                        if os.path.exists(downloaded_file):
-                                            new_path = FileManager.rename_with_number(downloaded_file)
-                                            downloaded_files.append(new_path)
-                                            LogManager.add_entry(entry, os.path.basename(new_path), url)
-                    else:
-                        # Single video
-                        if 'requested_downloads' in info:
-                            downloaded_file = info['requested_downloads'][0]['filepath']
-                        else:
-                            title = info.get('title', 'video')
-                            downloaded_file = os.path.join(DOWNLOAD_FOLDER, f"{title}.mp4")
-                        
-                        if downloaded_file and os.path.exists(downloaded_file):
-                            new_path = FileManager.rename_with_number(downloaded_file)
-                            downloaded_files.append(new_path)
-                            LogManager.add_entry(info, os.path.basename(new_path), url)
-                    
-                    if downloaded_files:
-                        logger.info(f"Downloaded {len(downloaded_files)} video(s) using {profile['name']}")
-                        return downloaded_files, info
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            info = ydl.extract_info(url, download=True)
+                            
+                            downloaded_files = []
+                            
+                            # Check if this is a playlist/multiple videos
+                            if 'entries' in info:
+                                # Multiple videos found
+                                logger.info(f"Found {len(info['entries'])} videos in tweet")
+                                for entry in info['entries']:
+                                    if entry and 'requested_downloads' in entry:
+                                        for download in entry['requested_downloads']:
+                                            if 'filepath' in download:
+                                                downloaded_file = download['filepath']
+                                                if os.path.exists(downloaded_file):
+                                                    new_path = FileManager.rename_with_number(downloaded_file)
+                                                    downloaded_files.append(new_path)
+                                                    LogManager.add_entry(entry, os.path.basename(new_path), url)
+                            else:
+                                # Single video
+                                if 'requested_downloads' in info:
+                                    downloaded_file = info['requested_downloads'][0]['filepath']
+                                else:
+                                    title = info.get('title', 'video')
+                                    downloaded_file = os.path.join(DOWNLOAD_FOLDER, f"{title}.mp4")
+                                
+                                if downloaded_file and os.path.exists(downloaded_file):
+                                    new_path = FileManager.rename_with_number(downloaded_file)
+                                    downloaded_files.append(new_path)
+                                    LogManager.add_entry(info, os.path.basename(new_path), url)
+                            
+                            if downloaded_files:
+                                logger.info(f"Downloaded {len(downloaded_files)} video(s) using {profile['name']}")
+                                return downloaded_files, info
+                                
+                    except yt_dlp.utils.DownloadError as e:
+                        error_msg = str(e)
+                        if "No video could be found" in error_msg or "Unsupported URL" in error_msg:
+                            raise e # Let outer catch handle this, don't retry
+                        if attempt < max_retries - 1:
+                            logger.warning(f"yt-dlp network error: {e}, retrying {attempt + 1}/{max_retries} in 2s...")
+                            time.sleep(2)
+                            continue
+                        raise e
                     
             except yt_dlp.utils.DownloadError as e:
                 error_msg = str(e)
@@ -541,16 +554,10 @@ class VideoDownloader:
             except Exception as e:
                 logger.error(f"Failed to send video {os.path.basename(video_path)}: {e}")
         
-        # Send images individually to avoid Pyrogram media group bug
+        # Send images in groups of 10
         if image_paths:
-            logger.info(f"Sending {len(image_paths)} images individually")
-            for img_path in image_paths:
-                try:
-                    if os.path.exists(img_path):
-                        await message.reply_photo(photo=img_path)
-                        await asyncio.sleep(0.5) # Avoid flood wait
-                except Exception as e:
-                    logger.error(f"Failed to send image {os.path.basename(img_path)}: {e}")
+            logger.info(f"Sending {len(image_paths)} images")
+            await ImageDownloader.send_images_to_user(image_paths, message, user_id)
     
     @staticmethod
     async def _send_summary(url_results: List[DownloadResult], video_success_count: int, 

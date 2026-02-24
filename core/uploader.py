@@ -86,7 +86,7 @@ class VideoUploader:
                         progress_args=(progress_key, status_msg, video_name, start_time),
                     )
                 else:
-                    thumb_path = VideoProcessor.generate_thumbnail(video_path)
+                    thumb_path = await VideoProcessor.generate_thumbnail(video_path)
                     try:
                         await upload_client.send_video(
                             chat_id=CHAT_ID,

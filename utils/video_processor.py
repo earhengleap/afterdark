@@ -63,7 +63,7 @@ class VideoProcessor:
             return None, None
 
     @staticmethod
-    def generate_thumbnail(video_path: str, output_path: Optional[str] = None) -> Optional[str]:
+    async def generate_thumbnail(video_path: str, output_path: Optional[str] = None) -> Optional[str]:
         """Generate a thumbnail from the video using ffmpeg natively"""
         if output_path is None:
             # Create a thumbnail path by replacing the extension with _thumb.jpg
@@ -71,6 +71,8 @@ class VideoProcessor:
             output_path = video_path.rsplit('.', 1)[0] + '_thumb.jpg'
             
         try:
+            import os
+            import asyncio
             cmd = [
                 "ffmpeg", "-y", "-i", video_path,
                 "-ss", "00:00:01.000",   # Capture at 1 second
@@ -78,9 +80,13 @@ class VideoProcessor:
                 "-q:v", "2",             # High quality JPEG
                 output_path
             ]
-            subprocess.run(cmd, capture_output=True, check=True)
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await process.communicate()
             
-            import os
             if os.path.exists(output_path):
                 return output_path
             return None
