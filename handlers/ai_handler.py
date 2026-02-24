@@ -26,15 +26,10 @@ class AIHandler:
             await message.reply_text("Please provide a message to the AI. Example: `/chat What can you do?`")
             return
 
-        from handlers.command_handlers import _discover_twa_public_url
+        import os
         
-        # 1. Discover the Web App URL
-        web_app_url = _discover_twa_public_url()
-        if not web_app_url:
-            await message.reply_text("⚠️ **AI Offline**\nCould not discover the active Web App URL. Make sure `start_stable_tunnel.bat` is running.")
-            return
-
-        base_url = web_app_url.rstrip("/")
+        twa_port = os.getenv("TWA_PORT", "5000").strip() or "5000"
+        base_url = f"http://127.0.0.1:{twa_port}"
         chat_api_url = f"{base_url}/api/chat"
         
         status_msg = await message.reply_text("🧠 *Thinking...* 0s", quote=True)
