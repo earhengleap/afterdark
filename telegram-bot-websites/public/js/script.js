@@ -1061,13 +1061,12 @@ async function init() {
     console.log("Context fetched:", context ? "OK" : "null");
 
     console.log("Loading media...");
-    const cachedItems = context?.cached_items || 0;
-    const shouldRefresh = cachedItems === 0;
-    console.log("Cached items:", cachedItems, "shouldRefresh:", shouldRefresh);
 
-    // Load initial batch for fast experience (don't load all at once over slow tunnels)
+    // Server runs background syncs on startup and via live_sync.
+    // Triggering a blocking sync here (refresh=true) causes Serveo to 502 timeout.
+    // Always load from cache initially.
     const initialLimit = 50;
-    const mediaResult = await loadMedia(initialLimit, 0, shouldRefresh);
+    const mediaResult = await loadMedia(initialLimit, 0, false);
     console.log("Media loaded:", mediaResult ? "OK" : "failed/null");
 
     console.log("Final state - items:", state.items.length, "filtered:", state.filtered.length);

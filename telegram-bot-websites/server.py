@@ -4051,7 +4051,7 @@ async def api_chat(
     except Exception:
         total_items = 0; stats = {}; ai_titled = 0; untitled = 0; recent_text = ""
 
-    system_prompt = f"""You are the friendly and powerful "Vault Assistant" — the built-in AI for this private Telegram Bot and Web Gallery. 
+    system_prompt = f"""You are the friendly and powerful "AfterDark Assistant" — the built-in AI for this private Telegram Bot and Web Gallery. 
 You are currently chatting directly with the Admin through the Telegram chat interface!
 
 Be extremely welcoming, conversational, and helpful. Always use emojis to make your responses lively and fun.

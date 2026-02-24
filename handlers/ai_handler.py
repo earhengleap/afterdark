@@ -102,7 +102,7 @@ class AIHandler:
                     model_used = poll_result.get("model", "unknown")
                     
                     # Format final message
-                    final_text = f"🤖 **Vault Assistant** (`{model_used}`)\n\n"
+                    final_text = "🤖 **AfterDark Assistant**\n\n"
                     final_text += reply_text
                     
                     # Telegram message limits

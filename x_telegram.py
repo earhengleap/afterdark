@@ -466,10 +466,20 @@ def _is_public_url_healthy(public_url: str) -> bool:
 
 def _wait_for_public_url_health(public_url: str, timeout_seconds: int) -> bool:
     deadline = time.time() + max(1, timeout_seconds)
+    consecutive_success = 0
     while time.time() < deadline:
         if _is_public_url_healthy(public_url):
-            return True
-        time.sleep(1)
+            consecutive_success += 1
+            # Require 3 consecutive successful checks to ensure proxy routing has stabilized 
+            # across all of the tunnel provider's global edge nodes before telling the user.
+            if consecutive_success >= 3:
+                # Add an extra 4s buffer to prevent immediate 502 when the user clicks the link
+                # (DNS/edge routes take a few seconds to fully propagate)
+                time.sleep(4) 
+                return True
+        else:
+            consecutive_success = 0
+        time.sleep(2.0)
     return False
 
 
@@ -589,15 +599,18 @@ def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
             _terminate_process(tunnel_proc)
             continue
 
-        if not _wait_for_public_url_health(public_url, health_timeout):
+        # Serveo can take 20-40 seconds to fully propagate its proxies worldwide
+        serveo_health_timeout = max(health_timeout, 60)
+        logger.info(f"serveo URL found: {public_url}. Waiting up to {serveo_health_timeout}s for health check...")
+        if not _wait_for_public_url_health(public_url, serveo_health_timeout):
             logger.warning(
-                f"serveo URL is not healthy after {health_timeout}s: {public_url}. "
+                f"serveo URL is not healthy after {serveo_health_timeout}s: {public_url}. "
                 "Trying next serveo port/fallback."
             )
             _terminate_process(tunnel_proc)
             continue
 
-        logger.info(f"TWA serveo tunnel active: {public_url}")
+        logger.info(f"TWA serveo tunnel active and healthy: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
         _send_tunnel_notification(public_url)
@@ -937,13 +950,13 @@ def _start_twa_stack() -> None:
             logger.info(f"Using existing persisted TWA URL: {persisted_url}")
             _sync_twa_menu_button(persisted_url, root_dir)
             return
-        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
-            return
-        logger.warning("serveo tunnel failed in auto mode, trying localhost.run...")
         if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
             return
-        logger.warning("localhost.run tunnel failed, trying lhr.life...")
+        logger.warning("localhost.run tunnel failed in auto mode, trying lhr.life...")
         if _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")) and _start_lhr_life_tunnel(root_dir, twa_port):
+            return
+        logger.warning("lhr.life tunnel failed, trying serveo as last resort...")
+        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
             return
         logger.warning("No tunnel provider succeeded in auto mode.")
         return
