@@ -26,6 +26,8 @@ from ui.messages import Messages
 from ui.keyboards import Keyboards
 from users.users import log_user_action
 
+from core.get_following_service import get_following_list, parse_cookies
+
 # Get logger
 logger = logging.getLogger("XVideoBot")
 
@@ -527,6 +529,78 @@ def setup_command_handlers(app: Client):
         text = summary
         keyboard = Keyboards.back_to_main()
         await message.reply_text(text, reply_markup=keyboard)
+
+    @app.on_message(filters.private & filters.command("get_following"))
+    async def get_following_handler(client: Client, message: Message) -> None:
+        """Handle /get_following command"""
+        if len(message.command) < 2:
+            await message.reply_text("⚠️ Please provide a username. Usage: `/get_following elonmusk`")
+            return
+            
+        username = message.command[1].strip().replace("@", "")
+        
+        cookies_file = "config/twitter_cookies.txt"
+        if not os.path.exists(cookies_file):
+            await message.reply_text("❌ System error: Cookie file missing. Cannot authenticate with Twitter.")
+            return
+
+        status_msg = await message.reply_text(f"🔍 **Starting scrape for @{username}...**\n\n⏳ Initializing...")
+        
+        try:
+            cookies = parse_cookies(cookies_file)
+            if not cookies.get('auth_token') or not cookies.get('ct0'):
+                await status_msg.edit_text("❌ Authentication Error: Cookies are invalid or expired.")
+                return
+
+            def update_progress(msg: str):
+                # Only update occasionally to avoid flood wait, or just log it
+                # We'll rely on the background thread printing to console for detailed logs
+                pass
+
+            # Run synchronous scraping in a thread pool
+            following_list = await asyncio.to_thread(
+                get_following_list, 
+                username, 
+                cookies, 
+                True, # resume mode
+                update_progress
+            )
+            
+            if following_list is None:
+                await status_msg.edit_text(f"❌ Failed to get following list for @{username}. They might be suspended, private, or the cookies are expired.")
+                return
+                
+            await status_msg.edit_text(f"✅ Scraping completed for @{username}. Found {len(following_list)} users. Preparing files...")
+
+            txt_file = f"{username}_following.txt"
+            json_file = f"{username}_following.json"
+            
+            # Send the files to the user
+            docs_to_send = []
+            if os.path.exists(txt_file):
+                docs_to_send.append(txt_file)
+            if os.path.exists(json_file):
+                docs_to_send.append(json_file)
+                
+            for doc in docs_to_send:
+                await message.reply_document(document=doc, caption=f"📑 Result for @{username}")
+                # Optional: Delete the file after sending
+                # try:
+                #    os.remove(doc)
+                # except Exception:
+                #    pass
+                
+            # Clear state file if it exists
+            state_file = f"{username}_state.json"
+            if os.path.exists(state_file):
+                try:
+                    os.remove(state_file)
+                except:
+                    pass
+                
+        except Exception as e:
+            logger.error(f"Scrape error: {e}")
+            await status_msg.edit_text(f"❌ An error occurred during scraping: {str(e)[:100]}")
 
     @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
     async def chat_handler(client: Client, message: Message) -> None:
