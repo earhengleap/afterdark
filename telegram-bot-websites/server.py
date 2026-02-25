@@ -351,6 +351,8 @@ class TelegramGalleryService:
         self._start_lock = asyncio.Lock()
         self._ai_title_lock = asyncio.Lock()
         self._thumb_locks: Dict[int, asyncio.Lock] = {}
+        self._dl_locks: Dict[str, asyncio.Lock] = {}
+        self._dl_locks_lock = asyncio.Lock()
         self._started = False
         self._last_ai_failure_at = 0.0
         self._ai_queue: deque[int] = deque()
@@ -1135,6 +1137,11 @@ class TelegramGalleryService:
             result = await self._generate_video_thumb_ffmpeg(cached_video, thumb_path, message_id)
             if result:
                 return result
+
+        # In CDN mode, do not download the full video just for a thumbnail
+        if CDN_ONLY_MODE:
+            logger.debug(f"[THUMB] Skipping full video download for thumbnail {message_id} in CDN mode")
+            return None
         
         # Download video if not cached
         try:
@@ -1146,6 +1153,9 @@ class TelegramGalleryService:
             )
             if downloaded:
                 video_path = Path(downloaded)
+        except asyncio.TimeoutError:
+            logger.warning(f"[THUMB] Timed out downloading video {message_id} for thumbnail generation")
+            return None
         except Exception as e:
             logger.warning(f"[THUMB] Failed to download video {message_id}: {e}")
             return None
@@ -2814,6 +2824,12 @@ class TelegramGalleryService:
 
         return None
 
+    async def _get_dl_lock(self, file_name: str) -> asyncio.Lock:
+        async with self._dl_locks_lock:
+            if file_name not in self._dl_locks:
+                self._dl_locks[file_name] = asyncio.Lock()
+            return self._dl_locks[file_name]
+
     async def sync_group_media(self, limit: Optional[int], force_redownload: bool = False, process_ai_realtime: bool = True) -> List[Dict[str, Any]]:
         if limit is not None:
             limit = max(1, limit)
@@ -3406,25 +3422,34 @@ async def api_file(message_id: int) -> FileResponse:
         if not media_tuple:
             raise HTTPException(status_code=404, detail="Message has no downloadable media")
 
-        try:
-            downloaded_path = await asyncio.wait_for(
-                service.client.download_media(message, file_name=str(local_path)),
-                timeout=DOWNLOAD_TIMEOUT_SECONDS,
-            )
-        except TimeoutError as exc:
-            raise HTTPException(
-                status_code=504,
-                detail=f"Media download timed out after {DOWNLOAD_TIMEOUT_SECONDS}s",
-            ) from exc
+        dl_lock = await service._get_dl_lock(local_path.name)
+        async with dl_lock:
+            # Check again inside the file-specific lock in case another request downloaded it
+            if local_path.exists():
+                item["is_cached"] = True
+                item["url"] = f"/media/{local_path.name}"
+                service._save_index()
+                return cached_file_response(local_path)
+                
+            try:
+                downloaded_path = await asyncio.wait_for(
+                    service.client.download_media(message, file_name=str(local_path)),
+                    timeout=DOWNLOAD_TIMEOUT_SECONDS,
+                )
+            except TimeoutError as exc:
+                raise HTTPException(
+                    status_code=504,
+                    detail=f"Media download timed out after {DOWNLOAD_TIMEOUT_SECONDS}s",
+                ) from exc
 
-        if not downloaded_path:
-            raise HTTPException(status_code=404, detail="Failed to download media")
+            if not downloaded_path:
+                raise HTTPException(status_code=404, detail="Failed to download media")
 
-        local_path = Path(downloaded_path)
-        item["file_name"] = local_path.name
-        item["is_cached"] = True
-        item["url"] = f"/media/{local_path.name}"
-        service._save_index()
+            local_path = Path(downloaded_path)
+            item["file_name"] = local_path.name
+            item["is_cached"] = True
+            item["url"] = f"/media/{local_path.name}"
+            service._save_index()
 
     return cached_file_response(local_path)
 

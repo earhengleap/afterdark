@@ -542,9 +542,9 @@ def _start_serveo_tunnel(root_dir: Path, twa_port: str) -> bool:
             "-o",
             "ExitOnForwardFailure=yes",
             "-o",
-            "ServerAliveInterval=30",
+            "ServerAliveInterval=15",
             "-o",
-            "ServerAliveCountMax=3",
+            "ServerAliveCountMax=5",
             "-R",
             f"{remote_port}:127.0.0.1:{twa_port}",
             tunnel_target,
@@ -846,6 +846,81 @@ def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
         return False
 
 
+def _stop_tunnel_processes() -> None:
+    for proc in reversed(_aux_processes):
+        try:
+            if proc and proc.poll() is None:
+                args = getattr(proc, 'args', [])
+                if isinstance(args, list) and any('ssh' in str(a).lower() for a in args):
+                    proc.terminate()
+                    proc.wait(timeout=3)
+        except Exception:
+            pass
+
+
+def _start_tunnel_provider_flow(root_dir: Path, twa_port: str) -> bool:
+    provider_raw = os.getenv("TWA_TUNNEL_PROVIDER", "auto").strip().lower()
+    provider = provider_raw if provider_raw else "auto"
+
+    if provider == "auto":
+        if not _resolve_ssh_executable():
+            logger.info("TWA Mini App started without public tunnel (ssh client not found).")
+            return False
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("localhost.run tunnel failed in auto mode, trying lhr.life...")
+        if _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")) and _start_lhr_life_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("lhr.life tunnel failed, trying serveo as last resort...")
+        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("No tunnel provider succeeded in auto mode.")
+        return False
+
+    if provider in {"none", "off", "disabled"}:
+        logger.info("TWA Mini App started without public tunnel (TWA_TUNNEL_PROVIDER=none).")
+        return False
+
+    if provider == "serveo":
+        if not _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. serveo autostart disabled by TWA_SERVEO_AUTOSTART.")
+            return False
+        if _start_serveo_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("serveo failed, falling back to localhost.run...")
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return True
+        return False
+
+    if provider == "localhostrun":
+        if not _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. localhost.run autostart disabled by TWA_LOCALHOSTRUN_AUTOSTART.")
+            return False
+        if _start_localhostrun_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("localhost.run failed, falling back to serveo...")
+        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
+            return True
+        return False
+
+    if provider == "lhrlife":
+        if not _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. lhr.life autostart disabled by TWA_LHR_LIFE_AUTOSTART.")
+            return False
+        if _start_lhr_life_tunnel(root_dir, twa_port):
+            return True
+        logger.warning("lhr.life failed, falling back to localhost.run...")
+        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
+            return True
+        return False
+
+    logger.warning(
+        f"Unknown TWA_TUNNEL_PROVIDER='{provider_raw}'. "
+        "Valid values: auto, serveo, localhostrun, lhrlife, none, off, disabled."
+    )
+    return False
+
+
 def _start_twa_stack() -> None:
     if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
         return
@@ -897,8 +972,6 @@ def _start_twa_stack() -> None:
     server_env = os.environ.copy()
     server_env.setdefault("TELEGRAM_GALLERY_AUTH", "auto")
     server_env["TWA_PORT"] = twa_port
-    # Prefer Dolphin as the local text polisher for porn-site style titles when the user didn't override it.
-    # Falls back automatically to gemma3:4b in the server if Dolphin isn't installed.
     if not server_env.get("TWA_AI_TEXT_MODEL", "").strip():
         server_env["TWA_AI_TEXT_MODEL"] = "dolphin-llama3:8b"
     if not server_env.get("TWA_AI_TEXT_FALLBACK_MODELS", "").strip():
@@ -938,70 +1011,13 @@ def _start_twa_stack() -> None:
             "Starting tunnel provider flow."
         )
 
-    provider_raw = os.getenv("TWA_TUNNEL_PROVIDER", "auto").strip().lower()
-    provider = provider_raw if provider_raw else "auto"
-
-    if provider == "auto":
-        if not _resolve_ssh_executable():
-            logger.info("TWA Mini App started without public tunnel (ssh client not found).")
-            return
-        persisted_url = _read_persisted_twa_public_url(root_dir)
-        if persisted_url and _is_public_url_healthy(persisted_url):
-            logger.info(f"Using existing persisted TWA URL: {persisted_url}")
-            _sync_twa_menu_button(persisted_url, root_dir)
-            return
-        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
-            return
-        logger.warning("localhost.run tunnel failed in auto mode, trying lhr.life...")
-        if _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")) and _start_lhr_life_tunnel(root_dir, twa_port):
-            return
-        logger.warning("lhr.life tunnel failed, trying serveo as last resort...")
-        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
-            return
-        logger.warning("No tunnel provider succeeded in auto mode.")
+    persisted_url = _read_persisted_twa_public_url(root_dir)
+    if persisted_url and _is_public_url_healthy(persisted_url):
+        logger.info(f"Using existing persisted TWA URL: {persisted_url}")
+        _sync_twa_menu_button(persisted_url, root_dir)
         return
 
-    if provider in {"none", "off", "disabled"}:
-        logger.info("TWA Mini App started without public tunnel (TWA_TUNNEL_PROVIDER=none).")
-        return
-
-    if provider == "serveo":
-        if not _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")):
-            logger.info("TWA Mini App started. serveo autostart disabled by TWA_SERVEO_AUTOSTART.")
-            return
-        if _start_serveo_tunnel(root_dir, twa_port):
-            return
-        logger.warning("serveo failed, falling back to localhost.run...")
-        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
-            return
-        return
-
-    if provider == "localhostrun":
-        if not _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")):
-            logger.info("TWA Mini App started. localhost.run autostart disabled by TWA_LOCALHOSTRUN_AUTOSTART.")
-            return
-        if _start_localhostrun_tunnel(root_dir, twa_port):
-            return
-        logger.warning("localhost.run failed, falling back to serveo...")
-        if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
-            return
-        return
-
-    if provider == "lhrlife":
-        if not _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")):
-            logger.info("TWA Mini App started. lhr.life autostart disabled by TWA_LHR_LIFE_AUTOSTART.")
-            return
-        if _start_lhr_life_tunnel(root_dir, twa_port):
-            return
-        logger.warning("lhr.life failed, falling back to localhost.run...")
-        if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
-            return
-        return
-
-    logger.warning(
-        f"Unknown TWA_TUNNEL_PROVIDER='{provider_raw}'. "
-        "Valid values: auto, serveo, localhostrun, lhrlife, none, off, disabled."
-    )
+    _start_tunnel_provider_flow(root_dir, twa_port)
 
 
 def _stop_aux_processes() -> None:
@@ -1015,6 +1031,68 @@ def _stop_aux_processes() -> None:
                 proc.kill()
             except Exception:
                 pass
+
+async def tunnel_watchdog(app) -> None:
+    """Continuously monitor TWA tunnel health and restart if disconnected."""
+    if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
+        return
+
+    root_dir = Path(__file__).resolve().parent
+    # Wait a bit after startup to avoid reacting to initialization 502s
+    await asyncio.sleep(60)
+    
+    while True:
+        try:
+            provider = os.getenv("TWA_TUNNEL_PROVIDER", "auto").strip().lower()
+            if provider in {"none", "off", "disabled"}:
+                break
+                
+            explicit = os.getenv("TWA_PUBLIC_URL", "").strip()
+            if explicit.startswith("https://"):
+                await asyncio.sleep(60)
+                continue
+                
+            twa_port = os.getenv("TWA_PORT", "5000").strip() or "5000"
+            
+            # Fast check: did the SSH process crash unexpectedly?
+            ssh_dead = False
+            for proc in reversed(_aux_processes):
+                if proc and getattr(proc, 'args', []):
+                    args_str = str(getattr(proc, 'args', [])).lower()
+                    if 'ssh' in args_str:
+                        if proc.poll() is not None:
+                            ssh_dead = True
+                        break # Only check the most recent ssh process
+                        
+            if ssh_dead:
+                logger.warning("SSH tunnel process crashed! Restarting tunnel instantly...")
+                await asyncio.to_thread(_stop_tunnel_processes)
+                await asyncio.sleep(2)
+                await asyncio.to_thread(_start_tunnel_provider_flow, root_dir, twa_port)
+                await asyncio.sleep(15)
+                continue
+
+            persisted = await asyncio.to_thread(_read_persisted_twa_public_url, root_dir)
+            
+            if persisted:
+                # Check public URL health
+                is_healthy = await asyncio.to_thread(_is_public_url_healthy, persisted)
+                if not is_healthy:
+                    logger.warning(f"Tunnel {persisted} is unhealthy! Restarting SSH tunnel...")
+                    await asyncio.to_thread(_stop_tunnel_processes)
+                    await asyncio.sleep(2)
+                    await asyncio.to_thread(_start_tunnel_provider_flow, root_dir, twa_port)
+            else:
+                # URL missing entirely? Maybe startup failed altogether. 
+                # Attempt to restart it.
+                await asyncio.to_thread(_start_tunnel_provider_flow, root_dir, twa_port)
+                
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.debug(f"Tunnel watchdog error: {e}")
+            
+        await asyncio.sleep(45)
 
 # ==================== PYROGRAM CLIENT ====================
 
@@ -1181,6 +1259,9 @@ async def main():
             # Step 5: Start health monitoring
             logger.info("Starting health monitor...")
             asyncio.create_task(start_health_monitor(app, interval=300))
+            
+            # Start tunnel watchdog to auto-restart dropped tunnels
+            asyncio.create_task(tunnel_watchdog(app))
             
             # Step 6: Log initial metrics
             logger.info("📊 Metrics tracking enabled")
