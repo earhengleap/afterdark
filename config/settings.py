@@ -49,6 +49,7 @@ if cookies_content:
     tmp_cookies_file.write(cookies_content)
     tmp_cookies_file.close()
     COOKIE_FILE = tmp_cookies_file.name
+    IMAGES_DIR = 'media/images'
 else:
     COOKIE_FILE = 'config/twitter_cookies.txt'
 

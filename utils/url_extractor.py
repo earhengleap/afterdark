@@ -12,62 +12,31 @@ class URLExtractor:
     @staticmethod
     def extract(text: str) -> List[str]:
         """
-        Extract all URLs from text with maximum flexibility
-        
-        Features:
-        - Handles URLs with NO SPACES between them
-        - Supports line breaks (\n)
-        - Removes trailing punctuation
-        - Handles URLs with query parameters
-        - No limit on number of URLs
-        - Supports both x.com and twitter.com
-        
-        Example:
-        Input: "https://x.com/user1/status/123https://x.com/user2/status/456"
-        Output: ['https://x.com/user1/status/123', 'https://x.com/user2/status/456']
+        Extract all URLs from text.
         """
         if not text:
             return []
-        
-        # Use regex pattern that finds ALL occurrences of URLs
-        # This pattern matches URLs even when they're stuck together
+            
+        # Standard robust matching that also explicitly splits stuck-together "https://"
         url_pattern = re.compile(
-            r'https?://'  # http:// or https://
-            r'(?:[a-zA-Z0-9-]+\.)*'  # subdomains (optional)
-            r'[a-zA-Z0-9-]+'  # domain name
-            r'\.[a-zA-Z]{2,}'  # TLD (.com, .net, etc)
-            r'(?::[0-9]+)?'  # port (optional)
-            r'(?:/[^\s]*?)?'  # path (optional, non-greedy)
-            r'(?=https?://|\s|$)',  # Stop before next URL, whitespace, or end of string
+            r"(?:https?://|www\.)[^\s<>]+?(?=(?:https?://|www\.|$|\s|<|>))", 
             re.IGNORECASE
         )
-        
-        # Find all URLs using findall
         found_urls = url_pattern.findall(text)
-        
-        # If no URLs found with lookahead, try simpler pattern
-        if not found_urls:
-            # Fallback pattern for edge cases
-            simple_pattern = re.compile(
-                r'https?://[^\s]+',
-                re.IGNORECASE
-            )
-            found_urls = simple_pattern.findall(text)
         
         # Clean up URLs
         cleaned_urls = []
         for url in found_urls:
+            url = url.strip()
+            
             # Remove trailing punctuation that's not part of the URL
-            url = re.sub(r'[,;.!?\)\]]+$', '', url)
+            # Note: Do not remove valid URL chars (like closing parens if it opened one)
+            url = re.sub(r'[,;:!?]+$', '', url)
             
-            # Remove trailing quotes
-            url = url.rstrip('"\'')
-            
-            # If URL ends with 'https://' (captured the start of next URL), remove it
-            if url.endswith('https://') or url.endswith('http://'):
-                url = re.sub(r'https?://$', '', url)
-            
-            # Validate that it's a reasonable URL
+            # If it's just 'www.', prepend 'http://'
+            if url.lower().startswith('www.'):
+                url = 'http://' + url
+                
             if len(url) > 10 and '.' in url:
                 cleaned_urls.append(url)
         

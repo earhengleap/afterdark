@@ -9,7 +9,7 @@ def ensure_gallery_dl():
         print("📦 Installing gallery-dl...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "gallery-dl"])
 
-def download_x_images(post_url, output_dir="downloads", cookie_file="twitter_cookies.txt"):
+def download_x_images(post_url, output_dir="downloads", cookie_file="config/twitter_cookies.txt"):
     ensure_gallery_dl()
     os.makedirs(output_dir, exist_ok=True)
 

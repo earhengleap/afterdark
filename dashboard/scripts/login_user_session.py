@@ -13,7 +13,7 @@ from pyrogram import Client  # noqa: E402
 from config.settings import API_ID, API_HASH  # noqa: E402
 
 SESSION_NAME = "twa_user"
-WORKDIR = "telegram-bot-websites/media_cache"
+WORKDIR = "dashboard/media_cache"
 
 
 async def main() -> None:

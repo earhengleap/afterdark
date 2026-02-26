@@ -14,3 +14,7 @@
 .x.com	TRUE	/	TRUE	1803320491	twid	u%3D2001698182674477056
 x.com	FALSE	/	FALSE	1783899900	g_state	{"i_l":0,"i_ll":1768347886996}
 x.com	FALSE	/	FALSE	0	lang	en
+.instagram.com	TRUE	/	TRUE	1806650042	csrftoken	DE2UNdTnoU1XxeR85sBGODXq0WF5tuBL
+.instagram.com	TRUE	/	TRUE	1806648743	mid	aZ_tpgALAAEgui-oCoGOTUYOinPS
+.instagram.com	TRUE	/	TRUE	1803624743	ig_did	A8B053CC-3C8E-4297-A45D-B8680AB3EECB
+.instagram.com	TRUE	/	TRUE	1803624743	ig_nrcb	1

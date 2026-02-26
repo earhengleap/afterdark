@@ -146,7 +146,7 @@ def main():
     if tests_passed == tests_total:
         print("\n[SUCCESS] All tests passed! Your AI title generation system is ready.")
         print("\nNext steps:")
-        print("1. Start the Mini App server: python telegram-bot-websites/server.py")
+        print("1. Start the Mini App server: python dashboard/server.py")
         print("2. Watch the logs for 'AI title worker active'")
         print("3. Post new media to your Telegram group")
         print("4. Check the website for AI-generated titles")

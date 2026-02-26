@@ -287,7 +287,7 @@ def get_following_list(username: str, cookies: Dict[str, str], resume: bool = Tr
 def main():
     parser = argparse.ArgumentParser(description="Scrape Twitter/X 'Following' lists safely.")
     parser.add_argument("-u", "--user", type=str, help="The target Twitter username (without @)")
-    parser.add_argument("-c", "--cookies", type=str, default="twitter_cookies.txt", help="Path to your twitter_cookies.txt file")
+    parser.add_argument("-c", "--cookies", type=str, default="config/twitter_cookies.txt", help="Path to your twitter_cookies.txt file")
     parser.add_argument("--no-resume", action="store_true", help="Start fresh and ignore any saved checkpoints")
     
     args = parser.parse_args()

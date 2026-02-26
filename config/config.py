@@ -20,7 +20,7 @@ COOKIE_FILE = 'config/twitter_cookies.txt'
 FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
 
 # Paths
-DOWNLOAD_FOLDER = "videos"
+DOWNLOAD_FOLDER = "media/videos"
 DATA_FOLDER = "data"
 LOG_FILE = "data/download_log.log"
 UPLOAD_LOG_FILE = "data/upload_history.log"

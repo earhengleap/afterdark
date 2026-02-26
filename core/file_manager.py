@@ -91,7 +91,7 @@ class FileManager:
         """Get all image files from images folder"""
         try:
             images = []
-            # Use IMAGES_FOLDER instead of videos/images
+            # Use IMAGES_FOLDER instead of media/images/ manually
             if os.path.exists(IMAGES_FOLDER):
                 for root, dirs, files in os.walk(IMAGES_FOLDER):
                     for filename in files:

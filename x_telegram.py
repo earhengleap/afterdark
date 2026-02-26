@@ -26,7 +26,7 @@ from pyrogram.types import BotCommand
 from pyrogram.errors import ApiIdInvalid, AuthKeyInvalid
 
 # Configuration imports
-from config.settings import BOT_TOKEN, API_ID, API_HASH, BOT_VERSION, BOT_NAME, VERSION_DATE
+from config.settings import BOT_TOKEN, API_ID, API_HASH, BOT_VERSION, BOT_NAME, VERSION_DATE, CHAT_ID
 from config.paths import setup_directories
 
 # Core functionality imports
@@ -48,55 +48,23 @@ _aux_processes = []
 _NOTIFY_USERNAME = "@HengleapEar"
 
 
-async def _send_tunnel_notification_async(public_url: str) -> None:
-    """Async function to send tunnel URL notification to Telegram user."""
-    try:
-        app = Client(
-            "tunnel_notifier",
-            api_id=API_ID,
-            api_hash=API_HASH,
-            bot_token=BOT_TOKEN,
-            workdir=str(Path(__file__).parent / "data")
-        )
-        await app.start()
-        try:
-            message = (
-                f"🌐 **Tunnel Active**\n\n"
-                f"URL: {public_url}\n\n"
-                f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            await app.send_message(_NOTIFY_USERNAME, message)
-            logger.info(f"✅ Tunnel URL sent to {_NOTIFY_USERNAME}")
-        finally:
-            await app.stop()
-    except Exception as e:
-        logger.error(f"❌ Failed to send tunnel notification to {_NOTIFY_USERNAME}: {e}")
-        raise
-
-
 def _send_tunnel_notification(public_url: str) -> None:
-    """Send tunnel URL notification to Telegram user."""
-    import asyncio
-    
-    async def wrapped_notification():
-        """Wrapper to catch and log any errors."""
-        try:
-            await _send_tunnel_notification_async(public_url)
-        except Exception as e:
-            logger.error(f"❌ Tunnel notification task failed: {e}")
-    
+    """Send tunnel URL notification to Telegram user synchronously via HTTP to avoid event loop crashes."""
     try:
-        try:
-            # Try to get the running event loop (we're in async context)
-            loop = asyncio.get_running_loop()
-            # Schedule the notification as a background task
-            task = asyncio.create_task(wrapped_notification())
-            logger.info(f"📤 Scheduled tunnel notification for {_NOTIFY_USERNAME}")
-        except RuntimeError:
-            # No running event loop, use asyncio.run (sync context)
-            asyncio.run(_send_tunnel_notification_async(public_url))
+        message_text = (
+            f"🌐 **Tunnel Active**\n\n"
+            f"URL: {public_url}\n\n"
+            f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        payload = {
+            "chat_id": CHAT_ID,
+            "text": message_text,
+            "disable_web_page_preview": "true"
+        }
+        _telegram_api_post("sendMessage", payload)
+        logger.info(f"✅ Tunnel URL sent to Chat ID {CHAT_ID}")
     except Exception as e:
-        logger.error(f"❌ Failed to schedule tunnel notification: {e}")
+        logger.error(f"❌ Failed to send tunnel notification: {e}")
 
 
 def _is_true(value: str) -> bool:
@@ -726,25 +694,52 @@ def _start_localhostrun_tunnel(root_dir: Path, twa_port: str) -> bool:
         return False
 
 
-def _lhr_life_target() -> str:
-    return os.getenv("TWA_LHR_LIFE_TARGET", "lhr.life").strip() or "lhr.life"
+def _pinggy_target() -> str:
+    return os.getenv("TWA_PINGGY_TARGET", "a.pinggy.io").strip() or "a.pinggy.io"
 
 
-def _lhr_life_remote_port() -> str:
-    raw = os.getenv("TWA_LHR_LIFE_REMOTE_PORT", "80").strip() or "80"
-    return raw if raw.isdigit() else "80"
+def _pinggy_log_paths(root_dir: Path) -> tuple[Path, Path]:
+    stdout_custom = os.getenv("TWA_PINGGY_STDOUT_LOG", "").strip()
+    stderr_custom = os.getenv("TWA_PINGGY_STDERR_LOG", "").strip()
 
-
-def _lhr_life_log_paths(root_dir: Path) -> tuple[Path, Path]:
-    stdout_custom = os.getenv("TWA_LHR_LIFE_STDOUT_LOG", "").strip()
-    stderr_custom = os.getenv("TWA_LHR_LIFE_STDERR_LOG", "").strip()
-
-    stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "lhr_life.stdout.log")
-    stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "lhr_life.stderr.log")
+    stdout_path = Path(stdout_custom).expanduser() if stdout_custom else (root_dir / "logs" / "pinggy.stdout.log")
+    stderr_path = Path(stderr_custom).expanduser() if stderr_custom else (root_dir / "logs" / "pinggy.stderr.log")
     return stdout_path, stderr_path
 
 
-def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
+def _read_pinggy_public_url(root_dir: Path) -> str | None:
+    stdout_path, stderr_path = _pinggy_log_paths(root_dir)
+    text_parts: list[str] = []
+
+    for path in (stdout_path, stderr_path):
+        try:
+            if path.exists():
+                text_parts.append(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+
+    if not text_parts:
+        return None
+
+    text = "\n".join(text_parts)
+    # Pinggy output usually contains "https://rnnbv-xxx.a.pinggy.online"
+    matches = re.findall(r"https://[A-Za-z0-9.-]+\.pinggy\.online", text, re.IGNORECASE)
+    if matches:
+        return matches[-1].strip().rstrip("/")
+    return None
+
+
+def _wait_for_pinggy_public_url(root_dir: Path, timeout_seconds: int) -> str | None:
+    deadline = time.time() + max(1, timeout_seconds)
+    while time.time() < deadline:
+        url = _read_pinggy_public_url(root_dir)
+        if url:
+            return url
+        time.sleep(2)
+    return None
+
+
+def _start_pinggy_tunnel(root_dir: Path, twa_port: str) -> bool:
     ssh_executable = _resolve_ssh_executable()
     if not ssh_executable:
         logger.warning(
@@ -753,23 +748,21 @@ def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
         )
         return False
 
-    stdout_log, stderr_log = _lhr_life_log_paths(root_dir)
+    stdout_log, stderr_log = _pinggy_log_paths(root_dir)
     try:
         stdout_log.parent.mkdir(parents=True, exist_ok=True)
         stderr_log.parent.mkdir(parents=True, exist_ok=True)
-        if _is_true(os.getenv("TWA_LHR_LIFE_TRUNCATE_LOG", "1")):
+        if _is_true(os.getenv("TWA_PINGGY_TRUNCATE_LOG", "1")):
             stdout_log.write_text("", encoding="utf-8")
             stderr_log.write_text("", encoding="utf-8")
     except Exception as e:
-        logger.warning(f"Unable to initialize lhr.life log files: {e}")
+        logger.warning(f"Unable to initialize pinggy log files: {e}")
 
-    remote_port = _lhr_life_remote_port()
-    tunnel_target = _lhr_life_target()
+    tunnel_target = _pinggy_target()
     command = [
         ssh_executable,
-        "-F",
-        "/dev/null",
-        "-v",
+        "-p",
+        "443",
         "-o",
         "StrictHostKeyChecking=accept-new",
         "-o",
@@ -778,8 +771,7 @@ def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
         "ServerAliveInterval=30",
         "-o",
         "ServerAliveCountMax=3",
-        "-R",
-        f"{remote_port}:127.0.0.1:{twa_port}",
+        "-R0:127.0.0.1:" + twa_port,
         tunnel_target,
     ]
 
@@ -798,31 +790,31 @@ def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
         stderr_handle.close()
 
     _aux_processes.append(tunnel_proc)
-    time.sleep(3)
+    time.sleep(4)
     if tunnel_proc.poll() is not None:
         stdout_content = stdout_log.read_text(encoding="utf-8", errors="ignore") if stdout_log.exists() else ""
         stderr_content = stderr_log.read_text(encoding="utf-8", errors="ignore") if stderr_log.exists() else ""
-        logger.warning(f"lhr.life tunnel exited early. stdout: {stdout_content[:200]}, stderr: {stderr_content[:200]}")
+        logger.warning(f"pinggy tunnel exited early. stdout: {stdout_content[:200]}, stderr: {stderr_content[:200]}")
         _terminate_process(tunnel_proc)
         return False
 
-    timeout_raw = os.getenv("TWA_LHR_LIFE_URL_TIMEOUT", "120").strip()
+    timeout_raw = os.getenv("TWA_PINGGY_URL_TIMEOUT", "45").strip()
     try:
         timeout_seconds = max(5, int(timeout_raw))
     except ValueError:
-        timeout_seconds = 120
+        timeout_seconds = 45
 
-    public_url = _wait_for_localhostrun_public_url(root_dir, timeout_seconds)
+    public_url = _wait_for_pinggy_public_url(root_dir, timeout_seconds)
     if public_url:
-        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "18").strip()
+        health_timeout_raw = os.getenv("TWA_TUNNEL_HEALTH_TIMEOUT", "25").strip()
         try:
             health_timeout = max(3, int(health_timeout_raw))
         except ValueError:
-            health_timeout = 18
+            health_timeout = 25
 
         if not _wait_for_public_url_health(public_url, health_timeout):
             logger.warning(
-                f"lhr.life URL is not healthy after {health_timeout}s: {public_url}. "
+                f"pinggy URL is not healthy after {health_timeout}s: {public_url}. "
                 "Trying fallback provider."
             )
             try:
@@ -832,14 +824,14 @@ def _start_lhr_life_tunnel(root_dir: Path, twa_port: str) -> bool:
                 pass
             return False
 
-        logger.info(f"TWA lhr.life tunnel active: {public_url}")
+        logger.info(f"TWA pinggy tunnel active: {public_url}")
         _persist_twa_public_url(root_dir, public_url)
         _sync_twa_menu_button(public_url, root_dir)
         _send_tunnel_notification(public_url)
         return True
     else:
         logger.warning(
-            f"lhr.life started, but no public URL was found in {stdout_log} or {stderr_log}. "
+            f"pinggy started, but no public URL was found in {stdout_log} or {stderr_log}. "
             "Set TWA_PUBLIC_URL manually if needed."
         )
         _terminate_process(tunnel_proc)
@@ -868,10 +860,10 @@ def _start_tunnel_provider_flow(root_dir: Path, twa_port: str) -> bool:
             return False
         if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
             return True
-        logger.warning("localhost.run tunnel failed in auto mode, trying lhr.life...")
-        if _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")) and _start_lhr_life_tunnel(root_dir, twa_port):
+        logger.warning("localhost.run tunnel failed in auto mode, trying pinggy.io...")
+        if _is_true(os.getenv("TWA_PINGGY_AUTOSTART", "1")) and _start_pinggy_tunnel(root_dir, twa_port):
             return True
-        logger.warning("lhr.life tunnel failed, trying serveo as last resort...")
+        logger.warning("pinggy tunnel failed, trying serveo as last resort...")
         if _is_true(os.getenv("TWA_SERVEO_AUTOSTART", "1")) and _start_serveo_tunnel(root_dir, twa_port):
             return True
         logger.warning("No tunnel provider succeeded in auto mode.")
@@ -903,13 +895,13 @@ def _start_tunnel_provider_flow(root_dir: Path, twa_port: str) -> bool:
             return True
         return False
 
-    if provider == "lhrlife":
-        if not _is_true(os.getenv("TWA_LHR_LIFE_AUTOSTART", "1")):
-            logger.info("TWA Mini App started. lhr.life autostart disabled by TWA_LHR_LIFE_AUTOSTART.")
+    if provider == "pinggy":
+        if not _is_true(os.getenv("TWA_PINGGY_AUTOSTART", "1")):
+            logger.info("TWA Mini App started. pinggy.io autostart disabled by TWA_PINGGY_AUTOSTART.")
             return False
-        if _start_lhr_life_tunnel(root_dir, twa_port):
+        if _start_pinggy_tunnel(root_dir, twa_port):
             return True
-        logger.warning("lhr.life failed, falling back to localhost.run...")
+        logger.warning("pinggy.io failed, falling back to localhost.run...")
         if _is_true(os.getenv("TWA_LOCALHOSTRUN_AUTOSTART", "1")) and _start_localhostrun_tunnel(root_dir, twa_port):
             return True
         return False
@@ -926,7 +918,7 @@ def _start_twa_stack() -> None:
         return
 
     root_dir = Path(__file__).resolve().parent
-    server_script = root_dir / "telegram-bot-websites" / "server.py"
+    server_script = root_dir / "dashboard/server.py"
     if not server_script.exists():
         logger.warning("TWA server script not found, skipping Mini App bootstrap")
         return

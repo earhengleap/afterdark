@@ -3,7 +3,7 @@
 Configure Telegram bot menu button for Mini App (WebApp).
 
 Usage:
-  python telegram-bot-websites/configure_twa.py --url https://your-public-domain.example
+  python dashboard/scripts/configure_twa.py --url https://your-tunnel-url.trycloudflare.comain.example
 """
 
 import argparse

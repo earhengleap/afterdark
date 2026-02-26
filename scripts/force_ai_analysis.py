@@ -23,7 +23,7 @@ def check_server():
                 return True
     except urllib.error.URLError:
         print("Server is offline.")
-        print("Please start the server first: python telegram-bot-websites/server.py")
+        print("Please start the server first: python dashboard/server.py")
         return False
     except Exception as e:
         print(f"Error connecting to server: {e}")
