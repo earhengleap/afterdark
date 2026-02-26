@@ -31,6 +31,68 @@ from core.get_following_service import get_following_list, parse_cookies
 # Get logger
 logger = logging.getLogger("XVideoBot")
 
+async def get_remote_file_size(url: str) -> float:
+    """Get remote file size in MB via HEAD request"""
+    try:
+        req = urllib.request.Request(url, method='HEAD')
+        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+        response = await asyncio.to_thread(urllib.request.urlopen, req, timeout=5)
+        size_bytes = int(response.headers.get('Content-Length', 0))
+        return size_bytes / (1024 * 1024)
+    except Exception as e:
+        logger.warning(f"Failed to get remote file size for {url}: {e}")
+        return 0.0
+
+async def send_direct_video_to_user(video_url: str, message: Message, user_id: int, username: str, app: Client):
+    """Send a video directly from a URL to the user without downloading"""
+    logger.info(f"Sending direct video from {video_url} to user {user_id}...")
+    
+    file_name = video_url.split('/')[-1] if '/' in video_url else "video.mp4"
+    file_size_mb = await get_remote_file_size(video_url)
+    formatted_url = format_url_for_display(video_url)
+    
+    caption = (
+        f"🎬 **Direct Download Successful**\n\n"
+        f"🔗 **Source:** {formatted_url}\n"
+        f"📁 **File:** `{file_name}`\n"
+        f"💾 **Estimated Size:** {file_size_mb:.2f} MB\n"
+        f"📥 **Requested by:** {username}\n"
+        f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+        f"✅ X Video Downloader Bot"
+    )
+    
+    status_msg = await message.reply_text(
+        f"📤 **Sending video directly...**\n\n"
+        f"🔗 `{video_url[:50]}...`\n"
+        f"⏳ Telegram is processing the URL, please wait..."
+    )
+    
+    try:
+        await app.send_video(
+            chat_id=message.chat.id,
+            video=video_url,
+            supports_streaming=True,
+            caption=caption
+        )
+        
+        # Track successful video send
+        metrics.increment_videos(1)
+        # We estimate bytes for metrics
+        metrics.download_completed(success=True, bytes_downloaded=int(file_size_mb * 1024 * 1024))
+        
+        logger.info(f"Sent direct video to user {user_id}: {file_name}")
+        await status_msg.delete()
+        
+    except Exception as e:
+        logger.error(f"Error sending direct video: {e}")
+        await safe_edit_text(
+            status_msg,
+            f"❌ **Error Sending Direct Video**\n\n"
+            f"🔗 **URL:** `{video_url}`\n"
+            f"⚠️ **Error:** {str(e)[:100]}\n\n"
+            f"Telegram server might have rejected the direct link."
+        )
+
 
 def _read_cached_twa_public_url() -> str | None:
     custom_path = os.getenv("TWA_PUBLIC_URL_FILE", "").strip()
@@ -848,65 +910,34 @@ def setup_command_handlers(app: Client):
                                 await log_user_action(user_id, username, url, "success", "image")
                                 logger.info(f"Image download successful for {url} - Sent {len(image_paths)} images")
                             except Exception as e:
-                                logger.error(f"Error sending confirmation message: {e}")
-                            
+                                logger.error(f"Error post-image download menu: {e}")
+                                
                         except Exception as e:
-                            logger.error(f"Error sending images: {e}")
-                            try:
-                                await safe_edit_text(
-                                    status_msg,
-                                    f"❌ **Image Send Failed**\n\n"
-                                    f"👤 **X User:** {clickable_username}\n"
-                                    f"🔗 **URL:** {formatted_url}\n"
-                                    f"🖼️ **Images Downloaded:** {len(image_paths)}\n"
-                                    f"⚠️ **Error:** {str(e)[:100]}\n\n"
-                                    f"Images downloaded but couldn't be sent.",
-                                    disable_web_page_preview=False
-                                )
-                            except:
-                                pass
-                            await log_user_action(user_id, username, url, "failed", "image")
+                            logger.error(f"Error handling images: {e}")
+                            await message.reply_text("❌ An error occurred while processing the images.")
                     else:
-                        # Both video and image failed
+                        # Nothing found
                         await safe_edit_text(
                             status_msg,
-                            f"❌ **Download Failed**\n\n"
+                            f"❌ **No Media Found**\n\n"
                             f"👤 **X User:** {clickable_username}\n"
                             f"🔗 **URL:** {formatted_url}\n"
-                            f"📥 **Requested by:** {username}\n"
-                            f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                            f"⚠️ No video or image content found.\n\n"
-                            f"**Possible reasons:**\n"
-                            f"• Tweet is private/deleted\n"
-                            f"• URL doesn't contain media\n"
-                            f"• Content is restricted",
+                            f"📥 **Requested by:** {username}\n\n"
+                            f"The URL doesn't contain any downloadable videos or images.\n\n"
+                            f"Please make sure the content is not private restricted or a text-only post.",
                             disable_web_page_preview=False
                         )
-                        await log_user_action(user_id, username, url, "failed", "unknown")
-                else:
-                    # Video explicitly requested but not found
-                    await safe_edit_text(
-                        status_msg,
-                        f"❌ **No Video Found**\n\n"
-                        f"👤 **X User:** {clickable_username}\n"
-                        f"🔗 **URL:** {formatted_url}\n"
-                        f"📥 **Requested by:** {username}\n"
-                        f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                        f"⚠️ No video content found at this URL.",
-                        disable_web_page_preview=False
-                    )
-                    await log_user_action(user_id, username, url, "failed", "video")
-            
+                        await log_user_action(user_id, username, url, "failed", "no_media")
             elif user_intent == "images":
-                # User explicitly wants images
+                # User explicitly requested images only
                 await safe_edit_text(
                     status_msg,
-                    f"🖼️ **Image Download Requested**\n\n"
+                    f"🖼️ **Image Download Started**\n\n"
                     f"👤 **X User:** {clickable_username}\n"
                     f"🔗 **URL:** {formatted_url}\n"
                     f"📥 **Requested by:** {username}\n"
                     f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                    f"⏳ Checking for image content...",
+                    f"⏳ Searching for images...",
                     disable_web_page_preview=False
                 )
                 image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
@@ -940,14 +971,8 @@ def setup_command_handlers(app: Client):
                         
                         await status_msg.delete()
                         
-                        # Send images individually to avoid Pyrogram media group bug
-                        for img_path in image_paths:
-                            try:
-                                if os.path.exists(img_path):
-                                    await app.send_photo(chat_id=message.chat.id, photo=img_path)
-                                    await asyncio.sleep(0.5)
-                            except Exception as e:
-                                logger.error(f"Error sending image: {e}")
+                        # Send images in groups of 10
+                        await ImageDownloader.send_images_to_user(image_paths, message, user_id)
                         
                         try:
                             sent_msg = await message.reply_text(
@@ -972,60 +997,156 @@ def setup_command_handlers(app: Client):
                             )
                             await log_user_action(user_id, username, url, "success", "image")
                         except Exception as e:
-                            logger.error(f"Error sending confirmation message: {e}")
-                        
+                            logger.error(f"Error post-image download menu: {e}")
                     except Exception as e:
-                        try:
-                            await safe_edit_text(
-                                status_msg,
-                                f"❌ **Image Send Failed**\n\n"
-                                f"⚠️ **Error:** {str(e)[:100]}",
-                                disable_web_page_preview=False
-                            )
-                        except:
-                            pass
-                        await log_user_action(user_id, username, url, "failed", "image")
+                        logger.error(f"Error handling images: {e}")
+                        await message.reply_text("❌ An error occurred while processing the images.")
                 else:
-                    # Try video as fallback
                     await safe_edit_text(
                         status_msg,
-                        f"🎬 **No Images Found - Checking Video**\n\n"
+                        f"❌ **No Images Found**\n\n"
                         f"👤 **X User:** {clickable_username}\n"
-                        f"🔗 **URL:** {formatted_url}\n\n"
-                        f"⏳ Searching for video...",
+                        f"🔗 **URL:** {formatted_url}\n"
+                        f"📥 **Requested by:** {username}\n\n"
+                        f"Could not find any downloadable images in this post.",
                         disable_web_page_preview=False
                     )
-                    video_paths, video_info = await VideoDownloader.download_with_progress(
-                        url=url,
-                        status_msg=status_msg,
-                        index=1,
-                        total=1,
+                    await log_user_action(user_id, username, url, "failed", "no_images")
+        elif "videy.co" in url:
+            # Direct video download bypass
+            await status_msg.delete()
+            await send_direct_video_to_user(url, message, user_id, username, app)
+            await log_user_action(user_id, username, url, "success", "direct_video")
+        
+        elif user_intent == "images":
+            # User explicitly wants images
+            await safe_edit_text(
+                status_msg,
+                f"🖼️ **Image Download Requested**\n\n"
+                f"👤 **X User:** {clickable_username}\n"
+                f"🔗 **URL:** {formatted_url}\n"
+                f"📥 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                f"⏳ Checking for image content...",
+                disable_web_page_preview=False
+            )
+            image_cb = build_status_callback(status_msg, "🖼️ Downloading Images")
+            image_paths, image_info = await ImageDownloader.download(
+                url,
+                message,
+                status_callback=image_cb,
+                index=1,
+                total=1,
+            )
+            
+            if image_paths and len(image_paths) > 0:
+                try:
+                    from models.enums import user_downloads
+                    user_downloads[user_id] = image_paths
+                    
+                    total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)
+                    
+                    await safe_edit_text(
+                        status_msg,
+                        f"✅ **Images Download Complete**\n\n"
+                        f"👤 **X User:** {clickable_username}\n"
+                        f"🔗 **URL:** {formatted_url}\n"
+                        f"🖼️ **Total Images:** {len(image_paths)}\n"
+                        f"💾 **Total Size:** {total_size:.2f} MB\n"
+                        f"📥 **Downloaded by:** {username}\n"
+                        f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                        f"📤 Sending images to you...",
+                        disable_web_page_preview=False
                     )
                     
-                    if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
-                        total_videos = len(video_paths)
-                        total_size = sum(os.path.getsize(vp) for vp in video_paths if os.path.exists(vp)) / (1024 * 1024)
-                        
-                        await safe_edit_text(
-                            status_msg,
-                            f"✅ **Video Found Instead**\n\n"
-                            f"🎬 **Videos:** {total_videos}\n"
-                            f"💾 **Size:** {total_size:.2f} MB\n\n"
-                            f"📤 Sending video(s)...",
+                    await status_msg.delete()
+                    
+                    # Send images individually to avoid Pyrogram media group bug
+                    for img_path in image_paths:
+                        try:
+                            if os.path.exists(img_path):
+                                await app.send_photo(chat_id=message.chat.id, photo=img_path)
+                                await asyncio.sleep(0.5)
+                        except Exception as e:
+                            logger.error(f"Error sending image: {e}")
+                    
+                    try:
+                        sent_msg = await message.reply_text(
+                            f"✅ **Images Download Successful**\n\n"
+                            f"👤 **X User:** {clickable_username}\n"
+                            f"🔗 **Source:** {formatted_url}\n"
+                            f"🖼️ **Images Found:** {len(image_paths)}\n"
+                            f"💾 **Total Size:** {total_size:.2f} MB\n"
+                            f"📥 **Downloaded by:** {username}\n\n"
+                            f"What would you like to do next?",
+                            reply_markup=Keyboards.image_actions_with_upload(user_id),
                             disable_web_page_preview=False
                         )
-                        
-                        await status_msg.delete()
-                        await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
-                        await log_user_action(user_id, username, url, "success", "video")
-                    else:
+                        from core.auto_scheduler import AutoScheduler
+                        await AutoScheduler.start_timer(
+                            client=app,
+                            message=sent_msg,
+                            user_id=user_id,
+                            content_type="image_bulk",
+                            content_path=image_paths,
+                            duration=120
+                        )
+                        await log_user_action(user_id, username, url, "success", "image")
+                    except Exception as e:
+                        logger.error(f"Error sending confirmation message: {e}")
+                    
+                except Exception as e:
+                    try:
                         await safe_edit_text(
                             status_msg,
-                            f"❌ **No Media Found**\n\n"
-                            f"⚠️ No images or videos found at this URL.",
+                            f"❌ **Image Send Failed**\n\n"
+                            f"⚠️ **Error:** {str(e)[:100]}",
                             disable_web_page_preview=False
                         )
-                        await log_user_action(user_id, username, url, "failed", "unknown")
+                    except:
+                        pass
+                    await log_user_action(user_id, username, url, "failed", "image")
+            else:
+                # Try video as fallback
+                await safe_edit_text(
+                    status_msg,
+                    f"🎬 **No Images Found - Checking Video**\n\n"
+                    f"👤 **X User:** {clickable_username}\n"
+                    f"🔗 **URL:** {formatted_url}\n\n"
+                    f"⏳ Searching for video...",
+                    disable_web_page_preview=False
+                )
+                video_paths, video_info = await VideoDownloader.download_with_progress(
+                    url=url,
+                    status_msg=status_msg,
+                    index=1,
+                    total=1,
+                )
+                
+                if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
+                    total_videos = len(video_paths)
+                    total_size = sum(os.path.getsize(vp) for vp in video_paths if os.path.exists(vp)) / (1024 * 1024)
+                    
+                    await safe_edit_text(
+                        status_msg,
+                        f"✅ **Video Found Instead**\n\n"
+                        f"🎬 **Videos:** {total_videos}\n"
+                        f"💾 **Size:** {total_size:.2f} MB\n\n"
+                        f"📤 Sending video(s)...",
+                        disable_web_page_preview=False
+                    )
+                    
+                    await status_msg.delete()
+                    await send_videos_to_user(video_paths, message, user_id, x_username, url, username, app)
+                    await log_user_action(user_id, username, url, "success", "video")
+                else:
+                    await safe_edit_text(
+                        status_msg,
+                        f"❌ **No Media Found**\n\n"
+                        f"⚠️ No images or videos found at this URL.",
+                        disable_web_page_preview=False
+                    )
+                    await log_user_action(user_id, username, url, "failed", "unknown")
         else:
             # Non-X/Twitter URL
             await safe_edit_text(
