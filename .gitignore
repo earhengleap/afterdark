@@ -1,9 +1,6 @@
 # Media files - DO NOT UPLOAD
 videos/
 images/
-uploadthing_videos/
-x_downloader_web/data/videos/
-x_downloader_web/data/images/
 audio/
 *.mp4
 *.mp3
@@ -24,7 +21,7 @@ audio/
 *.session-journal
 *.session-wal
 *.session-shm
-telegram-bot-websites/media_cache/
+dashboard/media_cache/
 data/*.db
 data/runtime/
 data/twa_public_url.txt
@@ -69,3 +66,7 @@ worktrees/
 # Replit
 # .replit
 replit.nix
+
+# Secrets and Environment Variables
+.env
+.env.*
