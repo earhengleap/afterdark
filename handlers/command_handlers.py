@@ -764,6 +764,19 @@ def setup_command_handlers(app: Client):
         
         if "x.com" in url or "twitter.com" in url:
             if user_intent == "video" or user_intent == "auto":
+                # Check for cdn.videy.co links in tweet text first
+                videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
+                
+                download_url = url
+                video_source = "X"
+                source_check_msg = ""
+                
+                if videy_url:
+                    download_url = videy_url
+                    video_source = "Videy (cDNA)"
+                    source_check_msg = f"\n🔗 **Videy Link:** Found in tweet caption"
+                    logger.info(f"Found videy link in tweet: {videy_url}")
+                
                 # Try video download first (supports multiple videos)
                 await safe_edit_text(
                     status_msg,
@@ -771,14 +784,15 @@ def setup_command_handlers(app: Client):
                     f"👤 **X User:** {clickable_username}\n"
                     f"🔗 **URL:** {formatted_url}\n"
                     f"📥 **Requested by:** {username}\n"
-                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n"
+                    f"{source_check_msg}\n\n"
                     f"⏳ Checking for video content...",
                     disable_web_page_preview=False
                 )
                 
                 # FIXED: download() now returns a LIST of video paths
                 video_paths, video_info = await VideoDownloader.download_with_progress(
-                    url=url,
+                    url=download_url,
                     status_msg=status_msg,
                     index=1,
                     total=1,
@@ -790,6 +804,8 @@ def setup_command_handlers(app: Client):
                     total_videos = len(video_paths)
                     total_size = sum(os.path.getsize(vp) for vp in video_paths if os.path.exists(vp)) / (1024 * 1024)
                     
+                    source_note = f"\n📍 **Source:** {video_source}" if video_source != "X" else ""
+                    
                     await safe_edit_text(
                         status_msg,
                         f"✅ **Video Download Complete**\n\n"
@@ -798,7 +814,8 @@ def setup_command_handlers(app: Client):
                         f"🎬 **Videos Found:** {total_videos}\n"
                         f"💾 **Total Size:** {total_size:.2f} MB\n"
                         f"📥 **Downloaded by:** {username}\n"
-                        f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                        f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n"
+                        f"{source_note}\n\n"
                         f"📤 Sending {total_videos} video(s) to you...",
                         disable_web_page_preview=False
                     )
@@ -835,8 +852,9 @@ def setup_command_handlers(app: Client):
                             duration=120
                         )
                     
-                    await log_user_action(user_id, username, url, "success", f"video({total_videos})")
-                    logger.info(f"Successfully sent {total_videos} video(s) from: {url}")
+                    source_info = f" (via {video_source})" if video_source != "X" else ""
+                    await log_user_action(user_id, username, url, "success", f"video({total_videos}){source_info}")
+                    logger.info(f"Successfully sent {total_videos} video(s) from: {url}{source_info}")
                     
                 elif user_intent == "auto":
                     # Video not found, try images (only in auto mode)

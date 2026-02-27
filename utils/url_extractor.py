@@ -4,7 +4,8 @@ Handles URLs with no spaces, unlimited input, line breaks, and various formats
 """
 
 import re
-from typing import List
+import requests
+from typing import List, Optional
 
 class URLExtractor:
     """Extract and validate URLs from text - SUPER FLEXIBLE"""
@@ -209,3 +210,35 @@ class URLExtractor:
                 unique_urls.append(url)
         
         return unique_urls
+
+    @staticmethod
+    def extract_videy_links(text: str) -> List[str]:
+        """
+        Extract cdn.videy.co links from text.
+        """
+        if not text:
+            return []
+        
+        pattern = r'https?://cdn\.videy\.co/[^\s<>"]+'
+        matches = re.findall(pattern, text)
+        return list(dict.fromkeys(matches))
+
+    @staticmethod
+    def get_videy_link_from_x_tweet(x_url: str) -> Optional[str]:
+        """
+        Extract cdn.videy.co video link from X/Twitter tweet using fxtwitter API.
+        Returns the videy URL if found, None otherwise.
+        """
+        try:
+            tweet_id = x_url.split("/status/")[-1].split("?")[0]
+            api_url = f"https://api.fxtwitter.com/status/{tweet_id}"
+            
+            response = requests.get(api_url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                tweet_text = data.get("tweet", {}).get("text", "")
+                videy_links = URLExtractor.extract_videy_links(tweet_text)
+                return videy_links[0] if videy_links else None
+        except Exception:
+            pass
+        return None

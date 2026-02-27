@@ -405,11 +405,20 @@ class VideoDownloader:
             try:
                 state["url_progress"][url] = "Checking media..."
                 
+                # Check for cdn.videy.co links in X tweet
+                from utils.url_extractor import URLExtractor
+                download_url = url
+                if "x.com" in url or "twitter.com" in url:
+                    videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
+                    if videy_url:
+                        download_url = videy_url
+                        logger.info(f"Bulk download: Found videy link in tweet: {videy_url}")
+                
                 # We do not pass status_msg to download_with_progress to prevent multiple 
                 # routines from fighting over editing the same Telegram message.
                 # It will run silently in the background while UI poller updates overall state.
                 video_paths, video_info = await VideoDownloader.download_with_progress(
-                    url=url,
+                    url=download_url,
                     status_msg=None, 
                     index=idx,
                     total=total,
