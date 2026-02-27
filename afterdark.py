@@ -49,27 +49,8 @@ _NOTIFY_USERNAMES = ["@HengleapEar", "@arekushisu_2001"]
 
 
 def _send_tunnel_notification(public_url: str) -> None:
-    """Send tunnel URL notification to Telegram user synchronously via HTTP to avoid event loop crashes."""
-    try:
-        message_text = (
-            f"🌐 **Tunnel Active**\n\n"
-            f"URL: {public_url}\n\n"
-            f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        for target in _NOTIFY_USERNAMES:
-            chat_target_str = target if target.startswith("@") else f"@{target}"
-            payload = {
-                "chat_id": chat_target_str,
-                "text": message_text,
-                "disable_web_page_preview": "true"
-            }
-            try:
-                _telegram_api_post("sendMessage", payload)
-                logger.info(f"✅ Tunnel URL sent to {chat_target_str}")
-            except Exception as e:
-                logger.error(f"❌ Failed to send tunnel notification to {chat_target_str}: {e}")
-    except Exception as e:
-        logger.error(f"❌ Failed to process tunnel notification: {e}")
+    """Tunnel notification is now deferred until Pyrogram MTProto boots up in main()."""
+    pass
 
 
 def _is_true(value: str) -> bool:
@@ -1272,6 +1253,22 @@ async def main():
             logger.info(f"🆔 Bot ID: {me.id}")
             logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             logger.info("⌨️ Press Ctrl+C to stop")
+            
+            # Send Notification using Pyrogram
+            public_url = _read_persisted_twa_public_url(Path(os.getcwd()))
+            if public_url:
+                message_text = (
+                    f"🌐 **Tunnel Active**\n\n"
+                    f"URL: {public_url}\n\n"
+                    f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                for target in _NOTIFY_USERNAMES:
+                    chat_target_str = target if target.startswith("@") else f"@{target}"
+                    try:
+                        await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
+                        logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")
+                    except Exception as e:
+                        logger.error(f"❌ Could not deliver tunnel URL to {chat_target_str}: {e}")
             
             # Step 5: Start health monitoring
             logger.info("Starting health monitor...")
