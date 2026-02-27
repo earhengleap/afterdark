@@ -760,6 +760,8 @@ def setup_command_handlers(app: Client):
                 cookies_file="config/twitter_cookies.txt",
             )
             urls = media_data.get("post_urls", [])
+            # Ensure /x_media never downloads the same status URL twice.
+            urls = list(dict.fromkeys(urls))
             video_count = int(media_data.get("video_count", 0) or 0)
             image_count = int(media_data.get("image_count", 0) or 0)
             if not urls:
