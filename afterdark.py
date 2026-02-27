@@ -42,6 +42,113 @@ from handlers.callback_handlers import setup_callback_handlers
 # Initialize Logger
 logger = setup_logger()
 
+# ==================== SINGLE INSTANCE LOCK ====================
+import socket
+import sys
+import platform
+
+def _get_running_pid() -> int:
+    """Get current process PID"""
+    return os.getpid()
+
+def _is_process_running(pid: int) -> bool:
+    """Check if a process with given PID is running"""
+    if os.name == 'nt':
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['tasklist', '/FI', f'PID eq {pid}'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return str(pid) in result.stdout
+        except:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+def _check_single_instance() -> bool:
+    """Ensure only one instance of the bot runs at a time"""
+    pid_file = os.path.join(os.getcwd(), "data", "afterdark.pid")
+    os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+    
+    current_pid = _get_running_pid()
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    system_info = platform.system()
+    
+    # Check for existing PID
+    existing_pid = None
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, 'r') as f:
+                existing_pid = int(f.read().strip())
+        except:
+            existing_pid = None
+    
+    # Check if existing process is still running
+    if existing_pid and existing_pid != current_pid:
+        if _is_process_running(existing_pid):
+            logger.error("=" * 60)
+            logger.error("  [MULTIPLE INSTANCE DETECTED]")
+            logger.error("=" * 60)
+            logger.error(f"  Current PID:    {current_pid}")
+            logger.error(f"  Running PID:    {existing_pid}")
+            logger.error(f"  System:         {system_info}")
+            logger.error(f"  Time:            {current_time}")
+            logger.info("-" * 60)
+            logger.error("  Another instance of AfterDark is already running!")
+            logger.error("  Please stop the existing instance first:")
+            logger.error(f"     Windows: Taskkill /PID {existing_pid} /F")
+            logger.error(f"     Linux:   kill -9 {existing_pid}")
+            logger.error("=" * 60)
+            return False
+        else:
+            logger.warning(f"Stale PID file found (PID: {existing_pid}), cleaning up...")
+            try:
+                os.remove(pid_file)
+            except:
+                pass
+    
+    # Acquire lock by writing current PID
+    lock_file = os.path.join(os.getcwd(), "data", "afterdark.lock")
+    try:
+        with open(pid_file, 'w') as f:
+            f.write(str(current_pid))
+        with open(lock_file, 'w') as f:
+            f.write(str(current_pid))
+        
+        # Print professional startup banner
+        logger.info("=" * 60)
+        logger.info("  AFTERDARK BOT STARTING")
+        logger.info("=" * 60)
+        logger.info(f"  Process ID:     {current_pid}")
+        logger.info(f"  System:         {system_info}")
+        logger.info(f"  Start Time:     {current_time}")
+        logger.info(f"  Workdir:        {os.getcwd()}")
+        logger.info("-" * 60)
+        logger.info("  Single instance lock acquired")
+        logger.info("=" * 60)
+        
+        return True
+        
+    except Exception as e:
+        logger.critical("=" * 60)
+        logger.critical("  [FAILED TO ACQUIRE LOCK]")
+        logger.critical("=" * 60)
+        logger.critical(f"  Error: {e}")
+        logger.critical("  Please check file permissions")
+        logger.critical("=" * 60)
+        return False
+
+# Check single instance before continuing
+if not _check_single_instance():
+    sys.exit(1)
+
 # ==================== TWA BOOTSTRAP ====================
 
 _aux_processes = []
@@ -1019,16 +1126,38 @@ def _start_twa_stack() -> None:
 
 
 def _stop_aux_processes() -> None:
+    """Forcefully stop all auxiliary processes"""
     for proc in reversed(_aux_processes):
         try:
             if proc and proc.poll() is None:
                 proc.terminate()
-                proc.wait(timeout=5)
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=2)
+                    except:
+                        pass
         except Exception:
             try:
-                proc.kill()
+                if proc:
+                    proc.kill()
             except Exception:
                 pass
+    
+    # Clean up lock files
+    try:
+        pid_file = os.path.join(os.getcwd(), "data", "afterdark.pid")
+        lock_file = os.path.join(os.getcwd(), "data", "afterdark.lock")
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+    except:
+        pass
+    
+    _aux_processes.clear()
 
 async def tunnel_watchdog(app) -> None:
     """Continuously monitor TWA tunnel health and restart if disconnected."""

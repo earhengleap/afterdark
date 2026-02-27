@@ -22,8 +22,8 @@ from core.database import history_db
 from core.uploader import safe_edit_text
 from utils.video_processor import VideoProcessor
 from handlers.ai_handler import AIHandler
-from ui.messages import Messages
-from ui.keyboards import Keyboards
+from resources.messages import Messages
+from resources.keyboards import Keyboards
 from users.users import log_user_action
 
 from core.get_following_service import get_following_list, parse_cookies

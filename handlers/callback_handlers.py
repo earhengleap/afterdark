@@ -16,9 +16,9 @@ logger = logging.getLogger("XVideoBot")
 from core.file_manager import FileManager
 from core.uploader import VideoUploader
 from core.image_downloader import ImageDownloader
-from ui.messages import Messages
-from ui.keyboards import Keyboards
-from ui.languages import language_manager
+from resources.messages import Messages
+from resources.keyboards import Keyboards
+from resources.languages import language_manager
 from models.enums import user_downloads, user_selections
 from utils.formatters import Formatter
 from core.image_uploader import ImageUploader

@@ -6,7 +6,7 @@ from pyrogram.types import Message
 from core.uploader import VideoUploader
 from core.image_uploader import ImageUploader
 from core.uploader import safe_edit_text
-from ui.keyboards import Keyboards
+from resources.keyboards import Keyboards
 
 class AutoScheduler:
     """

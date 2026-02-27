@@ -202,7 +202,7 @@ class ImageUploader:
         
         total_time = time.time() - overall_start
         
-        from ui.keyboards import Keyboards
+        from resources.keyboards import Keyboards
         await safe_edit_text(
             status_msg,
             f"✅ **Bulk Image Upload Complete!**\n\n"

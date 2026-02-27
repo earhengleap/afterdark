@@ -22,7 +22,7 @@ from core.file_manager import FileManager
 from core.log_manager import LogManager
 from utils.formatters import Formatter
 from models.enums import user_downloads
-from ui.keyboards import Keyboards
+from resources.keyboards import Keyboards
 from core.logger import setup_logger
 from core.database import history_db
 from utils.url_parser import extract_twitter_username

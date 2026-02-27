@@ -20,7 +20,7 @@ from core.image_downloader import ImageDownloader
 from utils.formatters import Formatter
 from utils.video_processor import VideoProcessor
 from models.enums import user_downloads
-from ui.keyboards import Keyboards
+from resources.keyboards import Keyboards
 from core.logger import setup_logger
 from core.progress_tracker import download_tracker, ProgressTracker
 from utils.media_info import MediaInfo
