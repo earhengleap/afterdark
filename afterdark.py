@@ -45,7 +45,7 @@ logger = setup_logger()
 # ==================== TWA BOOTSTRAP ====================
 
 _aux_processes = []
-_NOTIFY_USERNAME = "@HengleapEar"
+_NOTIFY_USERNAMES = ["@HengleapEar", "@arekushisu_2001"]
 
 
 def _send_tunnel_notification(public_url: str) -> None:
@@ -56,15 +56,20 @@ def _send_tunnel_notification(public_url: str) -> None:
             f"URL: {public_url}\n\n"
             f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        payload = {
-            "chat_id": CHAT_ID,
-            "text": message_text,
-            "disable_web_page_preview": "true"
-        }
-        _telegram_api_post("sendMessage", payload)
-        logger.info(f"✅ Tunnel URL sent to Chat ID {CHAT_ID}")
+        for target in _NOTIFY_USERNAMES:
+            chat_target_str = target if target.startswith("@") else f"@{target}"
+            payload = {
+                "chat_id": chat_target_str,
+                "text": message_text,
+                "disable_web_page_preview": "true"
+            }
+            try:
+                _telegram_api_post("sendMessage", payload)
+                logger.info(f"✅ Tunnel URL sent to {chat_target_str}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send tunnel notification to {chat_target_str}: {e}")
     except Exception as e:
-        logger.error(f"❌ Failed to send tunnel notification: {e}")
+        logger.error(f"❌ Failed to process tunnel notification: {e}")
 
 
 def _is_true(value: str) -> bool:
