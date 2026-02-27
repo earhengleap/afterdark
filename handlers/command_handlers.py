@@ -20,7 +20,10 @@ from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
 from core.database import history_db
 from core.uploader import safe_edit_text
+from core.videy_uploader import VideyUploader
+from core.videy_links import add_videy_link, get_videy_links
 from utils.video_processor import VideoProcessor
+from utils.videy_formatter import format_videy_message
 from handlers.ai_handler import AIHandler
 from resources.messages import Messages
 from resources.keyboards import Keyboards
@@ -50,6 +53,8 @@ async def send_direct_video_to_user(video_url: str, message: Message, user_id: i
     file_name = video_url.split('/')[-1] if '/' in video_url else "video.mp4"
     file_size_mb = await get_remote_file_size(video_url)
     formatted_url = format_url_for_display(video_url)
+    if "videy.co" in (video_url or "").lower():
+        add_videy_link(user_id, video_url, video_url)
     
     caption = (
         f"🎬 **Direct Download Successful**\n\n"
@@ -278,6 +283,7 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
     
     total_videos = len(video_paths)
     formatted_url = format_url_for_display(url)
+    bulk_videy_links = []
     
     logger.info(f"Sending {total_videos} video(s) to user {user_id}...")
     
@@ -325,8 +331,18 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     f"📥 **Downloaded by:** {username}\n"
                     f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
                     f"✅ X Video Downloader Bot"
-                )
-            
+                )
+            videy_cdn_url = await VideyUploader.upload_video(video_path)
+            if videy_cdn_url:
+                add_videy_link(user_id, videy_cdn_url, url)
+                if total_videos == 1:
+                    caption += f"\n\nCDN: `{videy_cdn_url}`"
+                else:
+                    bulk_videy_links.append(videy_cdn_url)
+                logger.info(f"Videy CDN link created for user {user_id}: {videy_cdn_url}")
+            else:
+                logger.info(f"Videy CDN link not created for {file_name}")
+
             # Generate thumbnail for better UX
             from utils.video_processor import VideoProcessor
             thumb_path = await VideoProcessor.generate_thumbnail(video_path)
@@ -353,7 +369,6 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
             file_size_bytes = os.path.getsize(video_path)
             metrics.increment_videos(1)
             metrics.download_completed(success=True, bytes_downloaded=file_size_bytes)
-            
             # Start auto-upload timer ONLY for single video
             # For bulk, we'll do it on the summary message
             if total_videos == 1:
@@ -377,6 +392,24 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 f"⚠️ **Error:** {str(e)[:100]}\n\n"
                 f"The video was downloaded but couldn't be sent."
             )
+
+    if total_videos > 1 and bulk_videy_links:
+        unique_links = list(dict.fromkeys(bulk_videy_links))
+        lines = [f"{i}. `{link}`" for i, link in enumerate(unique_links, 1)]
+        header = "🔗 **Bulk Videy Links**\n\n"
+        max_len = 3800
+        current = header
+
+        for line in lines:
+            entry = line + "\n"
+            if len(current) + len(entry) > max_len:
+                await message.reply_text(current, disable_web_page_preview=False)
+                current = header + entry
+            else:
+                current += entry
+
+        if current.strip():
+            await message.reply_text(current, disable_web_page_preview=False)
 
 async def process_shared_url(client: Client, message: Message, url: str, user_id: int, username: str):
     """
@@ -544,6 +577,30 @@ def setup_command_handlers(app: Client):
         text = Messages.help_text()
         keyboard = Keyboards.back_to_main()
         await message.reply_text(text, reply_markup=keyboard)
+
+    @app.on_message(filters.private & filters.command(["videy", "links"]))
+    async def videy_links_handler(client: Client, message: Message) -> None:
+        """Handle /videy command - read-only list of user's generated Videy links."""
+        user_id = message.from_user.id
+        metrics.increment_commands("videy")
+        links = get_videy_links(user_id)
+
+        if not links:
+            await message.reply_text(
+                "🔗 **Videy Links**\n\nNo links found yet.\n\nDownload a video first, then run `/videy`.",
+                disable_web_page_preview=False,
+            )
+            return
+
+        links = list(reversed(links))
+        per_page = 10
+        page = 1
+        total_count = len(links)
+        total_pages = max(1, (total_count + per_page - 1) // per_page)
+        page_entries = links[:per_page]
+        text = format_videy_message(page_entries, page, total_pages, total_count)
+        keyboard = Keyboards.videy_pagination(page, total_pages)
+        await message.reply_text(text, reply_markup=keyboard, disable_web_page_preview=False)
 
     @app.on_message(filters.private & filters.command(["stats", "stat"]))
     async def stats_handler(client: Client, message: Message) -> None:
@@ -1196,3 +1253,6 @@ def setup_command_handlers(app: Client):
                     disable_web_page_preview=False
                 )
                 await log_user_action(user_id, username, url, "failed", "unknown")
+
+
+

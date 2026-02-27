@@ -25,6 +25,8 @@ from core.logger import setup_logger
 from core.progress_tracker import download_tracker, ProgressTracker
 from utils.media_info import MediaInfo
 from core.database import history_db
+from core.videy_uploader import VideyUploader
+from core.videy_links import add_videy_link
 from utils.url_parser import extract_twitter_username
 
 logger = setup_logger("VideoDownloader")
@@ -359,6 +361,7 @@ class VideoDownloader:
         
         downloaded_video_paths = []
         downloaded_image_paths = []
+        video_source_map: Dict[str, str] = {}
         url_results = []
 
         # UI Updater Task
@@ -427,6 +430,8 @@ class VideoDownloader:
                 if video_paths and len(video_paths) > 0:
                     state["video_success_count"] += 1
                     downloaded_video_paths.extend(video_paths)
+                    for video_path in video_paths:
+                        video_source_map[video_path] = url
                     
                     source_username = extract_twitter_username(url)
                     for video_path in video_paths:
@@ -500,7 +505,13 @@ class VideoDownloader:
         # Send downloaded content to user
         if downloaded_video_paths or downloaded_image_paths:
             logger.info(f"Sending {len(downloaded_video_paths)} videos and {len(downloaded_image_paths)} images to user")
-            await VideoDownloader._send_downloaded_content(downloaded_video_paths, downloaded_image_paths, message, user_id)
+            await VideoDownloader._send_downloaded_content(
+                downloaded_video_paths,
+                downloaded_image_paths,
+                message,
+                user_id,
+                video_source_map=video_source_map,
+            )
         
         # Send summary
         await VideoDownloader._send_summary(url_results, state["video_success_count"], state["image_success_count"], 
@@ -508,9 +519,16 @@ class VideoDownloader:
                                     downloaded_video_paths, downloaded_image_paths)
     
     @staticmethod
-    async def _send_downloaded_content(video_paths: List[str], image_paths: List[str], 
-                               message: Message, user_id: int) -> None:
+    async def _send_downloaded_content(
+        video_paths: List[str],
+        image_paths: List[str],
+        message: Message,
+        user_id: int,
+        video_source_map: Optional[Dict[str, str]] = None,
+    ) -> None:
         """Send downloaded videos and images to user"""
+        bulk_videy_links: List[str] = []
+        video_source_map = video_source_map or {}
         # Send videos with progress tracking
         for idx, video_path in enumerate(video_paths):
             try:
@@ -538,8 +556,13 @@ class VideoDownloader:
                 
                 # Track upload start time for progress
                 start_time = time.time()
-                progress_key = f"upload_{user_id}_{idx}"
-                
+                progress_key = f"upload_{user_id}_{idx}"
+                videy_cdn_url = await VideyUploader.upload_video(video_path)
+                if videy_cdn_url:
+                    add_videy_link(user_id, videy_cdn_url, video_source_map.get(video_path, ""))
+                    bulk_videy_links.append(videy_cdn_url)
+                    logger.info(f"Videy CDN link created in bulk flow for {video_name}: {videy_cdn_url}")
+
                 # Send video with upload progress
                 await message.reply_video(
                     video=video_path,
@@ -551,7 +574,6 @@ class VideoDownloader:
                     progress=ProgressTracker.callback,
                     progress_args=(progress_key, upload_msg, video_name, start_time)
                 )
-                
                 # Delete upload status message
                 try:
                     await upload_msg.delete()
@@ -562,6 +584,24 @@ class VideoDownloader:
                 
             except Exception as e:
                 logger.error(f"Failed to send video {os.path.basename(video_path)}: {e}")
+
+        if bulk_videy_links:
+            unique_links = list(dict.fromkeys(bulk_videy_links))
+            lines = [f"{i}. `{link}`" for i, link in enumerate(unique_links, 1)]
+            header = "🔗 **Bulk Videy Links**\n\n"
+            max_len = 3800
+            current = header
+
+            for line in lines:
+                entry = line + "\n"
+                if len(current) + len(entry) > max_len:
+                    await message.reply_text(current, disable_web_page_preview=False)
+                    current = header + entry
+                else:
+                    current += entry
+
+            if current.strip():
+                await message.reply_text(current, disable_web_page_preview=False)
         
         # Send images in groups of 10
         if image_paths:
@@ -703,3 +743,6 @@ class VideoDownloader:
             return "Unsupported URL format"
         else:
             return error_msg[:100] if len(error_msg) > 100 else error_msg
+
+
+

@@ -72,6 +72,16 @@ class PersistentDict(dict):
         self._save()
         return default
 
+    def append_list_item(self, key, item):
+        """Atomically append an item to a list value and persist."""
+        with self._lock:
+            existing = super().get(key, [])
+            if not isinstance(existing, list):
+                existing = []
+            existing.append(item)
+            super().__setitem__(key, existing)
+            self._save()
+
 
 # Global state dictionaries (persisted where needed)
 user_downloads = PersistentDict(Path("data/runtime/user_downloads.pkl"))

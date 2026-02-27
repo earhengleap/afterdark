@@ -34,6 +34,7 @@ from core.logger import setup_logger
 from core.metrics import metrics, get_metrics
 from core.config_validator import validate_configuration
 from core.health_monitor import start_health_monitor, get_health_monitor
+from core.database import history_db
 
 # Handler imports
 from handlers.command_handlers import setup_command_handlers
@@ -1317,7 +1318,7 @@ def print_banner():
         print(f"\033[1;36m┣{border}┫\033[0m")
         print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
         print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:   {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
+        print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:  {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
         print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
         print(f"\033[1;36m┗{border}┛\033[0m")
     except UnicodeEncodeError:
@@ -1372,6 +1373,7 @@ async def main():
                 BotCommand("start", "Start the bot"),
                 BotCommand("help", "Get help instructions"),
                 BotCommand("stats", "View download statistics"),
+                BotCommand("videy", "View your Videy CDN links"),
                 BotCommand("version", "Check bot version"),
                 BotCommand("health", "System health status"),
                 BotCommand("chat", "Chat with the AI Assistant"),
@@ -1393,6 +1395,18 @@ async def main():
                 )
                 for target in _NOTIFY_USERNAMES:
                     chat_target_str = target if target.startswith("@") else f"@{target}"
+                    notify_enabled = True
+                    try:
+                        user_obj = await app.get_users(chat_target_str)
+                        target_user_id = getattr(user_obj, "id", None)
+                        if target_user_id:
+                            setting = history_db.get_setting(target_user_id, "tunnel_notifications", "1")
+                            notify_enabled = str(setting).strip().lower() in {"1", "true", "yes", "on"}
+                    except Exception as e:
+                        logger.warning(f"Could not resolve user settings for {chat_target_str}: {e}")
+                    if not notify_enabled:
+                        logger.info(f"Tunnel notification skipped (disabled) for {chat_target_str}")
+                        continue
                     try:
                         await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
                         logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")

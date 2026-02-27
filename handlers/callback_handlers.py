@@ -22,6 +22,9 @@ from resources.languages import language_manager
 from models.enums import user_downloads, user_selections
 from utils.formatters import Formatter
 from core.image_uploader import ImageUploader
+from core.videy_links import get_videy_links
+from utils.videy_formatter import format_videy_message, format_videy_export_message
+from utils.videy_exporter import export_videy_to_csv, export_videy_to_text
 
 def get_text(user_id: int, key: str) -> str:
     """Helper function to get localized text"""
@@ -188,10 +191,107 @@ def setup_callback_handlers(app: Client):
                 sync_status = f"\n\n⚠️ Log entries: {stats_info['log_entries']} | Folder videos: {stats_info['actual_videos']}"
             keyboard = Keyboards.back_to_main()
             await callback_query.message.edit_text(Messages.stats_text(log) + sync_status, reply_markup=keyboard)
+
+        elif data == "videy_links" or data.startswith("videy:"):
+            effective_data = "videy:1" if data == "videy_links" else data
+            parts = effective_data.split(":")
+            action = parts[1] if len(parts) > 1 else "1"
+            links = get_videy_links(user_id)
+            if not links:
+                await callback_query.message.edit_text(
+                    "🔗 **Videy Links**\n\nNo links found yet.\n\nDownload a video first, then use this menu again.",
+                    reply_markup=Keyboards.back_to_main(),
+                    disable_web_page_preview=False,
+                )
+                return
+
+            links = list(reversed(links))
+            if action == "export":
+                keyboard = Keyboards.videy_export_format_selection()
+                await callback_query.message.edit_text(
+                    format_videy_export_message(len(links)),
+                    reply_markup=keyboard
+                )
+                return
+
+            try:
+                page = int(action)
+            except ValueError:
+                page = 1
+
+            per_page = 10
+            total_count = len(links)
+            total_pages = max(1, (total_count + per_page - 1) // per_page)
+            page = max(1, min(page, total_pages))
+            offset = (page - 1) * per_page
+            page_entries = links[offset:offset + per_page]
+
+            text = format_videy_message(page_entries, page, total_pages, total_count)
+            keyboard = Keyboards.videy_pagination(page, total_pages)
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=keyboard,
+                disable_web_page_preview=False
+            )
+            await callback_query.answer(f"🔗 Page {page}/{total_pages}")
         
+        elif data.startswith("videy_export:"):
+            links = get_videy_links(user_id)
+            if not links:
+                await callback_query.answer("No Videy links to export!", show_alert=True)
+                return
+
+            links = list(reversed(links))
+            format_type = data.split(":")[1]
+            await callback_query.answer("📊 Generating Videy export...")
+
+            if format_type == "csv":
+                file_data = export_videy_to_csv(links)
+                filename = f"videy_links_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                caption = f"📊 **Videy Links (CSV)**\n\n{len(links)} total links"
+            else:
+                file_data = export_videy_to_text(links)
+                filename = f"videy_links_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                caption = f"📄 **Videy Links (Text)**\n\n{len(links)} total links"
+
+            await callback_query.message.reply_document(
+                document=file_data,
+                file_name=filename,
+                caption=caption
+            )
+
+            try:
+                await callback_query.message.delete()
+            except Exception:
+                pass
+
+            await callback_query.answer("✅ Videy links exported!")
+        
+        elif data == "settings_notifications":
+            from core.database import history_db
+            current = history_db.get_setting(user_id, "tunnel_notifications", "1")
+            is_enabled = str(current).strip().lower() in {"1", "true", "yes", "on"}
+            new_enabled = not is_enabled
+            history_db.set_setting(user_id, "tunnel_notifications", "1" if new_enabled else "0")
+
+            keyboard = Keyboards.settings_menu(new_enabled)
+            status_text = "ON" if new_enabled else "OFF"
+            await callback_query.message.edit_text(
+                Messages.settings_text() + f"\n\nTunnel notifications: **{status_text}**",
+                reply_markup=keyboard
+            )
+            await callback_query.answer(f"Notifications {status_text}")
+
         elif data == "settings":
-            keyboard = Keyboards.settings_menu()
-            await callback_query.message.edit_text(Messages.settings_text(), reply_markup=keyboard)
+            from core.database import history_db
+            current = history_db.get_setting(user_id, "tunnel_notifications", "1")
+            is_enabled = str(current).strip().lower() in {"1", "true", "yes", "on"}
+            keyboard = Keyboards.settings_menu(is_enabled)
+            status_text = "ON" if is_enabled else "OFF"
+            await callback_query.message.edit_text(
+                Messages.settings_text() + f"\n\nTunnel notifications: **{status_text}**",
+                reply_markup=keyboard
+            )
         
         elif data == "main_menu":
             keyboard = Keyboards.main_menu()

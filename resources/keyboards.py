@@ -33,6 +33,9 @@ class Keyboards:
                 InlineKeyboardButton("📊 Stats", callback_data="stats")
             ],
             [
+                InlineKeyboardButton("🔗 Videy Links", callback_data="videy_links")
+            ],
+            [
                 InlineKeyboardButton("⚙️ Settings", callback_data="settings"),
                 InlineKeyboardButton("❓ Help", callback_data="help")
             ]
@@ -53,11 +56,12 @@ class Keyboards:
         ])
     
     @staticmethod
-    def settings_menu():
+    def settings_menu(notifications_enabled: bool = True):
         """Settings menu keyboard"""
+        notif_label = "🔔 Notifications: ON" if notifications_enabled else "🔕 Notifications: OFF"
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("🔔 Notifications", callback_data="settings_notifications"),
+                InlineKeyboardButton(notif_label, callback_data="settings_notifications"),
                 InlineKeyboardButton("🎨 Theme", callback_data="settings_theme")
             ],
             [
@@ -374,6 +378,32 @@ class Keyboards:
         buttons.append([InlineKeyboardButton("🔙 Back to Menu", callback_data="main_menu")])
         
         return InlineKeyboardMarkup(buttons)
+
+    @staticmethod
+    def videy_pagination(current_page: int, total_pages: int):
+        """Videy links pagination keyboard (read-only list + export)."""
+        buttons = []
+
+        nav_row = []
+        if current_page > 1:
+            nav_row.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"videy:{current_page-1}"))
+        if current_page < total_pages:
+            nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"videy:{current_page+1}"))
+        if nav_row:
+            buttons.append(nav_row)
+
+        buttons.append([InlineKeyboardButton("📊 Export", callback_data="videy:export")])
+        buttons.append([InlineKeyboardButton("🔙 Back to Menu", callback_data="main_menu")])
+        return InlineKeyboardMarkup(buttons)
+
+    @staticmethod
+    def videy_export_format_selection():
+        """Videy export format selection keyboard."""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 CSV (Excel)", callback_data="videy_export:csv")],
+            [InlineKeyboardButton("📄 Text File", callback_data="videy_export:txt")],
+            [InlineKeyboardButton("🔙 Cancel", callback_data="videy:1")]
+        ])
     
     @staticmethod
     def export_format_selection():
@@ -393,3 +423,4 @@ class Keyboards:
                 InlineKeyboardButton("❌ Cancel", callback_data="history:1")
             ]
         ])
+

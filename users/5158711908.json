@@ -418,5 +418,40 @@
     "status": "success",
     "content_type": "image",
     "timestamp": "2026-02-27 12:05:16"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/bertnotah23920/status/2026353636641747157?s=46",
+    "status": "success",
+    "content_type": "image",
+    "timestamp": "2026-02-27 18:56:23"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://cdn.videy.co/xthBRnTk1.mp4",
+    "status": "success",
+    "content_type": "direct_video",
+    "timestamp": "2026-02-27 19:02:53"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/bertnotah23920/status/2026353636641747157?s=46",
+    "status": "success",
+    "content_type": "video(1) (via Videy (cDNA))",
+    "timestamp": "2026-02-27 21:33:11"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/riekc39393578/status/2027151187129364969?s=46",
+    "status": "success",
+    "content_type": "video(1) (via Videy (cDNA))",
+    "timestamp": "2026-02-27 21:45:47"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/bertnotah23920/status/2026353636641747157?s=46",
+    "status": "success",
+    "content_type": "video(1) (via Videy (cDNA))",
+    "timestamp": "2026-02-27 21:48:09"
   }
 ]
