@@ -19,6 +19,8 @@ audio/
 # Telegram session files are NOT ignored per user request to sync across devices
 dashboard/media_cache/
 !dashboard/media_cache/*.session*
+telegram_sessions/
+!telegram_sessions/*.session*
 data/*.db
 data/runtime/
 data/twa_public_url.txt
