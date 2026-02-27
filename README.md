@@ -90,7 +90,7 @@ TWA_AI_MODEL=moondream:latest
 ### 5. Run the Bot
 
 ```bash
-python x_telegram.py
+python afterdark.py
 ```
 
 ## Telegram Mini App Setup
@@ -123,7 +123,7 @@ python telegram-bot-websites/start_with_tunnel.py
 
 ```
 Telegram-Bot/
-├── x_telegram.py           # Main bot entrypoint
+├── afterdark.py            # Main bot entrypoint
 ├── config/
 │   ├── settings.py         # Configuration management
 │   └── config_loader.py    # Config loading utilities

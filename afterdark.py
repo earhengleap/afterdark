@@ -1,4 +1,4 @@
-# x_telegram.py
+# afterdark.py
 
 """
 X Video Downloader Bot - Clean Architecture Implementation
@@ -912,6 +912,35 @@ def _start_tunnel_provider_flow(root_dir: Path, twa_port: str) -> bool:
     )
     return False
 
+def _kill_port_process(port: int) -> bool:
+    try:
+        import subprocess, os, time
+        killed_any = False
+        if os.name == 'nt':
+            output = subprocess.check_output(f"netstat -ano | findstr :{port}", shell=True, text=True)
+            for line in output.strip().split('\n'):
+                if f":{port} " in line and "LISTENING" in line:
+                    parts = line.strip().split()
+                    if len(parts) > 4:
+                        pid = parts[-1]
+                        if pid.isdigit() and int(pid) > 0:
+                            logger.info(f"Force killing process {pid} occupying port {port}...")
+                            subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            killed_any = True
+        else:
+            output = subprocess.check_output(f"lsof -i:{port} -t", shell=True, text=True)
+            for pid in output.strip().split('\n'):
+                if pid.isdigit() and int(pid) > 0:
+                    logger.info(f"Force killing process {pid} occupying port {port}...")
+                    os.kill(int(pid), 9)
+                    killed_any = True
+        if killed_any:
+            time.sleep(1)
+        return killed_any
+    except Exception as e:
+        logger.debug(f"Failed to kill process on port {port}: {e}")
+        return False
+
 
 def _start_twa_stack() -> None:
     if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
@@ -934,26 +963,17 @@ def _start_twa_stack() -> None:
     selected_port_int = twa_port_int
     selected_port = str(selected_port_int)
     reuse_existing_server = False
-    require_ai_ready = _is_true(os.getenv("TWA_REUSE_REQUIRE_AI_TITLE_API", "1"))
+    
     if _is_port_open("127.0.0.1", twa_port_int):
-        if _is_twa_http_healthy(twa_port_int):
-            if require_ai_ready and not _supports_ai_title_api(twa_port_int):
-                fallback_port = _find_available_port(twa_port_int + 1)
-                selected_port_int = fallback_port
-                selected_port = str(fallback_port)
-                logger.warning(
-                    f"TWA backend on port {twa_port} is healthy but missing AI title API fields. "
-                    f"Starting updated backend on port {selected_port}."
-                )
-            else:
-                reuse_existing_server = True
-                logger.info(f"TWA backend already running on port {twa_port}, reusing existing server.")
-        else:
+        logger.info(f"Port {twa_port} is occupied. Force-killing to prevent reusing old servers...")
+        _kill_port_process(twa_port_int)
+        
+        if _is_port_open("127.0.0.1", twa_port_int):
             fallback_port = _find_available_port(twa_port_int + 1)
             selected_port_int = fallback_port
             selected_port = str(fallback_port)
             logger.warning(
-                f"TWA port {twa_port} is occupied but /api/health is not responding. "
+                f"Failed to kill process on port {twa_port}."
                 f"Starting a fresh backend on port {selected_port}."
             )
 
@@ -1089,7 +1109,7 @@ async def tunnel_watchdog(app) -> None:
 # ==================== PYROGRAM CLIENT ====================
 
 def _build_bot_client() -> Client:
-    session_name = os.getenv("BOT_SESSION_NAME", "x_video_bot").strip() or "x_video_bot"
+    session_name = os.getenv("BOT_SESSION_NAME", "afterdark_bot").strip() or "afterdark_bot"
     session_in_memory = _is_true(os.getenv("BOT_SESSION_IN_MEMORY", "1"))
     session_workdir = os.getenv("BOT_SESSION_WORKDIR", "").strip()
 
