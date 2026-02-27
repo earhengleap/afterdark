@@ -1377,7 +1377,8 @@ async def main():
                 BotCommand("version", "Check bot version"),
                 BotCommand("health", "System health status"),
                 BotCommand("chat", "Chat with the AI Assistant"),
-                BotCommand("get_following", "Scrape a Twitter user's following list")
+                BotCommand("get_following", "Scrape a Twitter user's following list"),
+                BotCommand("x_media", "Download media from an X username")
             ])
             
             logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")

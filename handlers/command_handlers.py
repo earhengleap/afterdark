@@ -30,7 +30,7 @@ from resources.keyboards import Keyboards
 from users.users import log_user_action
 
 from core.get_following_service import get_following_list, parse_cookies
-
+from core.x_media_service import XMediaService
 # Get logger
 logger = logging.getLogger("XVideoBot")
 
@@ -331,7 +331,8 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     f"📥 **Downloaded by:** {username}\n"
                     f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
                     f"✅ X Video Downloader Bot"
-                )
+                )
+
             videy_cdn_url = await VideyUploader.upload_video(video_path)
             if videy_cdn_url:
                 add_videy_link(user_id, videy_cdn_url, url)
@@ -721,6 +722,86 @@ def setup_command_handlers(app: Client):
             logger.error(f"Scrape error: {e}")
             await status_msg.edit_text(f"❌ An error occurred during scraping: {str(e)[:100]}")
 
+
+    @app.on_message(filters.private & filters.command(["x_media", "xmedia"]))
+    async def x_media_handler(client: Client, message: Message) -> None:
+        """Handle /x_media <username> [limit] command."""
+        if len(message.command) < 2:
+            await message.reply_text(
+                "Example:\n"
+                "/x_media LZYWT02\n"
+                "/x_media LZYWT02 10"
+            )
+            return
+
+        username = message.command[1].strip().replace("@", "")
+        limit = None
+        if len(message.command) >= 3:
+            try:
+                limit = int(message.command[2])
+                if limit <= 0:
+                    raise ValueError
+            except ValueError:
+                await message.reply_text("Limit must be a positive number, e.g. /x_media LZYWT02 10")
+                return
+
+        status_msg = await message.reply_text(
+            f"Scanning media timeline...\n\n"
+            f"Username: @{username}\n"
+            f"Source: https://x.com/{username}/media\n"
+            f"Limit: {limit if limit else 'ALL'}\n\n"
+            f"Collecting media posts..."
+        )
+
+        try:
+            media_data = await XMediaService.fetch_media_data(
+                username=username,
+                limit=limit,
+                cookies_file="config/twitter_cookies.txt",
+            )
+            urls = media_data.get("post_urls", [])
+            video_count = int(media_data.get("video_count", 0) or 0)
+            image_count = int(media_data.get("image_count", 0) or 0)
+            if not urls:
+                await status_msg.edit_text(
+                    f"No media posts found for @{username}.\n\n"
+                    f"Make sure the account exists, is public, and cookies are valid."
+                )
+                return
+
+            logger.info(
+                f"/x_media scrape success for @{username}: posts={len(urls)}, videos={video_count}, images={image_count}, limit={limit or 'ALL'}"
+            )
+            for link in urls:
+                logger.info(f"/x_media link @{username}: {link}")
+
+            await status_msg.edit_text(
+                f"X Media Scrape Completed\n\n"
+                f"Username: @{username}\n"
+                f"Posts found: {len(urls)}\n"
+                f"Videos found: {video_count}\n"
+                f"Images found: {image_count}\n"
+                f"Limit: {limit if limit else 'ALL'}\n\n"
+                f"Preparing links and starting download..."
+            )
+
+            max_len = 3800
+            header = f"Media Post Links for @{username}\n\n"
+            chunk = header
+            for idx, link in enumerate(urls, 1):
+                line = f"{idx}. {link}\n"
+                if len(chunk) + len(line) > max_len:
+                    await message.reply_text(chunk, disable_web_page_preview=True)
+                    chunk = header + line
+                else:
+                    chunk += line
+            if chunk.strip():
+                await message.reply_text(chunk, disable_web_page_preview=True)
+
+            await VideoDownloader.download_multiple(urls, message, message.from_user.id, status_msg)
+        except Exception as e:
+            logger.error(f"/x_media failed for @{username}: {e}", exc_info=True)
+            await status_msg.edit_text(f"Failed to process /x_media: {str(e)[:200]}")
     @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
     async def chat_handler(client: Client, message: Message) -> None:
         """Handle explicit AI chat commands"""
@@ -1253,6 +1334,8 @@ def setup_command_handlers(app: Client):
                     disable_web_page_preview=False
                 )
                 await log_user_action(user_id, username, url, "failed", "unknown")
+
+
 
 
 

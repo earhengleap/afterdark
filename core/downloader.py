@@ -208,6 +208,9 @@ class VideoDownloader:
                 if progress_state is not None:
                     progress_state["phase"] = f"Selecting format ({profile['name']})"
 
+                # Use a per-job token in filename template to avoid collisions across concurrent tasks.
+                job_token = f"{index}_{int(time.time() * 1000)}_{os.getpid()}"
+
                 # Progress hook for yt-dlp
                 def progress_hook(d):
                     if (status_msg or progress_state) and d['status'] == 'downloading':
@@ -242,13 +245,21 @@ class VideoDownloader:
                     'format': profile['format'],
                     'merge_output_format': profile['merge_output_format'],
                     'ffmpeg_location': FFMPEG_PATH,
-                    'outtmpl': os.path.join(DOWNLOAD_FOLDER, '%(title)s_%(autonumber)s.%(ext)s'),
+                    'outtmpl': os.path.join(DOWNLOAD_FOLDER, f'%(title).120B_{job_token}_%(autonumber)s.%(ext)s'),
                     'noplaylist': False,  # Changed to False to allow multiple videos
                     'quiet': True,
                     'no_warnings': True,
                     'no_color': True,
                     'extract_flat': False,
-                    'ignoreerrors': False,
+                    # Continue when one playlist entry is unsupported (e.g. external links in tweet cards).
+                    'ignoreerrors': True,
+                    # Disable resume/range continuation to prevent HTTP 416 on unstable servers.
+                    'continuedl': False,
+                    # Avoid .part rename race/lock issues on Windows.
+                    'nopart': True,
+                    # Make retries explicit at extractor/downloader layer.
+                    'retries': 3,
+                    'fragment_retries': 3,
                     'progress_hooks': [progress_hook] if (status_msg or progress_state is not None) else [],
                 }
                 
@@ -257,16 +268,20 @@ class VideoDownloader:
                     try:
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                             info = ydl.extract_info(url, download=True)
+                            if info is None:
+                                # With ignoreerrors=True yt-dlp can return None for unsupported/non-video entries.
+                                logger.info(f"No downloadable video info for URL: {url}")
+                                continue
                             
                             downloaded_files = []
                             
                             # Check if this is a playlist/multiple videos
-                            if 'entries' in info:
+                            if isinstance(info, dict) and 'entries' in info:
                                 # Multiple videos found
                                 logger.info(f"Found {len(info['entries'])} videos in tweet")
                                 for entry in info['entries']:
-                                    if entry and 'requested_downloads' in entry:
-                                        for download in entry['requested_downloads']:
+                                    if entry and isinstance(entry, dict) and 'requested_downloads' in entry:
+                                        for download in (entry.get('requested_downloads') or []):
                                             if 'filepath' in download:
                                                 downloaded_file = download['filepath']
                                                 if os.path.exists(downloaded_file):
@@ -275,10 +290,10 @@ class VideoDownloader:
                                                     LogManager.add_entry(entry, os.path.basename(new_path), url)
                             else:
                                 # Single video
-                                if 'requested_downloads' in info:
-                                    downloaded_file = info['requested_downloads'][0]['filepath']
+                                if isinstance(info, dict) and (info.get('requested_downloads') or []):
+                                    downloaded_file = (info.get('requested_downloads') or [])[0].get('filepath')
                                 else:
-                                    title = info.get('title', 'video')
+                                    title = info.get('title', 'video') if isinstance(info, dict) else 'video'
                                     downloaded_file = os.path.join(DOWNLOAD_FOLDER, f"{title}.mp4")
                                 
                                 if downloaded_file and os.path.exists(downloaded_file):
