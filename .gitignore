@@ -16,12 +16,9 @@ audio/
 *.gif
 *.webp
 
-# Telegram session files and user data
-*.session
-*.session-journal
-*.session-wal
-*.session-shm
+# Telegram session files are NOT ignored per user request to sync across devices
 dashboard/media_cache/
+!dashboard/media_cache/*.session*
 data/*.db
 data/runtime/
 data/twa_public_url.txt

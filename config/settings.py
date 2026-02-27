@@ -2,6 +2,9 @@ import os
 import tempfile
 from .config_loader import config_instance
 
+# Force user session auth mode so dashboard can read full group history
+os.environ["TELEGRAM_GALLERY_AUTH"] = "user"
+
 # ==================== BOT CONFIGURATION ====================
 BOT_TOKEN = config_instance.bot_token
 API_ID = config_instance.api_id

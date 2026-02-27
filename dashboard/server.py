@@ -38,6 +38,7 @@ import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import URL
 from starlette.responses import RedirectResponse, Response
@@ -590,19 +591,10 @@ class TelegramGalleryService:
                 if msg_date and msg_date.tzinfo is None:
                     msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                # Get CDN URL if available
-                cdn_url: Optional[str] = None
-                if CDN_ONLY_MODE:
-                    try:
-                        cdn_url = await self._get_telegram_cdn_url(message, media_kind)
-                    except Exception:
-                        pass
-
-                # Build URL
-                if cdn_url:
-                    item_url = cdn_url
-                else:
-                    item_url = f"/api/file/{message_id}"
+                # In CDN-only mode, always use streaming proxy (no local download)
+                # In normal mode, use the API file endpoint as fallback
+                item_url = f"/api/file/{message_id}"
+                cdn_url: Optional[str] = ""
 
                 # Build thumb URL
                 if media_kind == "image":
@@ -2766,42 +2758,15 @@ class TelegramGalleryService:
         return fallback
 
     async def _get_telegram_cdn_url(self, message: Any, media_kind: str) -> Optional[str]:
-        """Get Telegram CDN URL for direct media access (no local download needed)."""
-        try:
-            if media_kind == "video" and message.video:
-                file_id = message.video.file_id
-            elif media_kind == "image":
-                if message.photo:
-                    file_id = message.photo[-1].file_id if message.photo else None
-                elif message.document:
-                    file_id = message.document.file_id
-                else:
-                    return None
-            else:
-                return None
-            
-            if not file_id:
-                return None
-                
-            file_ref = getattr(message, 'file', None)
-            if not file_ref:
-                return None
-                
-            # Get file info which includes CDN URL
-            try:
-                file = await self.client.get_file(file_id)
-            except Exception:
-                return None
-                
-            # Check if CDN URL is available
-            if hasattr(file, 'cdn_url') and file.cdn_url:
-                return file.cdn_url
-            elif hasattr(file, 'file_path') and file.file_path:
-                # Build URL from file_path as fallback
-                return f"https://cdn1.telegram.org/file/{file.file_path}"
-                
-        except Exception as e:
-            logger.debug(f"[CDN] Failed to get CDN URL: {e}")
+        """Get Telegram CDN URL for direct media access.
+        
+        NOTE: Telegram's MTProto API (used by Pyrogram) does NOT expose persistent
+        CDN URLs. Media must be streamed through download_media(). This method
+        returns None to signal that the streaming proxy (/api/file/{id}) should be used.
+        """
+        # Pyrogram does not have client.get_file() and Telegram MTProto
+        # does not expose persistent CDN URLs.  Media is always served
+        # through the /api/file/{message_id} streaming proxy instead.
         return None
 
     def _extract_media(self, message: Any) -> Optional[Tuple[str, Any, str, str]]:
@@ -2874,27 +2839,11 @@ class TelegramGalleryService:
                     if msg_date and msg_date.tzinfo is None:
                         msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                    # Get Telegram CDN URL for direct access (no local download needed)
-                    cdn_url: Optional[str] = None
+                    # In CDN mode, we stream through /api/file/{id} directly
+                    # Otherwise we use the local URL if cached, or /api/file/{id} to demand download
+                    cdn_url: Optional[str] = ""
                     
-                    # Check if existing item has CDN URL
-                    existing_for_cdn = existing_items_by_id.get(int(message.id))
-                    if existing_for_cdn and existing_for_cdn.get("cdn_url"):
-                        cdn_url = existing_for_cdn.get("cdn_url")
-                    
-                    # If no existing CDN URL and CDN mode enabled, try to get new one
-                    if not cdn_url and CDN_ONLY_MODE:
-                        try:
-                            cdn_url = await self._get_telegram_cdn_url(message, media_kind)
-                            if cdn_url:
-                                logger.info(f"[CDN] Got CDN URL for message {message.id}")
-                        except Exception as e:
-                            logger.warning(f"[CDN] Failed to get CDN URL for {message.id}: {e}")
-
-                    # Use CDN URL if available, otherwise use local cache or API
-                    if cdn_url:
-                        item_url = cdn_url
-                    elif is_cached:
+                    if is_cached:
                         item_url = f"/media/{local_name}"
                     else:
                         item_url = f"/api/file/{message.id}"
@@ -3391,7 +3340,7 @@ async def api_webapp_context(
 
 
 @app.get("/api/file/{message_id}")
-async def api_file(message_id: int) -> FileResponse:
+async def api_file(message_id: int) -> Response:
     try:
         if not service._started:
             await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
@@ -3405,12 +3354,46 @@ async def api_file(message_id: int) -> FileResponse:
     if not item:
         raise HTTPException(status_code=404, detail="Media item not found")
 
+    # Check if file exists locally first
     local_path = service.cache_dir / str(item.get("file_name", ""))
     if local_path.exists():
         item["is_cached"] = True
         item["url"] = f"/media/{local_path.name}"
         return cached_file_response(local_path)
 
+    # CDN-only mode: stream from Telegram without saving to disk
+    if CDN_ONLY_MODE:
+        try:
+            message = await service.client.get_messages(CHAT_ID, message_id)
+            media_tuple = service._extract_media(message)
+            if not media_tuple:
+                raise HTTPException(status_code=404, detail="Message has no downloadable media")
+
+            media_kind, media_obj, mime_type, ext = media_tuple
+
+            async def media_stream():
+                try:
+                    async for chunk in service.client.stream_media(message):
+                        yield chunk
+                except Exception as stream_err:
+                    logger.warning(f"[CDN-STREAM] Error mid-stream for {message_id}: {stream_err}")
+
+            return StreamingResponse(
+                media_stream(),
+                media_type=mime_type or "application/octet-stream",
+                headers={
+                    "Cache-Control": "public, max-age=86400",
+                    "Content-Disposition": f'inline; filename="{item.get("file_name", "media")}"',
+                    "Accept-Ranges": "bytes",
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"[CDN-STREAM] Failed to setup stream for {message_id}: {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to stream media: {e}")
+
+    # Normal mode: download and cache locally
     async with service._lock:
         if local_path.exists():
             item["is_cached"] = True
@@ -3456,37 +3439,10 @@ async def api_file(message_id: int) -> FileResponse:
 
 @app.get("/api/cdn/{message_id}")
 async def api_cdn_file(message_id: int) -> Response:
-    """Redirect to Telegram CDN for direct media access (no local cache needed)."""
-    try:
-        if not service._started:
-            await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail="Gallery session not ready")
-
-    item = next((x for x in service.media_index if int(x.get("message_id", 0)) == message_id), None)
-    if not item:
-        raise HTTPException(status_code=404, detail="Media item not found")
-
-    # Check if we already have a CDN URL stored
-    existing_cdn_url = item.get("cdn_url")
-    if existing_cdn_url:
-        return RedirectResponse(url=existing_cdn_url, status_code=302)
-
-    # Try to get CDN URL from Telegram
-    try:
-        message = await service.client.get_messages(CHAT_ID, message_id)
-        media_kind = item.get("media_kind", "")
-        
-        cdn_url = await service._get_telegram_cdn_url(message, media_kind)
-        if cdn_url:
-            # Cache the CDN URL for future use
-            item["cdn_url"] = cdn_url
-            service._save_index()
-            return RedirectResponse(url=cdn_url, status_code=302)
-    except Exception as e:
-        logger.warning(f"[CDN] Failed to get CDN URL for {message_id}: {e}")
-
-    raise HTTPException(status_code=404, detail="CDN URL not available")
+    """Stream media directly from Telegram (no local cache needed)."""
+    # CDN endpoint now acts as a streaming proxy — identical to /api/file/{id}
+    # in CDN mode.  This avoids broken CDN URL redirects.
+    return await api_file(message_id)
 
 
 @app.get("/api/thumb/{message_id}")
