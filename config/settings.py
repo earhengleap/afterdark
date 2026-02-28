@@ -62,3 +62,7 @@ FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
 # Bot username for deep linking (without @)
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "Vuploads_bot")
 
+# ==================== WEB APP URL ====================
+# Dashboard/webapp URL for tracking
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "http://localhost:5000")
+

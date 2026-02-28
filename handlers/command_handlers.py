@@ -11,10 +11,32 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from datetime import datetime
 
-from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME, BOT_TOKEN
+from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME, BOT_TOKEN, WEB_APP_URL
 from core.log_manager import LogManager
 from core.file_manager import FileManager
 from core.metrics import metrics
+
+logger = logging.getLogger("XVideoBot")
+
+
+async def track_bot_action(action: str, user_id: int, username: str = None):
+    """Track bot actions to visitors log."""
+    try:
+        track_url = f"{WEB_APP_URL}/api/track/bot"
+        data = json.dumps({
+            "action": action,
+            "user_id": user_id,
+            "username": username
+        }).encode('utf-8')
+        
+        req = urllib.request.Request(
+            track_url,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        logger.debug(f"Bot tracking error: {e}")
 from utils.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
@@ -505,6 +527,7 @@ def setup_command_handlers(app: Client):
         """Handle /start command with deep link support"""
         user_id = message.from_user.id
         user_name = message.from_user.first_name
+        username = message.from_user.username
 
         # Refresh per-chat Mini App URL to prevent stale tunnel links.
         await _refresh_menu_for_chat(user_id)
@@ -512,6 +535,9 @@ def setup_command_handlers(app: Client):
         # Track metrics
         metrics.increment_commands("start")
         metrics.add_user(user_id)
+        
+        # Track bot action
+        await track_bot_action("start", user_id, username)
         
         # Check for deep link parameter
         if len(message.command) > 1:
@@ -826,6 +852,9 @@ def setup_command_handlers(app: Client):
         # Track user
         metrics.add_user(user_id)
         metrics.increment_commands("download_request")
+        
+        # Track bot action
+        await track_bot_action("download", user_id, message.from_user.username)
 
         urls = URLExtractor.extract(text)
         

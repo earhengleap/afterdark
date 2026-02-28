@@ -3533,7 +3533,8 @@ def cached_file_response(path: Path, media_type: str = "auto") -> FileResponse:
 
 
 @app.get("/")
-async def index() -> FileResponse:
+async def index(request: Request) -> FileResponse:
+    await _auto_track(request, "/")
     response = FileResponse(WEB_DIR / "public" / "index.html")
     response.headers["Cache-Control"] = "no-cache"
     return response
@@ -5094,7 +5095,8 @@ async def api_reset_cache(
 
 
 @app.get("/view/{message_id}", include_in_schema=False)
-async def serve_view_page(message_id: int):
+async def serve_view_page(request: Request, message_id: int):
+    await _auto_track(request, f"/view/{message_id}")
     view_path = WEB_DIR / "public" / "view.html"
     if not view_path.exists():
         return Response("view.html not found", status_code=404)
@@ -5191,7 +5193,7 @@ async def _geolocate(ip: str) -> Dict[str, str]:
     if ip in ("127.0.0.1", "::1", "unknown", "localhost") or ip.startswith("192.168.") or ip.startswith("10."):
         return {"country": "Local", "city": "Local", "isp": "Local Network"}
     try:
-        url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org"
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,lat,lon,isp,org"
         import urllib.request as _ur
         req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         loop = asyncio.get_event_loop()
@@ -5204,6 +5206,8 @@ async def _geolocate(ip: str) -> Dict[str, str]:
                 "country": data.get("country", "?"),
                 "region": data.get("regionName", ""),
                 "city": data.get("city", "?"),
+                "lat": data.get("lat"),
+                "lon": data.get("lon"),
                 "isp": data.get("isp") or data.get("org") or "?",
             }
     except Exception:
@@ -5228,6 +5232,48 @@ def _save_visitors(visitors: List[Dict]) -> None:
         logger.warning(f"[VISITORS] Could not save log: {e}")
 
 
+async def _auto_track(request: Request, page: str, tg_user_id: str = None, tg_username: str = None) -> None:
+    """Automatically track a page visit."""
+    try:
+        ip = _get_client_ip(request)
+        ua = request.headers.get("user-agent", "")
+        referrer = request.headers.get("referer", "")
+        
+        geo = await _geolocate(ip)
+        device = _parse_device(ua)
+        
+        entry: Dict[str, Any] = {
+            "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "ip": ip,
+            "country": geo.get("country", "?"),
+            "region": geo.get("region", ""),
+            "city": geo.get("city", "?"),
+            "lat": geo.get("lat"),
+            "lon": geo.get("lon"),
+            "isp": geo.get("isp", "?"),
+            "device_type": device["device_type"],
+            "os": device["os"],
+            "browser": device["browser"],
+            "referrer": referrer[:200] if referrer else "Direct",
+            "page": page,
+            "ua": ua[:300],
+        }
+        if tg_user_id:
+            entry["tg_user_id"] = tg_user_id
+        if tg_username:
+            entry["tg_username"] = tg_username
+        
+        async with _visitors_lock:
+            visitors = _load_visitors()
+            visitors.insert(0, entry)
+            visitors = visitors[:5000]
+            _save_visitors(visitors)
+        
+        logger.info(f"[VISITOR] {ip} | {geo.get('country')} {geo.get('city')} | {device['device_type']} {device['browser']} | {page}")
+    except Exception as e:
+        logger.debug(f"[VISITOR] Tracking error: {e}")
+
+
 @app.post("/api/track")
 async def api_track(request: Request) -> Dict[str, Any]:
     """Log a page visit — IP, geolocation, device, referrer, Telegram user."""
@@ -5242,6 +5288,8 @@ async def api_track(request: Request) -> Dict[str, Any]:
     page = body.get("page", "/")
     tg_user_id = body.get("tg_user_id")
     tg_username = body.get("tg_username")
+    captured_lat = body.get("lat")
+    captured_lon = body.get("lon")
 
     # Geo + device in parallel-ish
     geo = await _geolocate(ip)
@@ -5253,6 +5301,8 @@ async def api_track(request: Request) -> Dict[str, Any]:
         "country": geo.get("country", "?"),
         "region": geo.get("region", ""),
         "city": geo.get("city", "?"),
+        "lat": captured_lat if captured_lat is not None else geo.get("lat"),
+        "lon": captured_lon if captured_lon is not None else geo.get("lon"),
         "isp": geo.get("isp", "?"),
         "device_type": device["device_type"],
         "os": device["os"],
@@ -5260,6 +5310,8 @@ async def api_track(request: Request) -> Dict[str, Any]:
         "referrer": referrer[:200] if referrer else "Direct",
         "page": page,
         "ua": ua[:300],
+        "precision": body.get("precision", "ip") if captured_lat else "ip",
+        "geo_error": body.get("geo_error")
     }
     if tg_user_id:
         entry["tg_user_id"] = tg_user_id
@@ -5274,6 +5326,45 @@ async def api_track(request: Request) -> Dict[str, Any]:
         visitors = visitors[:5000]  # Keep max 5000 entries
         _save_visitors(visitors)
 
+    return {"ok": True}
+
+
+@app.post("/api/track/bot")
+async def api_track_bot(request: Request) -> Dict[str, Any]:
+    """Track Telegram bot interactions."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    
+    action = body.get("action", "unknown")
+    user_id = body.get("user_id")
+    username = body.get("username")
+    
+    entry: Dict[str, Any] = {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "type": "bot",
+        "action": action,
+        "tg_user_id": user_id,
+        "tg_username": username,
+        "country": "Telegram",
+        "city": "",
+        "isp": "Telegram Bot",
+        "device_type": "Bot",
+        "os": "Telegram",
+        "browser": "Bot API",
+        "referrer": "Bot",
+        "page": f"/bot/{action}",
+    }
+    
+    async with _visitors_lock:
+        visitors = _load_visitors()
+        visitors.insert(0, entry)
+        visitors = visitors[:5000]
+        _save_visitors(visitors)
+    
+    logger.info(f"[BOT] {action} | user:{user_id} @{username}")
+    
     return {"ok": True}
 
 

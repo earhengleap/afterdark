@@ -488,5 +488,40 @@
     "status": "success",
     "content_type": "video(1)",
     "timestamp": "2026-02-28 00:18:12"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.instagram.com/reel/DVOfrOMieUZ/?igsh=Z2dycDVyNXVhcHVr",
+    "status": "success",
+    "content_type": "video",
+    "timestamp": "2026-02-28 23:25:15"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/stuzzpopo/status/2027771187464646733?s=20",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-28 23:26:04"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/dg6nkzpl60796/status/2027669270411579432?s=20",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-02-28 23:44:14"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://x.com/barbara_hu27142/status/2027216575837691967?s=46",
+    "status": "success",
+    "content_type": "video(1)",
+    "timestamp": "2026-03-01 00:54:36"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/gonewild/s/Hq5CoGu6Ez",
+    "status": "failed",
+    "content_type": "unknown",
+    "timestamp": "2026-03-01 00:58:43"
   }
 ]

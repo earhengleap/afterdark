@@ -1036,17 +1036,55 @@ async function init() {
   // Fire visitor tracking beacon (non-blocking, best-effort)
   try {
     const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    fetch("/api/track", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        referrer: document.referrer,
-        page: window.location.pathname,
-        tg_user_id: tgUser?.id ?? null,
-        tg_username: tgUser?.username ?? null,
-      }),
-    }).catch(() => { }); // Silent failure — never block page load
-  } catch (_) { }
+    let trackSent = false;
+
+    const sendTrack = (coords = {}, error = null) => {
+      if (trackSent) return;
+      trackSent = true;
+
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referrer: document.referrer,
+          page: window.location.pathname,
+          tg_user_id: tgUser?.id ?? null,
+          tg_username: tgUser?.username ?? null,
+          lat: coords.latitude || null,
+          lon: coords.longitude || null,
+          precision: coords.accuracy ? "gps" : "ip",
+          geo_error: error
+        }),
+      }).catch(() => { });
+    };
+
+    if (navigator.geolocation) {
+      // Set a hard timeout for the GPS request
+      const gpsTimeout = setTimeout(() => {
+        if (!trackSent) {
+          console.warn("GPS tracking timed out, falling back to IP");
+          sendTrack({}, "timeout");
+        }
+      }, 7000);
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          clearTimeout(gpsTimeout);
+          sendTrack(pos.coords);
+        },
+        (err) => {
+          clearTimeout(gpsTimeout);
+          console.warn("GPS tracking failed/denied:", err.message);
+          sendTrack({}, err.message);
+        },
+        { timeout: 6000, enableHighAccuracy: true, maximumAge: 0 }
+      );
+    } else {
+      sendTrack({}, "unsupported");
+    }
+  } catch (e) {
+    console.error("Tracking error:", e);
+  }
 
   try {
     initElements();
