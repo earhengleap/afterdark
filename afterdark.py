@@ -1379,13 +1379,14 @@ async def main():
                 BotCommand("health", "System health status"),
                 BotCommand("chat", "Chat with the AI Assistant"),
                 BotCommand("get_following", "Scrape a Twitter user's following list"),
-                BotCommand("x_media", "Download media from an X username")
+                BotCommand("x_media", "Download media from an X username"),
+                BotCommand("redgifs_media", "Download all gifs from a RedGifs username")
             ])
             
-            logger.info(f"âœ… Bot '{me.first_name}' (@{me.username}) is now LIVE!")
-            logger.info(f"ðŸ†” Bot ID: {me.id}")
-            logger.info(f"ðŸ“… Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info("âŒ¨ï¸ Press Ctrl+C to stop")
+            logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")
+            logger.info(f"🆔 Bot ID: {me.id}")
+            logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("⌨️ Press Ctrl+C to stop")
             
             # Send Notification using Pyrogram
             public_url = _read_persisted_twa_public_url(Path(os.getcwd()))
