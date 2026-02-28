@@ -7,7 +7,7 @@ from typing import Optional
 
 import requests
 
-logger = logging.getLogger("XVideoBot")
+logger = logging.getLogger("AfterDark")
 
 
 class VideyUploader:
@@ -88,3 +88,4 @@ class VideyUploader:
         if not video_path or not os.path.exists(video_path):
             return None
         return await asyncio.to_thread(VideyUploader._upload_sync, video_path)
+

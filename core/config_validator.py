@@ -1,4 +1,4 @@
-"""
+﻿"""
 Configuration Validator - Validate environment and bot configuration
 """
 
@@ -7,7 +7,7 @@ import logging
 from typing import List, Tuple, Optional
 from pathlib import Path
 
-logger = logging.getLogger("XVideoBot.ConfigValidator")
+logger = logging.getLogger("AfterDark.ConfigValidator")
 
 
 class ConfigValidator:
@@ -124,25 +124,23 @@ class ConfigValidator:
     def print_validation_report(self, is_valid: bool, errors: List[str], warnings: List[str]):
         """Print a formatted validation report"""
         print("\n" + "=" * 60)
-        print("🔍 Configuration Validation Report")
-        print("=" * 60)
         
         if errors:
-            print("\n❌ ERRORS (must be fixed):")
+            print("\nâŒ ERRORS (must be fixed):")
             for i, error in enumerate(errors, 1):
                 print(f"  {i}. {error}")
         
         if warnings:
-            print("\n⚠️  WARNINGS (recommended to fix):")
+            print("\nâš ï¸  WARNINGS (recommended to fix):")
             for i, warning in enumerate(warnings, 1):
                 print(f"  {i}. {warning}")
         
         if is_valid and not warnings:
-            print("\n✅ All checks passed! Configuration is valid.")
+            print("\nâœ… Configuration is valid.")
         elif is_valid:
-            print(f"\n✅ Configuration is valid (with {len(warnings)} warnings)")
+            print(f"\nâœ… Configuration is valid (with {len(warnings)} warnings)")
         else:
-            print(f"\n❌ Configuration is INVALID ({len(errors)} errors)")
+            print(f"\nâŒ Configuration is INVALID ({len(errors)} errors)")
         
         print("=" * 60 + "\n")
 
@@ -172,11 +170,11 @@ def validate_configuration(raise_on_error: bool = True) -> bool:
         for warning in warnings:
             logger.warning(f"Configuration warning: {warning}")
     
-    # Print report
-    validator.print_validation_report(is_valid, errors, warnings)
-    
     if not is_valid and raise_on_error:
         error_msg = "\n".join([f"  - {e}" for e in errors])
         raise ValueError(f"Configuration validation failed:\n{error_msg}")
     
     return is_valid
+
+
+

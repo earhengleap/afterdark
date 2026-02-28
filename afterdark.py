@@ -1,4 +1,4 @@
-# afterdark.py
+﻿# afterdark.py
 
 """
 X Video Downloader Bot - Clean Architecture Implementation
@@ -123,18 +123,6 @@ def _check_single_instance() -> bool:
         with open(lock_file, 'w') as f:
             f.write(str(current_pid))
         
-        # Print professional startup banner
-        logger.info("=" * 60)
-        logger.info("  AFTERDARK BOT STARTING")
-        logger.info("=" * 60)
-        logger.info(f"  Process ID:     {current_pid}")
-        logger.info(f"  System:         {system_info}")
-        logger.info(f"  Start Time:     {current_time}")
-        logger.info(f"  Workdir:        {os.getcwd()}")
-        logger.info("-" * 60)
-        logger.info("  Single instance lock acquired")
-        logger.info("=" * 60)
-        
         return True
         
     except Exception as e:
@@ -146,9 +134,6 @@ def _check_single_instance() -> bool:
         logger.critical("=" * 60)
         return False
 
-# Check single instance before continuing
-if not _check_single_instance():
-    sys.exit(1)
 
 # ==================== TWA BOOTSTRAP ====================
 
@@ -1261,11 +1246,11 @@ async def shutdown(signal_name, loop):
         # Stop accepting new requests
         logger.info("Stopping bot client...")
         await asyncio.wait_for(app.stop(), timeout=10)
-        logger.info("✓ Telegram client stopped successfully")
+        logger.info("âœ“ Telegram client stopped successfully")
     except asyncio.TimeoutError:
-        logger.error("⏱️ Timeout while stopping client - forcing shutdown")
+        logger.error("â±ï¸ Timeout while stopping client - forcing shutdown")
     except Exception as e:
-        logger.warning(f"⚠️ Error stopping client: {e}")
+        logger.warning(f"âš ï¸ Error stopping client: {e}")
     
     # Cancel all running tasks gracefully
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
@@ -1281,15 +1266,15 @@ async def shutdown(signal_name, loop):
                 asyncio.gather(*tasks, return_exceptions=True),
                 timeout=10
             )
-            logger.info("✓ All tasks cancelled successfully")
+            logger.info("âœ“ All tasks cancelled successfully")
         except asyncio.TimeoutError:
-            logger.warning("⏱️ Some tasks did not cancel in time")
+            logger.warning("â±ï¸ Some tasks did not cancel in time")
     
     # Log final metrics
-    logger.info("📊 Final metrics:")
+    logger.info("ðŸ“Š Final metrics:")
     logger.info(f"\n{metrics.get_summary()}")
     
-    logger.info("Goodbye! 👋")
+    logger.info("Goodbye! ðŸ‘‹")
     _stop_aux_processes()
     loop.stop()
 
@@ -1300,43 +1285,59 @@ def handle_exception(loop, context):
 # ==================== MAIN ENTRY POINT ====================
 
 def print_banner():
-    """Print a professional banner on startup"""
+    """Print a professional startup rectangle with runtime metadata."""
     import sys
-    # Force UTF-8 encoding for standard output to prevent charmap errors on Windows
-    if sys.stdout.encoding.lower() != 'utf-8':
+
+    if (sys.stdout.encoding or "").lower() != "utf-8":
         try:
-            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stdout.reconfigure(encoding="utf-8")
         except Exception:
             pass
-            
-    width = 60
-    border = "━" * width
+
+    width = 84
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pid = os.getpid()
+    system = platform.system()
+    workdir = os.getcwd()
+
+    def _line(text: str) -> str:
+        return f"| {text:<{width - 4}} |"
+
     try:
-        print(f"\n\033[1;36m┏{border}┓\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;33m{BOT_NAME.center(width-2)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;32m{'Production Ready • Stable Version'.center(width-2)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┣{border}┫\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;37m📦 Version: {BOT_VERSION.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;37m📅 Release: {VERSION_DATE.ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;37m🛡️ System:  {os.name.upper().ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┃\033[0m \033[1;37m🕒 Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S').ljust(width-14)}\033[0m \033[1;36m┃\033[0m")
-        print(f"\033[1;36m┗{border}┛\033[0m")
+        top = "+" + ("=" * (width - 2)) + "+"
+        sep = "|" + ("-" * (width - 2)) + "|"
+        print(f"\n\033[1;36m{top}\033[0m")
+        print(f"\033[1;36m{_line('AfterDark'.center(width - 4))}\033[0m")
+        print(f"\033[1;36m{_line('Production Ready - Stable Build'.center(width - 4))}\033[0m")
+        print(f"\033[1;36m{sep}\033[0m")
+        print(f"\033[1;37m{_line(f'Bot Name : {BOT_NAME}')}\033[0m")
+        print(f"\033[1;37m{_line(f'Version  : {BOT_VERSION}')}\033[0m")
+        print(f"\033[1;37m{_line(f'Release  : {VERSION_DATE}')}\033[0m")
+        print(f"\033[1;37m{_line(f'PID      : {pid}')}\033[0m")
+        print(f"\033[1;37m{_line(f'System   : {system}')}\033[0m")
+        print(f"\033[1;37m{_line(f'Started  : {now}')}\033[0m")
+        print(f"\033[1;37m{_line(f'Workdir  : {workdir}')}\033[0m")
+        print(f"\033[1;36m{top}\033[0m")
     except UnicodeEncodeError:
-        # Fallback if reconfigure failed and terminal absolutely cannot print emojis
-        print("\n--- X Video Downloader Pro ---")
-        print(f"Version: {BOT_VERSION}")
-        print(f"Startup: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("------------------------------\n")
+        print("\n+===============================+")
+        print("|           AfterDark          |")
+        print("|-------------------------------|")
+        print(f"| Version : {BOT_VERSION:<20} |")
+        print(f"| Started : {now:<20} |")
+        print("+===============================+\n")
+
 
 async def main():
     """Main bot entry point with enhanced error handling and monitoring"""
     print_banner()
-    
+    if not _check_single_instance():
+        return
+
     # Step 1: Validate configuration
     logger.info("Validating configuration...")
     try:
         validate_configuration(raise_on_error=True)
-        logger.info("✓ Configuration validated successfully")
+        logger.info("âœ“ Configuration validated successfully")
     except ValueError as e:
         logger.critical(f"Configuration validation failed: {e}")
         return
@@ -1344,13 +1345,13 @@ async def main():
     # Step 2: Setup directories
     logger.info("Initializing system directories...")
     setup_directories()
-    logger.info("✓ Directories initialized")
+    logger.info("âœ“ Directories initialized")
     
     # Step 3: Setup handlers
     logger.info("Setting up command and callback handlers...")
     setup_command_handlers(app)
     setup_callback_handlers(app)
-    logger.info("✓ Handlers configured")
+    logger.info("âœ“ Handlers configured")
     # Step 3.5: Start Mini App backend stack
     try:
         _start_twa_stack()
@@ -1381,16 +1382,16 @@ async def main():
                 BotCommand("x_media", "Download media from an X username")
             ])
             
-            logger.info(f"✅ Bot '{me.first_name}' (@{me.username}) is now LIVE!")
-            logger.info(f"🆔 Bot ID: {me.id}")
-            logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info("⌨️ Press Ctrl+C to stop")
+            logger.info(f"âœ… Bot '{me.first_name}' (@{me.username}) is now LIVE!")
+            logger.info(f"ðŸ†” Bot ID: {me.id}")
+            logger.info(f"ðŸ“… Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info("âŒ¨ï¸ Press Ctrl+C to stop")
             
             # Send Notification using Pyrogram
             public_url = _read_persisted_twa_public_url(Path(os.getcwd()))
             if public_url:
                 message_text = (
-                    f"🌐 **Tunnel Active**\n\n"
+                    f"ðŸŒ **Tunnel Active**\n\n"
                     f"URL: {public_url}\n\n"
                     f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
@@ -1410,9 +1411,9 @@ async def main():
                         continue
                     try:
                         await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
-                        logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")
+                        logger.info(f"âœ… Tunnel URL properly delivered to {chat_target_str}")
                     except Exception as e:
-                        logger.error(f"❌ Could not deliver tunnel URL to {chat_target_str}: {e}")
+                        logger.error(f"âŒ Could not deliver tunnel URL to {chat_target_str}: {e}")
             
             # Step 5: Start health monitoring
             logger.info("Starting health monitor...")
@@ -1422,14 +1423,14 @@ async def main():
             asyncio.create_task(tunnel_watchdog(app))
             
             # Step 6: Log initial metrics
-            logger.info("📊 Metrics tracking enabled")
+            logger.info("ðŸ“Š Metrics tracking enabled")
             
             # Keep the bot running
             await idle()
             break
             
         except (ApiIdInvalid, AuthKeyInvalid) as e:
-            logger.critical("❌ Invalid API_ID, API_HASH, or BOT_TOKEN")
+            logger.critical("âŒ Invalid API_ID, API_HASH, or BOT_TOKEN")
             logger.critical("Please check your .env configuration file")
             return
             
@@ -1438,12 +1439,12 @@ async def main():
             if retry_count < max_retries:
                 wait_time = 2 ** retry_count
                 logger.warning(
-                    f"⚠️ Connection failed (attempt {retry_count}/{max_retries}). "
+                    f"âš ï¸ Connection failed (attempt {retry_count}/{max_retries}). "
                     f"Retrying in {wait_time}s..."
                 )
                 await asyncio.sleep(wait_time)
             else:
-                logger.critical(f"❌ Failed to connect after {max_retries} attempts")
+                logger.critical(f"âŒ Failed to connect after {max_retries} attempts")
                 return
                 
         except Exception as e:
@@ -1472,7 +1473,7 @@ async def main():
         if app.is_connected:
             logger.info("Disconnecting bot...")
             await app.stop()
-            logger.info("✓ Bot disconnected")
+            logger.info("âœ“ Bot disconnected")
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
     finally:
@@ -1502,3 +1503,6 @@ if __name__ == "__main__":
         logger.warning("Bot stopped by user interrupt (KeyboardInterrupt)")
     finally:
         logger.info("System shutdown complete")
+
+
+

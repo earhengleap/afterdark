@@ -32,7 +32,7 @@ from users.users import log_user_action
 from core.get_following_service import get_following_list, parse_cookies
 from core.x_media_service import XMediaService
 # Get logger
-logger = logging.getLogger("XVideoBot")
+logger = logging.getLogger("AfterDark")
 
 async def get_remote_file_size(url: str) -> float:
     """Get remote file size in MB via HEAD request"""
@@ -1336,6 +1336,7 @@ def setup_command_handlers(app: Client):
                     disable_web_page_preview=False
                 )
                 await log_user_action(user_id, username, url, "failed", "unknown")
+
 
 
 

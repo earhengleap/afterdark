@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Visitor Analytics — AfterDark Vault</title>
+    <title>Visitor Analytics â€” AfterDark Vault</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
@@ -167,6 +167,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .log-title {
@@ -188,6 +190,11 @@
         .refresh-btn:hover {
             background: var(--purple);
             color: white;
+        }
+
+        .live-meta {
+            color: var(--muted);
+            font-size: 12px;
         }
 
         .table-wrap {
@@ -277,44 +284,44 @@
     <header>
         <div class="dot"></div>
         <h1>Visitor Analytics</h1>
-        <a href="/">← Back to Gallery</a>
+        <a href="/">â† Back to Gallery</a>
     </header>
 
     <main>
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="stat-label">Total Visits</div>
-                <div class="stat-value" id="statTotal">—</div>
+                <div class="stat-value" id="statTotal">â€”</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Countries</div>
-                <div class="stat-value" id="statCountries">—</div>
+                <div class="stat-value" id="statCountries">â€”</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Mobile %</div>
-                <div class="stat-value" id="statMobile">—</div>
+                <div class="stat-value" id="statMobile">â€”</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Top Browser</div>
-                <div class="stat-value" style="font-size:20px" id="statBrowser">—</div>
+                <div class="stat-value" style="font-size:20px" id="statBrowser">â€”</div>
             </div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-card">
-                <div class="chart-title">🌍 Top Countries</div>
+                <div class="chart-title">ðŸŒ Top Countries</div>
                 <div id="chartCountries">
                     <div class="loading">Loading...</div>
                 </div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">📱 Device Types</div>
+                <div class="chart-title">ðŸ“± Device Types</div>
                 <div id="chartDevices">
                     <div class="loading">Loading...</div>
                 </div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">🌐 Browsers</div>
+                <div class="chart-title">ðŸŒ Browsers</div>
                 <div id="chartBrowsers">
                     <div class="loading">Loading...</div>
                 </div>
@@ -323,7 +330,8 @@
 
         <div class="log-header">
             <span class="log-title">Recent Visitors</span>
-            <button class="refresh-btn" onclick="load()">↻ Refresh</button>
+            <span class="live-meta" id="liveMeta">Live refresh: every 10s</span>
+            <button class="refresh-btn" onclick="load()">&#8635; Refresh</button>
         </div>
         <div class="table-wrap">
             <table>
@@ -340,7 +348,7 @@
                 </thead>
                 <tbody id="visitorLog">
                     <tr>
-                        <td colspan="7" class="loading">Loading…</td>
+                        <td colspan="7" class="loading">Loadingâ€¦</td>
                     </tr>
                 </tbody>
             </table>
@@ -354,16 +362,26 @@
             return d.toLocaleString();
         }
 
+        function fmtLocation(v) {
+            const country = v.country || '?';
+            const region = v.region || '';
+            const city = v.city || '';
+            const parts = [country];
+            if (region && region !== country) parts.push(region);
+            if (city && city !== region && city !== country) parts.push(city);
+            return `${countryFlag(country)} ${parts.join(', ')}`;
+        }
+
         function countryFlag(country) {
             const flags = {
-                'United States': '🇺🇸', 'Cambodia': '🇰🇭', 'Thailand': '🇹🇭', 'Japan': '🇯🇵',
-                'China': '🇨🇳', 'India': '🇮🇳', 'Germany': '🇩🇪', 'France': '🇫🇷',
-                'United Kingdom': '🇬🇧', 'Australia': '🇦🇺', 'Canada': '🇨🇦', 'Brazil': '🇧🇷',
-                'Russia': '🇷🇺', 'South Korea': '🇰🇷', 'Singapore': '🇸🇬', 'Vietnam': '🇻🇳',
-                'Indonesia': '🇮🇩', 'Philippines': '🇵🇭', 'Malaysia': '🇲🇾', 'Netherlands': '🇳🇱',
-                'Local': '🏠',
+                'United States': 'ðŸ‡ºðŸ‡¸', 'Cambodia': 'ðŸ‡°ðŸ‡­', 'Thailand': 'ðŸ‡¹ðŸ‡­', 'Japan': 'ðŸ‡¯ðŸ‡µ',
+                'China': 'ðŸ‡¨ðŸ‡³', 'India': 'ðŸ‡®ðŸ‡³', 'Germany': 'ðŸ‡©ðŸ‡ª', 'France': 'ðŸ‡«ðŸ‡·',
+                'United Kingdom': 'ðŸ‡¬ðŸ‡§', 'Australia': 'ðŸ‡¦ðŸ‡º', 'Canada': 'ðŸ‡¨ðŸ‡¦', 'Brazil': 'ðŸ‡§ðŸ‡·',
+                'Russia': 'ðŸ‡·ðŸ‡º', 'South Korea': 'ðŸ‡°ðŸ‡·', 'Singapore': 'ðŸ‡¸ðŸ‡¬', 'Vietnam': 'ðŸ‡»ðŸ‡³',
+                'Indonesia': 'ðŸ‡®ðŸ‡©', 'Philippines': 'ðŸ‡µðŸ‡­', 'Malaysia': 'ðŸ‡²ðŸ‡¾', 'Netherlands': 'ðŸ‡³ðŸ‡±',
+                'Local': 'ðŸ ',
             };
-            return flags[country] || '🌐';
+            return flags[country] || 'ðŸŒ';
         }
 
         function renderBars(containerId, items, labelKey, countKey, max) {
@@ -389,7 +407,7 @@
                 document.getElementById('statCountries').textContent = data.stats.top_countries.length;
                 const mobileCount = data.stats.devices.find(d => d.type === 'Mobile')?.count || 0;
                 document.getElementById('statMobile').textContent = data.total > 0 ? Math.round(mobileCount / data.total * 100) + '%' : '0%';
-                document.getElementById('statBrowser').textContent = data.stats.browsers[0]?.browser || '—';
+                document.getElementById('statBrowser').textContent = data.stats.browsers[0]?.browser || 'â€”';
 
                 // Charts
                 const maxC = data.stats.top_countries[0]?.count || 1;
@@ -398,6 +416,8 @@
                 renderBars('chartDevices', data.stats.devices.map(d => ({ country: d.type, count: d.count })), 'country', 'count', maxD);
                 const maxB = data.stats.browsers[0]?.count || 1;
                 renderBars('chartBrowsers', data.stats.browsers.map(b => ({ country: b.browser, count: b.count })), 'country', 'count', maxB);
+                const meta = document.getElementById('liveMeta');
+                if (meta) meta.textContent = `Live refresh: every 10s • Updated ${new Date().toLocaleTimeString()}`;
 
                 // Table
                 const tbody = document.getElementById('visitorLog');
@@ -408,12 +428,12 @@
                 tbody.innerHTML = data.visitors.map(v => `
           <tr>
             <td class="ts">${fmtTime(v.ts)}</td>
-            <td>${countryFlag(v.country)} ${v.country}${v.city && v.city !== v.country ? ', ' + v.city : ''}</td>
-            <td style="color:#6b7280;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.isp}">${v.isp || '—'}</td>
+            <td>${fmtLocation(v)}</td>
+            <td style="color:#6b7280;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.isp}">${v.isp || 'â€”'}</td>
             <td><span class="badge ${(v.device_type || '').toLowerCase()}">${v.device_type || '?'}</span></td>
             <td>${v.os || '?'} / ${v.browser || '?'}</td>
             <td style="color:#6b7280;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.referrer}">${v.referrer || 'Direct'}</td>
-            <td style="color:#8b5cf6">${v.tg_username ? '@' + v.tg_username : (v.tg_user_id ? '#' + v.tg_user_id : '—')}</td>
+            <td style="color:#8b5cf6">${v.tg_username ? '@' + v.tg_username : (v.tg_user_id ? '#' + v.tg_user_id : 'â€”')}</td>
           </tr>
         `).join('');
             } catch (e) {
@@ -422,9 +442,10 @@
         }
 
         load();
-        // Auto-refresh every 30s
-        setInterval(load, 30000);
+        // Auto-refresh every 10s
+        setInterval(load, 10000);
     </script>
 </body>
 
 </html>
+

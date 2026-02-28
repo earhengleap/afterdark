@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 import aiofiles
 
 # Configure logging
-logger = logging.getLogger("XVideoBot.Users")
+logger = logging.getLogger("AfterDark.Users")
 
 class UserManager:
     """

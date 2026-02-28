@@ -9,7 +9,7 @@ import os
 from typing import Dict, Optional
 from datetime import datetime
 
-logger = logging.getLogger("XVideoBot.HealthMonitor")
+logger = logging.getLogger("AfterDark.HealthMonitor")
 
 
 class HealthMonitor:
@@ -159,3 +159,4 @@ async def start_health_monitor(app, interval: int = 300):
 def get_health_monitor(app) -> HealthMonitor:
     """Create and return a health monitor instance"""
     return HealthMonitor(app)
+

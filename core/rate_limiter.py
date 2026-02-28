@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 import threading
 import logging
 
-logger = logging.getLogger("XVideoBot.RateLimiter")
+logger = logging.getLogger("AfterDark.RateLimiter")
 
 
 class RateLimiter:
@@ -196,3 +196,4 @@ rate_limiter = RateLimiter(
 def get_rate_limiter() -> RateLimiter:
     """Get the global rate limiter instance"""
     return rate_limiter
+

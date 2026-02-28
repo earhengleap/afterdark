@@ -9,7 +9,7 @@ import threading
 import json
 import logging
 
-logger = logging.getLogger("XVideoBot.Metrics")
+logger = logging.getLogger("AfterDark.Metrics")
 
 
 @dataclass
@@ -176,3 +176,4 @@ metrics = BotMetrics()
 def get_metrics() -> BotMetrics:
     """Get the global metrics instance"""
     return metrics
+

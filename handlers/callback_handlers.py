@@ -1,4 +1,4 @@
-﻿"""
+"""
 Callback query handlers for the bot
 """
 import os
@@ -11,7 +11,7 @@ from pyrogram.types import CallbackQuery, Message
 import logging
 
 # Get logger
-logger = logging.getLogger("XVideoBot")
+logger = logging.getLogger("AfterDark")
 
 from core.file_manager import FileManager
 from core.uploader import VideoUploader
@@ -84,9 +84,9 @@ def setup_callback_handlers(app: Client):
             is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
             
             await callback_query.message.edit_text(
-                f"📦 **Bulk Download Queue**\n\n"
-                f"📊 **Items in Queue:** {queue_count}\n"
-                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"?? **Bulk Download Queue**\n\n"
+                f"?? **Items in Queue:** {queue_count}\n"
+                f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
                 reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
             )
@@ -103,9 +103,9 @@ def setup_callback_handlers(app: Client):
             is_bulk_mode = new_value == "1"
             
             await callback_query.message.edit_text(
-                f"📦 **Bulk Download Queue**\n\n"
-                f"📊 **Items in Queue:** {queue_count}\n"
-                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"?? **Bulk Download Queue**\n\n"
+                f"?? **Items in Queue:** {queue_count}\n"
+                f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
                 reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
             )
@@ -116,18 +116,18 @@ def setup_callback_handlers(app: Client):
             
             urls = history_db.get_queue(user_id)
             if not urls:
-                await callback_query.answer("❌ Queue is empty!", show_alert=True)
+                await callback_query.answer("? Queue is empty!", show_alert=True)
                 return
             
             # Clear queue immediately to prevent double processing
             history_db.clear_queue(user_id)
             
-            await callback_query.answer(f"🚀 Processing {len(urls)} links...")
+            await callback_query.answer(f"?? Processing {len(urls)} links...")
             
             status_msg = await callback_query.message.edit_text(
-                f"🚀 **Processing Bulk Queue**\n\n"
-                f"📊 **Links:** {len(urls)}\n"
-                f"⏳ Starting download process...",
+                f"?? **Processing Bulk Queue**\n\n"
+                f"?? **Links:** {len(urls)}\n"
+                f"? Starting download process...",
                 reply_markup=None
             )
             
@@ -138,14 +138,14 @@ def setup_callback_handlers(app: Client):
             from core.database import history_db
             
             history_db.clear_queue(user_id)
-            await callback_query.answer("✅ Queue cleared!")
+            await callback_query.answer("? Queue cleared!")
             
             # Refresh menu
             is_bulk_mode = history_db.get_setting(user_id, "bulk_mode", "0") == "1"
             await callback_query.message.edit_text(
-                f"📦 **Bulk Download Queue**\n\n"
-                f"📊 **Items in Queue:** 0\n"
-                f"⚙️ **Bulk Mode:** {'✅ Enabled' if is_bulk_mode else '❌ Disabled'}\n\n"
+                f"?? **Bulk Download Queue**\n\n"
+                f"?? **Items in Queue:** 0\n"
+                f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Queue cleared successfully.__",
                 reply_markup=Keyboards.bulk_queue_menu(0, is_bulk_mode)
             )
@@ -157,7 +157,7 @@ def setup_callback_handlers(app: Client):
             share_link = DeepLinkHelper.generate_share_link(BOT_USERNAME)
             
             await callback_query.message.edit_text(
-                f"📤 **Share to Bot**\n\n"
+                f"?? **Share to Bot**\n\n"
                 f"Share an X video to this bot without copying the link!\n\n"
                 f"**Method 1: Mobile Share**\n"
                 f"1. Tap Share on any X post\n"
@@ -173,11 +173,11 @@ def setup_callback_handlers(app: Client):
 
         elif data == "socials":
             await callback_query.message.edit_text(
-                "🌍 **Community & Socials**\n\n"
+                "?? **Community & Socials**\n\n"
                 "Stay updated and get support from our community:\n\n"
-                "📢 **Channel:** @XDownloaderPro_News\n"
-                "💬 **Support Group:** @XDownloaderPro_Support\n"
-                "🛠️ **Developer:** @DevMoonlight\n\n"
+                "?? **Channel:** @XDownloaderPro_News\n"
+                "?? **Support Group:** @XDownloaderPro_Support\n"
+                "??? **Developer:** @DevMoonlight\n\n"
                 "Feel free to report bugs or suggest features!",
                 reply_markup=Keyboards.back_to_main()
             )
@@ -188,7 +188,7 @@ def setup_callback_handlers(app: Client):
             log = stats_info['log_data']
             sync_status = ""
             if not stats_info['synced']:
-                sync_status = f"\n\n⚠️ Log entries: {stats_info['log_entries']} | Folder videos: {stats_info['actual_videos']}"
+                sync_status = f"\n\n?? Log entries: {stats_info['log_entries']} | Folder videos: {stats_info['actual_videos']}"
             keyboard = Keyboards.back_to_main()
             await callback_query.message.edit_text(Messages.stats_text(log) + sync_status, reply_markup=keyboard)
 
@@ -199,7 +199,7 @@ def setup_callback_handlers(app: Client):
             links = get_videy_links(user_id)
             if not links:
                 await callback_query.message.edit_text(
-                    "🔗 **Videy Links**\n\nNo links found yet.\n\nDownload a video first, then use this menu again.",
+                    "?? **Videy Links**\n\nNo links found yet.\n\nDownload a video first, then use this menu again.",
                     reply_markup=Keyboards.back_to_main(),
                     disable_web_page_preview=False,
                 )
@@ -233,7 +233,7 @@ def setup_callback_handlers(app: Client):
                 reply_markup=keyboard,
                 disable_web_page_preview=False
             )
-            await callback_query.answer(f"🔗 Page {page}/{total_pages}")
+            await callback_query.answer(f"?? Page {page}/{total_pages}")
         
         elif data.startswith("videy_export:"):
             links = get_videy_links(user_id)
@@ -243,16 +243,16 @@ def setup_callback_handlers(app: Client):
 
             links = list(reversed(links))
             format_type = data.split(":")[1]
-            await callback_query.answer("📊 Generating Videy export...")
+            await callback_query.answer("?? Generating Videy export...")
 
             if format_type == "csv":
                 file_data = export_videy_to_csv(links)
                 filename = f"videy_links_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-                caption = f"📊 **Videy Links (CSV)**\n\n{len(links)} total links"
+                caption = f"?? **Videy Links (CSV)**\n\n{len(links)} total links"
             else:
                 file_data = export_videy_to_text(links)
                 filename = f"videy_links_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-                caption = f"📄 **Videy Links (Text)**\n\n{len(links)} total links"
+                caption = f"?? **Videy Links (Text)**\n\n{len(links)} total links"
 
             await callback_query.message.reply_document(
                 document=file_data,
@@ -265,7 +265,7 @@ def setup_callback_handlers(app: Client):
             except Exception:
                 pass
 
-            await callback_query.answer("✅ Videy links exported!")
+            await callback_query.answer("? Videy links exported!")
         
         elif data == "settings_notifications":
             from core.database import history_db
@@ -311,7 +311,7 @@ def setup_callback_handlers(app: Client):
         elif data == "bulk_upload":
             videos = FileManager.get_all_videos()
             if not videos:
-                await callback_query.answer("❌ No videos found in download folder!", show_alert=True)
+                await callback_query.answer("? No videos found in download folder!", show_alert=True)
                 return
             
             video_dicts = [{'filename': v.filename, 'filepath': v.filepath, 'size': v.size_mb} for v in videos]
@@ -326,7 +326,7 @@ def setup_callback_handlers(app: Client):
         elif data == "bulk_upload_images":
             images = FileManager.get_all_images()
             if not images:
-                await callback_query.answer("❌ No images found in download folder!", show_alert=True)
+                await callback_query.answer("? No images found in download folder!", show_alert=True)
                 return
             
             image_dicts = [{'filename': img.filename, 'filepath': img.filepath, 'size': img.size_mb} for img in images]
@@ -342,7 +342,7 @@ def setup_callback_handlers(app: Client):
             try:
                 video_idx = int(data.replace("sel_", ""))
             except ValueError:
-                await callback_query.answer("❌ Invalid selection", show_alert=True)
+                await callback_query.answer("? Invalid selection", show_alert=True)
                 return
             
             if user_id not in user_selections:
@@ -350,10 +350,10 @@ def setup_callback_handlers(app: Client):
             
             if video_idx in user_selections[user_id]:
                 user_selections[user_id].remove(video_idx)
-                await callback_query.answer("❌ Deselected")
+                await callback_query.answer("? Deselected")
             else:
                 user_selections[user_id].add(video_idx)
-                await callback_query.answer("✅ Selected")
+                await callback_query.answer("? Selected")
             
             videos = user_downloads.get(f"{user_id}_videos", [])
             current_page = user_downloads.get(f"{user_id}_page", 0)
@@ -368,7 +368,7 @@ def setup_callback_handlers(app: Client):
             try:
                 image_idx = int(data.replace("img_sel_", ""))
             except ValueError:
-                await callback_query.answer("❌ Invalid selection", show_alert=True)
+                await callback_query.answer("? Invalid selection", show_alert=True)
                 return
             
             if user_id not in user_selections:
@@ -376,10 +376,10 @@ def setup_callback_handlers(app: Client):
             
             if image_idx in user_selections[user_id]:
                 user_selections[user_id].remove(image_idx)
-                await callback_query.answer("❌ Deselected")
+                await callback_query.answer("? Deselected")
             else:
                 user_selections[user_id].add(image_idx)
-                await callback_query.answer("✅ Selected")
+                await callback_query.answer("? Selected")
             
             images = user_downloads.get(f"{user_id}_images", [])
             current_page = user_downloads.get(f"{user_id}_image_page", 0)
@@ -395,28 +395,28 @@ def setup_callback_handlers(app: Client):
             user_selections[user_id] = set(range(len(videos)))
             keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-            await callback_query.answer(f"✅ Selected all {len(videos)} videos")
+            await callback_query.answer(f"? Selected all {len(videos)} videos")
         
         elif data == "img_sel_all":
             images = user_downloads.get(f"{user_id}_images", [])
             user_selections[user_id] = set(range(len(images)))
             keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-            await callback_query.answer(f"✅ Selected all {len(images)} images")
+            await callback_query.answer(f"? Selected all {len(images)} images")
         
         elif data == "desel_all":
             videos = user_downloads.get(f"{user_id}_videos", [])
             user_selections[user_id] = set()
             keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-            await callback_query.answer("❌ Deselected all videos")
+            await callback_query.answer("? Deselected all videos")
         
         elif data == "img_desel_all":
             images = user_downloads.get(f"{user_id}_images", [])
             user_selections[user_id] = set()
             keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-            await callback_query.answer("❌ Deselected all images")
+            await callback_query.answer("? Deselected all images")
         
         elif data.startswith("pg_"):
             try:
@@ -429,7 +429,7 @@ def setup_callback_handlers(app: Client):
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-                await callback_query.answer(f"📄 Page {page + 1}")
+                await callback_query.answer(f"?? Page {page + 1}")
             except Exception:
                 pass
         
@@ -444,23 +444,23 @@ def setup_callback_handlers(app: Client):
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
-                await callback_query.answer(f"📄 Page {page + 1}")
+                await callback_query.answer(f"?? Page {page + 1}")
             except Exception:
                 pass
         
         elif data == "confirm_upload":
             if user_id not in user_selections or not user_selections[user_id]:
-                await callback_query.answer("❌ No videos selected!", show_alert=True)
+                await callback_query.answer("? No videos selected!", show_alert=True)
                 return
             
             videos = user_downloads.get(f"{user_id}_videos", [])
             selected_files = [videos[idx]['filepath'] for idx in user_selections[user_id] if idx < len(videos)]
             
             if not selected_files:
-                await callback_query.answer("❌ No valid videos selected!", show_alert=True)
+                await callback_query.answer("? No valid videos selected!", show_alert=True)
                 return
             
-            await callback_query.answer("📤 Starting upload...")
+            await callback_query.answer("?? Starting upload...")
             await VideoUploader.upload_multiple(selected_files, callback_query.message, user_id)
             
             user_selections[user_id] = set()
@@ -469,17 +469,17 @@ def setup_callback_handlers(app: Client):
         
         elif data == "confirm_image_upload":
             if user_id not in user_selections or not user_selections[user_id]:
-                await callback_query.answer("❌ No images selected!", show_alert=True)
+                await callback_query.answer("? No images selected!", show_alert=True)
                 return
             
             images = user_downloads.get(f"{user_id}_images", [])
             selected_files = [images[idx]['filepath'] for idx in user_selections[user_id] if idx < len(images)]
             
             if not selected_files:
-                await callback_query.answer("❌ No valid images selected!", show_alert=True)
+                await callback_query.answer("? No valid images selected!", show_alert=True)
                 return
             
-            await callback_query.answer("📤 Starting image upload...")
+            await callback_query.answer("?? Starting image upload...")
             await ImageUploader.upload_multiple_images(selected_files, callback_query.message, user_id)
             
             user_selections[user_id] = set()
@@ -505,12 +505,12 @@ def setup_callback_handlers(app: Client):
             # Check if it's a single video path or multiple videos
             if isinstance(video_path, list) and len(video_path) > 0:
                 # Multiple videos from single URL
-                await callback_query.answer(f"📤 Uploading {len(video_path)} videos to group...", show_alert=False)
+                await callback_query.answer(f"?? Uploading {len(video_path)} videos to group...", show_alert=False)
                 
                 status_msg = await callback_query.message.reply_text(
-                    f"📤 **Starting Bulk Upload**\n\n"
-                    f"🎬 Videos: {len(video_path)} files\n\n"
-                    f"⏳ Preparing..."
+                    f"?? **Starting Bulk Upload**\n\n"
+                    f"?? Videos: {len(video_path)} files\n\n"
+                    f"? Preparing..."
                 )
                 
                 # Upload all videos from this URL
@@ -518,15 +518,15 @@ def setup_callback_handlers(app: Client):
                 
             elif video_path and os.path.exists(video_path):
                 # Single video (original behavior)
-                await callback_query.answer("📤 Uploading to group...", show_alert=False)
+                await callback_query.answer("?? Uploading to group...", show_alert=False)
                 
                 video_name = os.path.basename(video_path)
                 file_size = os.path.getsize(video_path)
                 status_msg = await callback_query.message.reply_text(
-                    f"📤 **Starting Upload**\n\n"
-                    f"📁 File: `{video_name[:35]}...`\n"
-                    f"💾 Size: {Formatter.size(file_size)}\n\n"
-                    f"⏳ Preparing..."
+                    f"?? **Starting Upload**\n\n"
+                    f"?? File: `{video_name[:35]}...`\n"
+                    f"?? Size: {Formatter.size(file_size)}\n\n"
+                    f"? Preparing..."
                 )
                 
                 # Pass the client from callback_query
@@ -536,22 +536,22 @@ def setup_callback_handlers(app: Client):
                 
                 if success:
                     await status_msg.edit_text(
-                        "✅ **Video Uploaded to Group Successfully!**\n\n"
-                        f"📁 File: `{video_name}`\n"
-                        f"💾 Size: {Formatter.size(file_size)}\n\n"
+                        "? **Video Uploaded to Group Successfully!**\n\n"
+                        f"?? File: `{video_name}`\n"
+                        f"?? Size: {Formatter.size(file_size)}\n\n"
                         "The video has been shared with the group.\n\n"
                         "Want to download another video?",
                         reply_markup=Keyboards.back_to_main()
                     )
                 else:
                     await status_msg.edit_text(
-                        f"❌ **Upload Failed**\n\n"
+                        f"? **Upload Failed**\n\n"
                         f"Error: {message}\n\n"
                         "Please try again later.",
                         reply_markup=Keyboards.back_to_main()
                     )
             else:
-                await callback_query.answer("❌ Video file not found. Please download again.", show_alert=True)
+                await callback_query.answer("? Video file not found. Please download again.", show_alert=True)
 
         elif data.startswith("upload_images_to_group_"):
             # Cancel auto-upload if pending
@@ -564,18 +564,18 @@ def setup_callback_handlers(app: Client):
                 image_paths = _fallback_image_paths()[:20]
             
             if not image_paths or (isinstance(image_paths, str) and not os.path.exists(image_paths)):
-                await callback_query.answer("❌ Image files not found. Please download again.", show_alert=True)
+                await callback_query.answer("? Image files not found. Please download again.", show_alert=True)
                 return
             
-            await callback_query.answer("📤 Uploading images to group...", show_alert=False)
+            await callback_query.answer("?? Uploading images to group...", show_alert=False)
             
             if isinstance(image_paths, str):
                 image_paths = [image_paths]
             
             status_msg = await callback_query.message.reply_text(
-                f"📤 **Starting Image Upload**\n\n"
-                f"🖼️ Files: {len(image_paths)} images\n\n"
-                f"⏳ Preparing..."
+                f"?? **Starting Image Upload**\n\n"
+                f"??? Files: {len(image_paths)} images\n\n"
+                f"? Preparing..."
             )
             
             success, message = await ImageUploader.upload_images_to_group(
@@ -584,15 +584,15 @@ def setup_callback_handlers(app: Client):
             
             if success:
                 await status_msg.edit_text(
-                    "✅ **Images Uploaded to Group Successfully!**\n\n"
-                    f"🖼️ Uploaded: {len(image_paths)} images\n\n"
+                    "? **Images Uploaded to Group Successfully!**\n\n"
+                    f"??? Uploaded: {len(image_paths)} images\n\n"
                     "The images have been shared with the group.\n\n"
                     "Want to download more images?",
                     reply_markup=Keyboards.back_to_main()
                 )
             else:
                 await status_msg.edit_text(
-                    f"❌ **Upload Failed**\n\n"
+                    f"? **Upload Failed**\n\n"
                     f"Error: {message}\n\n"
                     "Please try again later.",
                     reply_markup=Keyboards.back_to_main()
@@ -615,10 +615,10 @@ def setup_callback_handlers(app: Client):
                 downloaded_paths = _fallback_video_paths()
             
             if not downloaded_paths:
-                await callback_query.answer("❌ No downloaded videos found!", show_alert=True)
+                await callback_query.answer("? No downloaded videos found!", show_alert=True)
                 return
             
-            await callback_query.answer(f"📤 Starting bulk upload of {len(downloaded_paths)} videos...")
+            await callback_query.answer(f"?? Starting bulk upload of {len(downloaded_paths)} videos...")
             await VideoUploader.upload_multiple(downloaded_paths, callback_query.message, user_id)
 
         elif data == "upload_bulk_images_downloaded":
@@ -648,11 +648,11 @@ def setup_callback_handlers(app: Client):
                 downloaded_paths = _fallback_image_paths()
             
             if not downloaded_paths:
-                await callback_query.answer("❌ No downloaded images found!", show_alert=True)
+                await callback_query.answer("? No downloaded images found!", show_alert=True)
                 return
             
             logger.info(f"Found {len(downloaded_paths)} images for bulk upload")
-            await callback_query.answer("📤 Starting bulk image upload...")
+            await callback_query.answer("?? Starting bulk image upload...")
             await ImageUploader.upload_multiple_images(downloaded_paths, callback_query.message, user_id)
 
         elif data == "upload_bulk_all_downloaded":
@@ -687,11 +687,11 @@ def setup_callback_handlers(app: Client):
                 all_paths = video_paths + image_paths
             
             if not all_paths:
-                await callback_query.answer("❌ No downloaded content found!", show_alert=True)
+                await callback_query.answer("? No downloaded content found!", show_alert=True)
                 return
             
             logger.info(f"Found {len(video_paths)} videos and {len(image_paths)} images for bulk upload")
-            await callback_query.answer(f"📤 Starting bulk upload of {len(all_paths)} files...")
+            await callback_query.answer(f"?? Starting bulk upload of {len(all_paths)} files...")
             
             # Upload videos first, then images
             if video_paths:
@@ -722,11 +722,11 @@ def setup_callback_handlers(app: Client):
                     # Recover bulk list after restart.
                     video_paths = _fallback_video_paths()
                 if video_paths and len(video_paths) > 0:
-                    await callback_query.answer(f"📤 Uploading {len(video_paths)} videos to group...", show_alert=False)
+                    await callback_query.answer(f"?? Uploading {len(video_paths)} videos to group...", show_alert=False)
                     status_msg = await callback_query.message.reply_text(
-                        f"📤 **Starting Bulk Upload**\n\n"
-                        f"🎬 Videos: {len(video_paths)} files\n\n"
-                        f"⏳ Preparing..."
+                        f"?? **Starting Bulk Upload**\n\n"
+                        f"?? Videos: {len(video_paths)} files\n\n"
+                        f"? Preparing..."
                     )
                     await VideoUploader.upload_multiple(video_paths, status_msg, user_id)
                     return
@@ -736,15 +736,15 @@ def setup_callback_handlers(app: Client):
                     video_path = fallback_videos[0]
             if video_path and os.path.exists(video_path):
                 # Single video upload (original behavior)
-                await callback_query.answer("📤 Uploading to group...", show_alert=False)
+                await callback_query.answer("?? Uploading to group...", show_alert=False)
                 
                 video_name = os.path.basename(video_path)
                 file_size = os.path.getsize(video_path)
                 status_msg = await callback_query.message.reply_text(
-                    f"📤 **Starting Upload**\n\n"
-                    f"📁 File: `{video_name[:35]}...`\n"
-                    f"💾 Size: {Formatter.size(file_size)}\n\n"
-                    f"⏳ Preparing..."
+                    f"?? **Starting Upload**\n\n"
+                    f"?? File: `{video_name[:35]}...`\n"
+                    f"?? Size: {Formatter.size(file_size)}\n\n"
+                    f"? Preparing..."
                 )
                 
                 # Pass the client from callback_query
@@ -754,9 +754,9 @@ def setup_callback_handlers(app: Client):
                 
                 if success:
                     await status_msg.edit_text(
-                        "✅ **Video Uploaded Successfully!**\n\n"
-                        f"📁 File: `{video_name}`\n"
-                        f"💾 Size: {Formatter.size(file_size)}",
+                        "? **Video Uploaded Successfully!**\n\n"
+                        f"?? File: `{video_name}`\n"
+                        f"?? Size: {Formatter.size(file_size)}",
                         reply_markup=Keyboards.back_to_main()
                     )
                     try:
@@ -765,12 +765,12 @@ def setup_callback_handlers(app: Client):
                         pass
                 else:
                     await status_msg.edit_text(
-                        f"❌ **Upload Failed**\n\n"
+                        f"? **Upload Failed**\n\n"
                         f"Error: {message}",
                         reply_markup=Keyboards.back_to_main()
                     )
             else:
-                await callback_query.answer("❌ Video file not found.", show_alert=True)
+                await callback_query.answer("? Video file not found.", show_alert=True)
         
         elif data.startswith("upload_single_image_"):
             image_key = data.replace("upload_single_image_", "")
@@ -781,18 +781,18 @@ def setup_callback_handlers(app: Client):
                     image_path = fallback_images[0]
             
             if not image_path or not os.path.exists(image_path):
-                await callback_query.answer("❌ Image file not found.", show_alert=True)
+                await callback_query.answer("? Image file not found.", show_alert=True)
                 return
             
-            await callback_query.answer("📤 Uploading to group...", show_alert=False)
+            await callback_query.answer("?? Uploading to group...", show_alert=False)
             
             image_name = os.path.basename(image_path)
             file_size = os.path.getsize(image_path)
             status_msg = await callback_query.message.reply_text(
-                f"📤 **Starting Image Upload**\n\n"
-                f"🖼️ File: `{image_name[:35]}...`\n"
-                f"💾 Size: {Formatter.size(file_size)}\n\n"
-                f"⏳ Preparing..."
+                f"?? **Starting Image Upload**\n\n"
+                f"??? File: `{image_name[:35]}...`\n"
+                f"?? Size: {Formatter.size(file_size)}\n\n"
+                f"? Preparing..."
             )
             
             success, message = await ImageUploader.upload_single_image_to_group(
@@ -801,14 +801,14 @@ def setup_callback_handlers(app: Client):
             
             if success:
                 await status_msg.edit_text(
-                    "✅ **Image Uploaded Successfully!**\n\n"
-                    f"🖼️ File: `{image_name}`\n"
-                    f"💾 Size: {Formatter.size(file_size)}",
+                    "? **Image Uploaded Successfully!**\n\n"
+                    f"??? File: `{image_name}`\n"
+                    f"?? Size: {Formatter.size(file_size)}",
                     reply_markup=Keyboards.back_to_main()
                 )
             else:
                 await status_msg.edit_text(
-                    f"❌ **Upload Failed**\n\n"
+                    f"? **Upload Failed**\n\n"
                     f"Error: {message}",
                     reply_markup=Keyboards.back_to_main()
                 )
@@ -823,17 +823,17 @@ def setup_callback_handlers(app: Client):
                 # Clear history confirmation
                 total_count = history_db.get_total_count(user_id)
                 if history_db.clear_user_history(user_id):
-                    await callback_query.answer("✅ History cleared!", show_alert=True)
+                    await callback_query.answer("? History cleared!", show_alert=True)
                     keyboard = Keyboards.main_menu()
                     await callback_query.message.edit_text(
-                        f"🗑️ **History Cleared**\n\n"
+                        f"??? **History Cleared**\n\n"
                         f"Successfully deleted {total_count} entries.\n\n"
                         f"Your download history is now empty.",
                         reply_markup=keyboard
                     )
                     logger.info(f"User {user_id} cleared {total_count} history entries")
                 else:
-                    await callback_query.answer("❌ Failed to clear history", show_alert=True)
+                    await callback_query.answer("? Failed to clear history", show_alert=True)
             
             elif parts[1] == "clear":
                 # Show clear confirmation
@@ -887,7 +887,7 @@ def setup_callback_handlers(app: Client):
                     disable_web_page_preview=True
                 )
                 
-                await callback_query.answer(f"📜 Page {page}/{total_pages}")
+                await callback_query.answer(f"?? Page {page}/{total_pages}")
         
         # Export format selection
         elif data.startswith("export:"):
@@ -904,17 +904,17 @@ def setup_callback_handlers(app: Client):
                 return
             
             # Show processing message
-            await callback_query.answer("📊 Generating export file...")
+            await callback_query.answer("?? Generating export file...")
             
             # Generate file
             if format_type == 'csv':
                 file_data = export_to_csv(all_history)
                 filename = f"download_history_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-                caption = f"📊 **Download History (CSV)**\n\n{len(all_history)} total entries"
+                caption = f"?? **Download History (CSV)**\n\n{len(all_history)} total entries"
             else:  # txt
                 file_data = export_to_text(all_history)
                 filename = f"download_history_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-                caption = f"📄 **Download History (Text)**\n\n{len(all_history)} total entries"
+                caption = f"?? **Download History (Text)**\n\n{len(all_history)} total entries"
             
             # Send file
             await callback_query.message.reply_document(
@@ -929,7 +929,8 @@ def setup_callback_handlers(app: Client):
             except Exception:
                 pass
             
-            await callback_query.answer("✅ History exported!")
+            await callback_query.answer("? History exported!")
             logger.info(f"User {user_id} exported {len(all_history)} history entries as {format_type}")
+
 
 

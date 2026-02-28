@@ -14,7 +14,7 @@ CHAT_ID = config_instance.chat_id
 # ==================== BOT METADATA ====================
 
 BOT_VERSION = "1.1.0"
-BOT_NAME = "X Video Downloader Pro"
+BOT_NAME = "AfterDark"
 VERSION_DATE = "February 2026"
 
 CHANGELOG = {
@@ -61,3 +61,4 @@ FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
 # ==================== BOT USERNAME ====================
 # Bot username for deep linking (without @)
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "Vuploads_bot")
+

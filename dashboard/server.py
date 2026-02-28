@@ -205,6 +205,7 @@ SESSION_CLONE_CLEANUP = os.getenv("TWA_SESSION_CLONE_CLEANUP", "1").strip().lowe
 GALLERY_AUTH_MODE = os.getenv("TELEGRAM_GALLERY_AUTH", "auto").strip().lower()
 if GALLERY_AUTH_MODE not in {"auto", "bot", "user"}:
     GALLERY_AUTH_MODE = "auto"
+VISITORS_PAGE_PASSWORD = os.getenv("TWA_VISITORS_PAGE_PASSWORD", "afterdark").strip() or "afterdark"
 
 GALLERY_USER_SESSION = os.getenv("TELEGRAM_GALLERY_SESSION", "twa_user")
 NO_LIMIT_TOKENS = {"", "all", "none", "nolimit", "no-limit", "0", "-1", "inf", "infinite"}
@@ -358,6 +359,7 @@ class TelegramGalleryService:
         self._last_ai_failure_at = 0.0
         self._ai_queue: deque[int] = deque()
         self._ai_queue_ids: set[int] = set()
+        self._ai_progress: Dict[int, Dict[str, Any]] = {}
         self._background_sync_task: Optional[asyncio.Task] = None
         self._ollama_models_cached_at = 0.0
         self._ollama_models_cache: set[str] = set()
@@ -476,10 +478,29 @@ class TelegramGalleryService:
 
         self._ai_queue.append(message_id)
         self._ai_queue_ids.add(message_id)
+        self._ai_progress[message_id] = {
+            "stage": "queued",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "error": None,
+        }
 
         while len(self._ai_queue) > AI_TITLE_QUEUE_MAX:
             dropped = self._ai_queue.popleft()
             self._ai_queue_ids.discard(dropped)
+            self._ai_progress[dropped] = {
+                "stage": "dropped",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "error": "Queue limit exceeded",
+            }
+
+    def _set_ai_progress(self, message_id: int, stage: str, error: Optional[str] = None) -> None:
+        if message_id <= 0:
+            return
+        self._ai_progress[message_id] = {
+            "stage": stage,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "error": error,
+        }
 
     async def start(self) -> None:
         async with self._start_lock:
@@ -711,8 +732,8 @@ class TelegramGalleryService:
                     "file_name": local_path.name,
                     "url": f"/media/{local_path.name}",
                     "thumb_url": (
-                        f"/media/{self._thumb_file_name(message_id)}"
-                        if (media_kind == "video" and self._thumb_path(message_id).exists())
+                        f"/media/{self._resolve_video_thumb_path(message_id).name}"
+                        if (media_kind == "video" and self._resolve_video_thumb_path(message_id).exists())
                         else (
                             f"/media/{self._image_thumb_file_name(message_id)}"
                             if (media_kind == "image" and self._image_thumb_path(message_id).exists())
@@ -920,10 +941,32 @@ class TelegramGalleryService:
 
     @staticmethod
     def _thumb_file_name(message_id: int) -> str:
+        return f"{message_id}_video_thumb.jpg"
+
+    @staticmethod
+    def _legacy_thumb_file_name(message_id: int) -> str:
         return f"{message_id}_thumb.jpg"
 
     def _thumb_path(self, message_id: int) -> Path:
         return self.cache_dir / self._thumb_file_name(message_id)
+
+    def _legacy_thumb_path(self, message_id: int) -> Path:
+        return self.cache_dir / self._legacy_thumb_file_name(message_id)
+
+    def _resolve_video_thumb_path(self, message_id: int) -> Path:
+        """Return existing thumb path (new preferred), migrating legacy name when possible."""
+        primary = self._thumb_path(message_id)
+        if primary.exists():
+            return primary
+
+        legacy = self._legacy_thumb_path(message_id)
+        if legacy.exists():
+            try:
+                legacy.replace(primary)
+                return primary
+            except OSError:
+                return legacy
+        return primary
 
     @staticmethod
     def _image_thumb_file_name(message_id: int) -> str:
@@ -933,7 +976,7 @@ class TelegramGalleryService:
         return self.cache_dir / self._image_thumb_file_name(message_id)
 
     def _thumb_url_if_cached(self, message_id: int) -> Optional[str]:
-        thumb_path = self._thumb_path(message_id)
+        thumb_path = self._resolve_video_thumb_path(message_id)
         if thumb_path.exists():
             return f"/media/{thumb_path.name}"
         return None
@@ -984,18 +1027,21 @@ class TelegramGalleryService:
             return
         try:
             with Image.open(thumb_path) as img:
-                if img.mode not in ("RGB", "RGBA"):
+                # Normalize into a consistent JPEG thumbnail and write atomically.
+                if img.mode != "RGB":
                     img = img.convert("RGB")
-                width, height = img.size
-                max_size = 400
-                if width > max_size or height > max_size:
-                    scale = max_size / max(width, height)
-                    new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+                max_size = 512
+                resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+                img.thumbnail((max_size, max_size), resample)
+
                 output = io.BytesIO()
-                img.save(output, format="JPEG", quality=75, optimize=True)
+                img.save(output, format="JPEG", quality=82, optimize=True, progressive=True)
                 output.seek(0)
-                thumb_path.write_bytes(output.getvalue())
+
+                tmp_path = thumb_path.with_suffix(thumb_path.suffix + ".tmp")
+                tmp_path.write_bytes(output.getvalue())
+                tmp_path.replace(thumb_path)
         except Exception:
             pass
 
@@ -1094,9 +1140,10 @@ class TelegramGalleryService:
 
     async def _get_video_thumb_with_ffmpeg_fallback(self, message: Any, message_id: int) -> Optional[Path]:
         """Get video thumbnail - tries embedded thumb first, then falls back to ffmpeg."""
-        thumb_path = self._thumb_path(message_id)
+        thumb_path = self._resolve_video_thumb_path(message_id)
         if thumb_path.exists():
             return thumb_path
+        thumb_path = self._thumb_path(message_id)
         
         media_tuple = self._extract_media(message)
         if not media_tuple:
@@ -1197,7 +1244,7 @@ class TelegramGalleryService:
             async with item_lock:
                 # Check again after acquiring lock - another task might have just finished
                 if media_kind == "video":
-                    thumb_path = self._thumb_path(message_id)
+                    thumb_path = self._resolve_video_thumb_path(message_id)
                     if thumb_path.exists():
                         return True
                 elif media_kind == "image":
@@ -1216,6 +1263,7 @@ class TelegramGalleryService:
                                 for idx, i in enumerate(self.media_index):
                                     if int(i.get("message_id", 0)) == message_id:
                                         self.media_index[idx]["thumb_url"] = f"/media/{downloaded_thumb.name}"
+                                        self.media_index[idx]["thumb_unavailable"] = False
                                         break
                                 return True
                         
@@ -1227,10 +1275,19 @@ class TelegramGalleryService:
                                 for idx, i in enumerate(self.media_index):
                                     if int(i.get("message_id", 0)) == message_id:
                                         self.media_index[idx]["thumb_url"] = f"/media/{downloaded_thumb.name}"
+                                        self.media_index[idx]["thumb_unavailable"] = False
                                         break
                                 return True
-                        
-                        logger.warning(f"[THUMB] Could not generate thumb for video {message_id}")
+
+                        for idx, i in enumerate(self.media_index):
+                            if int(i.get("message_id", 0)) == message_id:
+                                self.media_index[idx]["thumb_url"] = "/assets/video-placeholder.svg"
+                                self.media_index[idx]["thumb_unavailable"] = True
+                                break
+                        if CDN_ONLY_MODE:
+                            logger.info(f"[THUMB] Video thumb unavailable in CDN mode for {message_id} (using placeholder)")
+                        else:
+                            logger.warning(f"[THUMB] Could not generate thumb for video {message_id}")
                         
                     elif media_kind == "image":
                         thumb_path = self._image_thumb_path(message_id)
@@ -1239,19 +1296,18 @@ class TelegramGalleryService:
                         cached_image = self._find_image_file(message_id)
                         if cached_image and cached_image.exists():
                             try:
-                                await self._optimize_thumbnail(cached_image)
-                                if cached_image.exists():
-                                    import shutil
-                                    try:
-                                        shutil.copy2(cached_image, thumb_path)
-                                    except Exception:
-                                        pass
-                                    if thumb_path.exists():
-                                        for idx, i in enumerate(self.media_index):
-                                            if int(i.get("message_id", 0)) == message_id:
-                                                self.media_index[idx]["thumb_url"] = f"/media/{thumb_path.name}"
-                                                break
-                                        return True
+                                import shutil
+                                try:
+                                    shutil.copy2(cached_image, thumb_path)
+                                except Exception:
+                                    pass
+                                if thumb_path.exists():
+                                    await self._optimize_thumbnail(thumb_path)
+                                    for idx, i in enumerate(self.media_index):
+                                        if int(i.get("message_id", 0)) == message_id:
+                                            self.media_index[idx]["thumb_url"] = f"/media/{thumb_path.name}"
+                                            break
+                                    return True
                             except Exception as e:
                                 logger.warning(f"[THUMB] Failed to optimize cached image {message_id}: {e}")
                         
@@ -1612,6 +1668,30 @@ class TelegramGalleryService:
         return "hot adult video moment" if media_kind == "video" else "hot adult moment"
 
     @staticmethod
+    def _fallback_ai_description(media_kind: str, seed: int = 0) -> str:
+        if AI_TITLE_STYLE == "explicit":
+            safe_seed = int(seed or 0)
+            video_templates = (
+                "Explicit adult video scene with visible nudity and sexual activity.",
+                "Adult clip showing explicit nude content and intense sexual action.",
+                "Hardcore adult video moment with clear erotic visuals.",
+                "NSFW video segment featuring explicit adult intimacy and nudity.",
+            )
+            image_templates = (
+                "Explicit adult image showing full nudity and erotic pose.",
+                "NSFW photo with visible nude body details and sexual tone.",
+                "Adult still image featuring explicit nudity and intimate framing.",
+                "Erotic nude photo with explicit adult visual content.",
+            )
+            templates = video_templates if media_kind == "video" else image_templates
+            return templates[abs(safe_seed) % len(templates)]
+        return (
+            "Adult media content with explicit visual details."
+            if media_kind == "video"
+            else "Adult image content with explicit visual details."
+        )
+
+    @staticmethod
     def _is_fallback_ai_title(value: str) -> bool:
         title = (value or "").strip().lower()
         if not title:
@@ -1631,6 +1711,62 @@ class TelegramGalleryService:
             "Hot nude tits and pussy tease",
         }
         return title in fallback_titles
+
+    @staticmethod
+    def _is_fallback_ai_description(value: str) -> bool:
+        text = (value or "").strip().lower()
+        if not text:
+            return False
+        known = {
+            "explicit adult video scene with visible nudity and sexual activity.",
+            "adult clip showing explicit nude content and intense sexual action.",
+            "hardcore adult video moment with clear erotic visuals.",
+            "nsfw video segment featuring explicit adult intimacy and nudity.",
+            "explicit adult image showing full nudity and erotic pose.",
+            "nsfw photo with visible nude body details and sexual tone.",
+            "adult still image featuring explicit nudity and intimate framing.",
+            "erotic nude photo with explicit adult visual content.",
+            "adult media content with explicit visual details.",
+            "adult image content with explicit visual details.",
+            "no description available for this media.",
+            "no description available",
+        }
+        return text in known
+
+    def _ensure_item_ai_fields(self, entry: Dict[str, Any]) -> bool:
+        """Guarantee non-empty ai_title + ai_description for every media item."""
+        changed = False
+        media_kind = str(entry.get("media_kind", "video") or "video")
+        message_id = int(entry.get("message_id", 0) or 0)
+
+        title = str(entry.get("ai_title", "")).strip()
+        description = str(entry.get("ai_description", "")).strip()
+
+        if (
+            not title
+            or is_default_media_title(title)
+            or self._contains_blocked_title_terms(title)
+            or self._is_fallback_ai_title(title)
+        ):
+            title = self._fallback_ai_title(media_kind, seed=message_id)
+            entry["ai_title"] = title
+            entry["ai_title_model"] = "fallback"
+            entry["ai_title_is_fallback"] = True
+            entry["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
+            changed = True
+
+        if (
+            not description
+            or self._contains_blocked_title_terms(description)
+            or self._is_fallback_ai_description(description)
+        ):
+            description = self._fallback_ai_description(media_kind, seed=message_id)
+            entry["ai_description"] = description
+            entry["ai_description_model"] = "fallback"
+            entry["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
+            changed = True
+
+        return changed
 
     @staticmethod
     def _ai_title_needs_generation(entry: Dict[str, Any], mode: str) -> bool:
@@ -1657,7 +1793,9 @@ class TelegramGalleryService:
         if mode_norm == "fallback":
             if bool(entry.get("ai_title_is_fallback")):
                 return True
-            return TelegramGalleryService._is_fallback_ai_title(current_title)
+            if TelegramGalleryService._is_fallback_ai_title(current_title):
+                return True
+            return TelegramGalleryService._is_fallback_ai_description(current_description)
         if mode_norm == "style":
             prev_style = str(entry.get("ai_title_style", "")).strip().lower()
             # Treat missing metadata as eligible for re-title when mode=style.
@@ -2194,29 +2332,48 @@ class TelegramGalleryService:
         if frame_path.exists():
             return frame_path
 
-        command = [
-            self.ffmpeg_bin,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-ss",
-            "00:00:01.000",
-            "-i",
-            str(video_path),
-            "-frames:v",
-            "1",
-            "-q:v",
-            "4",
-            str(frame_path),
-        ]
-        try:
-            subprocess.run(command, check=False, timeout=25)
-        except Exception:
-            return None
+        # Try multiple seek points and keep the richest frame (largest JPEG).
+        seek_points = ["00:00:00.500", "00:00:01.500", "00:00:03.000"]
+        candidates: list[Path] = []
+        for idx, seek in enumerate(seek_points):
+            candidate = self.cache_dir / f"{message_id}_frame_{idx}.jpg"
+            command = [
+                self.ffmpeg_bin,
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-ss",
+                seek,
+                "-i",
+                str(video_path),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "4",
+                str(candidate),
+            ]
+            try:
+                subprocess.run(command, check=False, timeout=25)
+                if candidate.exists() and candidate.stat().st_size > 1024:
+                    candidates.append(candidate)
+            except Exception:
+                continue
 
-        if frame_path.exists() and frame_path.stat().st_size > 0:
-            return frame_path
+        if candidates:
+            best = max(candidates, key=lambda p: p.stat().st_size)
+            try:
+                best.replace(frame_path)
+            except OSError:
+                frame_path = best
+            for candidate in candidates:
+                if candidate == frame_path:
+                    continue
+                with suppress(Exception):
+                    candidate.unlink()
+            if frame_path.exists() and frame_path.stat().st_size > 0:
+                return frame_path
+
         return None
 
     async def _ensure_image_cached_for_ai(self, item: Dict[str, Any], message: Any) -> Optional[Path]:
@@ -2359,7 +2516,7 @@ class TelegramGalleryService:
             return None
 
         if media_kind == "video":
-            thumb_path = self._thumb_path(message_id)
+            thumb_path = self._resolve_video_thumb_path(message_id)
             if thumb_path.exists():
                 return thumb_path
 
@@ -2388,28 +2545,33 @@ class TelegramGalleryService:
         message: Optional[Any] = None,
         media_tuple: Optional[Tuple[str, Any, str, str]] = None,
     ) -> Optional[str]:
-        if not self._ai_generation_ready():
-            logger.debug(f"AI generation not ready for {item.get('message_id')}")
-            return None
-        if not self._ai_title_needs_generation(item, mode):
-            logger.debug(f"AI title not needed for {item.get('message_id')}")
-            return None
-
         message_id = int(item.get("message_id", 0))
         if message_id <= 0:
             return None
 
         def _apply_fallback(reason: str) -> str:
             logger.debug(f"{reason} for {message_id} - using fallback title to prevent queue stall")
-            fallback_title = self._fallback_ai_title(str(item.get("media_kind", "video")), seed=message_id)
+            media_kind_safe = str(item.get("media_kind", "video"))
+            fallback_title = self._fallback_ai_title(media_kind_safe, seed=message_id)
+            fallback_description = self._fallback_ai_description(media_kind_safe, seed=message_id)
             item["ai_title_style"] = AI_TITLE_STYLE
             item["ai_title_model"] = "fallback"
             item["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
             item["ai_title_is_fallback"] = True
-            item["ai_description"] = ""
+            item["ai_description"] = fallback_description
             item["ai_description_model"] = "fallback"
             item["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
+            self._set_ai_progress(message_id, "failed", error=reason)
             return fallback_title
+
+        if not self._ai_title_needs_generation(item, mode):
+            logger.debug(f"AI title not needed for {item.get('message_id')}")
+            return None
+
+        self._set_ai_progress(message_id, "analyzing")
+
+        if not self._ai_generation_ready():
+            return _apply_fallback("AI generation backend unavailable")
 
         if message is None:
             try:
@@ -2474,20 +2636,23 @@ class TelegramGalleryService:
         if not title:
             return _apply_fallback("Empty title from AI analysis")
 
+        self._set_ai_progress(message_id, "polishing")
+
         # Metadata for future re-titling decisions.
         item["ai_title_style"] = AI_TITLE_STYLE
         item["ai_title_model"] = used_model
         item["ai_title_generated_at"] = datetime.now(timezone.utc).isoformat()
         item["ai_title_is_fallback"] = False
-        item["ai_description"] = description
+        item["ai_description"] = (
+            str(description).strip()
+            or self._fallback_ai_description(media_kind, seed=message_id)
+        )
         item["ai_description_model"] = used_model
         item["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
         return title
 
     async def generate_missing_ai_titles(self, batch_size: int, recent_limit: int, mode: str = "missing") -> int:
         async with self._ai_title_lock:
-            if not self._ai_generation_ready():
-                return 0
             if not self._started:
                 return 0
             if not self.media_index:
@@ -2510,6 +2675,17 @@ class TelegramGalleryService:
                     queued_ids = list(reversed(list(self._ai_queue)[-queue_budget:]))
                 else:
                     queued_ids = []
+
+                # Drop stale queue entries that are gone or no longer need generation.
+                stale_ids = [
+                    msg_id for msg_id in list(self._ai_queue)
+                    if msg_id not in by_id or not self._ai_title_needs_generation(by_id[msg_id], mode)
+                ]
+                for stale_id in stale_ids:
+                    self._ai_queue_ids.discard(stale_id)
+                    with suppress(ValueError):
+                        self._ai_queue.remove(stale_id)
+                    self._set_ai_progress(stale_id, "done")
 
                 queued_set = set(queued_ids)
                 queued_candidates = [
@@ -2572,6 +2748,12 @@ class TelegramGalleryService:
                     title = await self._generate_ai_title_for_item(item, mode=mode)
                 except Exception as e:
                     logger.error(f"[DEBUG] _generate_ai_title_for_item error for item {item.get('message_id')}: {e}")
+                    try:
+                        msg_id = int(item.get("message_id", 0))
+                    except (TypeError, ValueError):
+                        msg_id = 0
+                    if msg_id > 0:
+                        self._set_ai_progress(msg_id, "failed", error=str(e))
                     continue
                 if not title:
                     continue
@@ -2579,6 +2761,8 @@ class TelegramGalleryService:
                 message_id = int(item.get("message_id", 0))
                 if message_id <= 0:
                     continue
+
+                self._set_ai_progress(message_id, "saving")
 
                 async with self._lock:
                     current = next(
@@ -2609,13 +2793,26 @@ class TelegramGalleryService:
                         if value not in (None, ""):
                             current[field] = value
 
-                    current["ai_title"] = self._sanitize_ai_title(title)
+                    final_title = self._sanitize_ai_title(title)
+                    if not final_title:
+                        final_title = self._fallback_ai_title(str(current.get("media_kind", "video")), seed=message_id)
+                        current["ai_title_model"] = "fallback"
+                        current["ai_title_is_fallback"] = True
+                    current["ai_title"] = final_title
+                    if not str(current.get("ai_description", "")).strip():
+                        current["ai_description"] = self._fallback_ai_description(
+                            str(current.get("media_kind", "video")),
+                            seed=message_id,
+                        )
+                        current["ai_description_model"] = "fallback"
+                        current["ai_description_generated_at"] = datetime.now(timezone.utc).isoformat()
                     generated += 1
                     changed = True
                     if message_id in self._ai_queue_ids:
                         self._ai_queue_ids.discard(message_id)
                         with suppress(ValueError):
                             self._ai_queue.remove(message_id)
+                    self._set_ai_progress(message_id, "done")
 
             if generated and changed:
                 async with self._lock:
@@ -2651,11 +2848,14 @@ class TelegramGalleryService:
                 "remaining": 0,
             }
         
-        # Get all items without AI titles OR with default titles like "Video #123"
+        # Get all items without AI title/description or with default titles.
         untitled_items = [
             item for item in self.media_index
             if not str(item.get("ai_title", "")).strip() 
             or is_default_media_title(str(item.get("ai_title", "")))
+            or not str(item.get("ai_description", "")).strip()
+            or self._is_fallback_ai_title(str(item.get("ai_title", "")))
+            or self._is_fallback_ai_description(str(item.get("ai_description", "")))
         ]
         
         if max_items:
@@ -2679,13 +2879,6 @@ class TelegramGalleryService:
             
             while retry_count < max_retries:
                 try:
-                    # Check if AI generation is ready
-                    if not self._ai_generation_ready():
-                        logger.warning(f"AI generation not ready, waiting {retry_delay}s...")
-                        await asyncio.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 1.5, max_delay)
-                        continue
-                    
                     # Try to generate title
                     title = await self._generate_ai_title_for_item(item, mode="missing")
                     
@@ -2861,22 +3054,28 @@ class TelegramGalleryService:
                     existing_ai_description = str(existing_item.get("ai_description", "")).strip()
                     if existing_ai_description and self._contains_blocked_title_terms(existing_ai_description):
                         existing_ai_description = ""
+                    # Self-heal old records where fallback metadata exists but field is blank.
+                    if not existing_ai_title and str(existing_item.get("ai_title_model", "")).strip().lower() == "fallback":
+                        existing_ai_title = self._fallback_ai_title(media_kind, seed=int(message.id))
+                    if not existing_ai_description and str(existing_item.get("ai_description_model", "")).strip().lower() == "fallback":
+                        existing_ai_description = self._fallback_ai_description(media_kind, seed=int(message.id))
 
                     thumb_url: Optional[str]
+                    thumb_unavailable = bool(existing_item.get("thumb_unavailable", False)) if media_kind == "video" else False
                     if media_kind == "image":
                         cached_img_thumb = self._image_thumb_path(message.id)
                         if cached_img_thumb.exists():
                             thumb_url = f"/media/{cached_img_thumb.name}"
-                        elif cdn_url:
-                            thumb_url = cdn_url  # Use CDN for image thumb
                         else:
-                            thumb_url = item_url
+                            thumb_url = f"/api/thumb/{message.id}/image"
                     else:
                         cached_thumb = self._thumb_url_if_cached(message.id)
                         if cached_thumb:
                             thumb_url = cached_thumb
+                            thumb_unavailable = False
                         elif self._pick_best_thumb(media_obj):
                             thumb_url = f"/api/thumb/{message.id}"
+                            thumb_unavailable = False
                         else:
                             thumb_url = "/assets/video-placeholder.svg"
 
@@ -2903,6 +3102,7 @@ class TelegramGalleryService:
                                     await self._generate_video_thumb_ffmpeg(cached_video, video_thumb_path, message.id)
                                     if video_thumb_path.exists():
                                         thumb_url = f"/media/{video_thumb_path.name}"
+                                        thumb_unavailable = False
                                 except Exception as e:
                                     logger.warning(f"[THUMB] Failed to create video thumb for {message.id}: {e}")
                                     thumb_url = "/assets/video-placeholder.svg"
@@ -2914,6 +3114,7 @@ class TelegramGalleryService:
                         "url": item_url,
                         "cdn_url": cdn_url or "",
                         "thumb_url": thumb_url,
+                        "thumb_unavailable": thumb_unavailable,
                         "mime_type": mime_type,
                         "size": int(media_size or 0),
                         "is_cached": is_cached,
@@ -2931,6 +3132,7 @@ class TelegramGalleryService:
                         "ai_description_generated_at": existing_item.get("ai_description_generated_at"),
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
                     }
+                    self._ensure_item_ai_fields(item)
                     messages_map[message.id] = message
                     
                     if process_ai_realtime and self._ai_title_needs_generation(item, mode="missing"):
@@ -3013,7 +3215,7 @@ class TelegramGalleryService:
             # Download thumbnails in parallel in background - process ALL items
             items_needing_thumbs = [
                 item for item in self.media_index
-                if (item.get("media_kind") == "video" and not self._thumb_path(int(item["message_id"])).exists())
+                if (item.get("media_kind") == "video" and not item.get("thumb_unavailable", False) and not self._resolve_video_thumb_path(int(item["message_id"])).exists())
                 or (item.get("media_kind") == "image" and not self._image_thumb_path(int(item["message_id"])).exists())
             ]
             if items_needing_thumbs and messages_map:
@@ -3110,8 +3312,8 @@ async def lifespan(_: FastAPI):
                     media_kind = str(item.get("media_kind", ""))
                     
                     if media_kind == "video":
-                        thumb_path = service._thumb_path(msg_id)
-                        if not thumb_path.exists():
+                        thumb_path = service._resolve_video_thumb_path(msg_id)
+                        if not item.get("thumb_unavailable", False) and not thumb_path.exists():
                             items_needing_thumbs.append(item)
                     elif media_kind == "image":
                         thumb_path = service._image_thumb_path(msg_id)
@@ -3152,6 +3354,7 @@ async def lifespan(_: FastAPI):
         await asyncio.sleep(6)
         
         consecutive_empty = 0
+        idle_cycles = 0
         while True:
             try:
                 # Prefer quick, real-time titling for newly fetched media.
@@ -3171,16 +3374,28 @@ async def lifespan(_: FastAPI):
                     recent_limit=AI_TITLE_RECENT_SCAN_LIMIT, 
                     mode=AI_TITLE_RETITLE_MODE
                 )
-                
+
+                # When queue is idle, continuously backfill old/default/fallback items across full index.
+                if generated == 0 and queue_len == 0 and idle_cycles >= 2:
+                    backfill_generated = await service.generate_missing_ai_titles(
+                        batch_size=max(4, min(20, batch)),
+                        recent_limit=0,  # full scan of all cached media
+                        mode="fallback",
+                    )
+                    if backfill_generated > 0:
+                        generated = backfill_generated
+                 
                 # Adaptive polling: if we generated titles, keep going fast
                 if generated > 0:
                     consecutive_empty = 0
+                    idle_cycles = 0
                     # Short sleep if we made progress and queue still has items
                     if len(service._ai_queue) > 0:
                         await asyncio.sleep(2)
                         continue
                 else:
                     consecutive_empty += 1
+                    idle_cycles += 1
                     
             except Exception:
                 pass
@@ -3324,6 +3539,50 @@ async def index() -> FileResponse:
     return response
 
 
+def _require_visitors_password(request: Request) -> None:
+    """Protect visitors page with HTTP Basic password prompt."""
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Basic "):
+        raise HTTPException(
+            status_code=401,
+            detail="Password required",
+            headers={"WWW-Authenticate": 'Basic realm="AfterDark Visitors"'},
+        )
+
+    encoded = auth_header.split(" ", 1)[1].strip()
+    try:
+        decoded = base64.b64decode(encoded).decode("utf-8", errors="ignore")
+    except Exception:
+        decoded = ""
+    if ":" not in decoded:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": 'Basic realm="AfterDark Visitors"'},
+        )
+
+    _username, password = decoded.split(":", 1)
+    if not hmac.compare_digest(password, VISITORS_PAGE_PASSWORD):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid password",
+            headers={"WWW-Authenticate": 'Basic realm="AfterDark Visitors"'},
+        )
+
+
+@app.get("/visitors", include_in_schema=False)
+@app.get("/visitors.html", include_in_schema=False)
+@app.get("/visitors.hmtl", include_in_schema=False)
+@app.get("/vistors", include_in_schema=False)
+@app.get("/vistors.html", include_in_schema=False)
+@app.get("/vistors.hmtl", include_in_schema=False)
+async def visitors_page(request: Request) -> FileResponse:
+    _require_visitors_password(request)
+    response = FileResponse(WEB_DIR / "public" / "visitors.html")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 app.mount("/css", CachedStaticFiles(directory=str(WEB_DIR / "public" / "css")), name="css")
 app.mount("/js", CachedStaticFiles(directory=str(WEB_DIR / "public" / "js")), name="js")
 app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR / "public" / "assets")), name="assets")
@@ -3445,6 +3704,21 @@ async def api_cdn_file(message_id: int) -> Response:
     return await api_file(message_id)
 
 
+@app.get("/api/{message_id}_{media_kind}.{ext}")
+async def api_legacy_media_file(message_id: int, media_kind: str, ext: str) -> Response:
+    """Backward-compatible media route for URLs like /api/665_image.jpg."""
+    kind = str(media_kind or "").strip().lower()
+    if kind not in {"image", "video"}:
+        raise HTTPException(status_code=404, detail="Unsupported media path")
+
+    item = next((x for x in service.media_index if int(x.get("message_id", 0)) == message_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Media item not found")
+
+    # Keep compatibility but route to canonical file endpoint logic.
+    return await api_file(message_id)
+
+
 @app.get("/api/thumb/{message_id}")
 async def api_thumb(message_id: int) -> FileResponse:
     try:
@@ -3467,12 +3741,13 @@ async def api_thumb(message_id: int) -> FileResponse:
             return cached_file_response(local_path)
         raise HTTPException(status_code=404, detail="Thumbnail not required for this media kind")
 
-    thumb_path = service._thumb_path(message_id)
+    thumb_path = service._resolve_video_thumb_path(message_id)
     if thumb_path.exists():
         item["thumb_url"] = f"/media/{thumb_path.name}"
         return cached_file_response(thumb_path)
 
     async with service._lock:
+        thumb_path = service._resolve_video_thumb_path(message_id)
         if thumb_path.exists():
             item["thumb_url"] = f"/media/{thumb_path.name}"
             return cached_file_response(thumb_path)
@@ -3489,10 +3764,12 @@ async def api_thumb(message_id: int) -> FileResponse:
         downloaded_thumb = await service._get_video_thumb_with_ffmpeg_fallback(message, message_id)
         if not downloaded_thumb or not downloaded_thumb.exists():
             item["thumb_url"] = "/assets/video-placeholder.svg"
+            item["thumb_unavailable"] = True
             service._save_index()
             return cached_file_response(WEB_DIR / "video-placeholder.svg")
 
         item["thumb_url"] = f"/media/{downloaded_thumb.name}"
+        item["thumb_unavailable"] = False
         service._save_index()
         return cached_file_response(downloaded_thumb)
 
@@ -3510,7 +3787,35 @@ async def api_image_thumb(message_id: int) -> FileResponse:
     if str(item.get("media_kind", "")) == "image":
         local_path = service.cache_dir / str(item.get("file_name", ""))
         if local_path.exists():
-            return cached_file_response(local_path)
+            try:
+                import shutil
+                shutil.copy2(local_path, img_thumb_path)
+                await service._optimize_thumbnail(img_thumb_path)
+                if img_thumb_path.exists():
+                    item["thumb_url"] = f"/media/{img_thumb_path.name}"
+                    service._save_index()
+                    return cached_file_response(img_thumb_path)
+            except Exception:
+                return cached_file_response(local_path)
+
+        # CDN mode path: fetch image from Telegram and build thumb on demand.
+        async with service._lock:
+            if img_thumb_path.exists():
+                item["thumb_url"] = f"/media/{img_thumb_path.name}"
+                service._save_index()
+                return cached_file_response(img_thumb_path)
+            try:
+                message = await service.client.get_messages(CHAT_ID, message_id)
+                media_tuple = service._extract_media(message)
+                if media_tuple:
+                    _, media_obj, _, _ = media_tuple
+                    generated = await service._ensure_image_thumb(message, media_obj, message_id)
+                    if generated and generated.exists():
+                        item["thumb_url"] = f"/media/{generated.name}"
+                        service._save_index()
+                        return cached_file_response(generated)
+            except Exception:
+                pass
 
     raise HTTPException(status_code=404, detail="Image thumbnail not available")
 
@@ -3544,6 +3849,15 @@ async def api_media(
             sync_error = str(e)
     else:
         items = service.media_index
+
+    # Unconditional normalization: every media must have title + description.
+    async with service._lock:
+        normalized = False
+        for entry in service.media_index:
+            if service._ensure_item_ai_fields(entry):
+                normalized = True
+        if normalized:
+            service._save_index()
 
     # Get total from cached index BEFORE applying offset
     total_items = len(service.media_index)
@@ -3592,6 +3906,14 @@ async def api_media_page(
         # Warm the cache with a small sync so first page isn't empty.
         with suppress(HTTPException):
             await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False)
+
+    async with service._lock:
+        normalized = False
+        for entry in service.media_index:
+            if service._ensure_item_ai_fields(entry):
+                normalized = True
+        if normalized:
+            service._save_index()
 
     items = service.media_index
     total = len(items)
@@ -3689,6 +4011,15 @@ async def api_media_recent(
             sync_error = str(exc.detail)
     else:
         items = service.media_index
+
+    # Unconditional normalization: every media must have title + description.
+    async with service._lock:
+        normalized = False
+        for entry in service.media_index:
+            if service._ensure_item_ai_fields(entry):
+                normalized = True
+        if normalized:
+            service._save_index()
 
     response_items = apply_limit(items, limit_value)
 
@@ -3927,6 +4258,7 @@ async def api_ai_titles_process(
 
 
 @app.post("/api/ai-titles/process-all")
+@app.get("/api/ai-titles/process-all")
 async def api_ai_titles_process_all(
     max_items: int = Query(0, ge=0, description="Max items (0=all)"),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
@@ -4325,8 +4657,9 @@ async def api_media_ai_status(
     has_title = bool(raw_title) and not is_default_media_title(raw_title)
     has_description = bool(str(item.get("ai_description", "")).strip())
     is_queued = message_id in service._ai_queue_ids
+    progress = service._ai_progress.get(message_id, {})
     
-    # If missing AI content and not queued, enqueue it
+    # If AI content is missing and not queued, enqueue it immediately.
     if AI_TITLE_ENABLED and not (has_title and has_description) and not is_queued:
         service._enqueue_ai_title(message_id)
         is_queued = True
@@ -4354,6 +4687,9 @@ async def api_media_ai_status(
         "is_queued": is_queued,
         "queue_position": list(service._ai_queue).index(message_id) if is_queued and message_id in service._ai_queue else None,
         "queue_length": len(service._ai_queue),
+        "ai_stage": progress.get("stage", "idle"),
+        "ai_stage_updated_at": progress.get("updated_at"),
+        "ai_stage_error": progress.get("error"),
         "webapp": context,
     }
 
@@ -4383,7 +4719,7 @@ async def api_fix_all_thumbnails(
         media_kind = str(item.get("media_kind", ""))
         
         if media_kind == "video":
-            thumb_path = service._thumb_path(msg_id)
+            thumb_path = service._resolve_video_thumb_path(msg_id)
             if not thumb_path.exists():
                 # Try to find cached video and generate thumb
                 cached_video = service._find_video_file(msg_id)
@@ -4474,6 +4810,7 @@ async def api_generate_ai_for_item(
     # Add to front of queue for priority processing
     service._ai_queue.appendleft(message_id)
     service._ai_queue_ids.add(message_id)
+    service._set_ai_progress(message_id, "queued")
     
     # Generate immediately
     try:
@@ -4504,9 +4841,11 @@ async def api_generate_ai_for_item(
             "generated": title is not None,
             "ai_title": title,
             "ai_description": item.get("ai_description", ""),
+            "ai_stage": service._ai_progress.get(message_id, {}).get("stage", "idle"),
             "webapp": context,
         }
     except asyncio.TimeoutError:
+        service._set_ai_progress(message_id, "queued")
         return {
             "ok": True,
             "message_id": message_id,
@@ -4516,6 +4855,7 @@ async def api_generate_ai_for_item(
             "webapp": context,
         }
     except Exception as e:
+        service._set_ai_progress(message_id, "failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
 
 
@@ -4541,8 +4881,8 @@ async def api_regenerate_thumbnails(
         media_kind = str(item.get("media_kind", ""))
         
         if media_kind == "video":
-            thumb_path = service._thumb_path(msg_id)
-            if force or not thumb_path.exists():
+            thumb_path = service._resolve_video_thumb_path(msg_id)
+            if force or (not item.get("thumb_unavailable", False) and not thumb_path.exists()):
                 items_needing_thumbs.append(item)
         elif media_kind == "image":
             thumb_path = service._image_thumb_path(msg_id)
@@ -4581,7 +4921,7 @@ async def api_regenerate_thumbnails(
         media_kind = str(item.get("media_kind", ""))
         
         if media_kind == "video":
-            thumb_path = service._thumb_path(msg_id)
+            thumb_path = service._resolve_video_thumb_path(msg_id)
             if thumb_path.exists():
                 generated += 1
         elif media_kind == "image":
@@ -4617,12 +4957,37 @@ async def api_health() -> Dict[str, Any]:
         msg_id = int(item.get("message_id", 0))
         media_kind = str(item.get("media_kind", ""))
         if media_kind == "video":
-            if service._thumb_path(msg_id).exists():
+            if service._resolve_video_thumb_path(msg_id).exists():
                 thumb_stats["videos"] += 1
         elif media_kind == "image":
             if service._image_thumb_path(msg_id).exists():
                 thumb_stats["images"] += 1
     thumb_stats["total"] = thumb_stats["videos"] + thumb_stats["images"]
+
+    ai_backend_up = False
+    ai_backend_error: Optional[str] = None
+    ai_backend_models: List[str] = []
+    ai_backend_url = ""
+    if AI_TITLE_ENABLED and AI_TITLE_PROVIDER == "ollama" and AI_TITLE_OLLAMA_URL:
+        ai_backend_url = service._ollama_tags_url()
+        try:
+            request = urllib.request.Request(
+                ai_backend_url,
+                headers={"Content-Type": "application/json"},
+                method="GET",
+            )
+            with urllib.request.urlopen(request, timeout=3) as response:
+                body = response.read().decode("utf-8", errors="ignore")
+            parsed = json.loads(body)
+            models = parsed.get("models") or []
+            for entry in models:
+                name = str((entry or {}).get("name", "")).strip()
+                if name:
+                    ai_backend_models.append(name)
+            ai_backend_up = True
+        except Exception as exc:
+            ai_backend_up = False
+            ai_backend_error = str(exc)
     
     return {
         "ok": True,
@@ -4658,6 +5023,10 @@ async def api_health() -> Dict[str, Any]:
         "ai_title_image_priority": AI_TITLE_IMAGE_PRIORITY,
         "ai_title_max_image_side": AI_TITLE_MAX_IMAGE_SIDE,
         "ai_title_image_quality": AI_TITLE_IMAGE_QUALITY,
+        "ai_backend_up": ai_backend_up,
+        "ai_backend_url": ai_backend_url,
+        "ai_backend_models": ai_backend_models,
+        "ai_backend_error": ai_backend_error,
         "ai_queue_length": len(service._ai_queue),
         "ai_titled_count": count_ai_titled_items(service.media_index),
     }
@@ -4680,7 +5049,11 @@ async def api_reset_cache(
     if clear_thumbnails:
         count = 0
         for f in service.cache_dir.iterdir():
-            if f.is_file() and ("_thumb.jpg" in f.name or "_image_thumb.jpg" in f.name):
+            if f.is_file() and (
+                "_video_thumb.jpg" in f.name
+                or "_thumb.jpg" in f.name
+                or "_image_thumb.jpg" in f.name
+            ):
                 try:
                     f.unlink()
                     count += 1
@@ -4739,6 +5112,10 @@ async def get_single_media(
     item = next((x for x in service.media_index if int(x.get("message_id", 0)) == message_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="Media item not found")
+
+    async with service._lock:
+        if service._ensure_item_ai_fields(item):
+            service._save_index()
         
     return {
         "ok": True,
@@ -4871,7 +5248,7 @@ async def api_track(request: Request) -> Dict[str, Any]:
     device = _parse_device(ua)
 
     entry: Dict[str, Any] = {
-        "ts": datetime.utcnow().isoformat() + "Z",
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "ip": ip,
         "country": geo.get("country", "?"),
         "region": geo.get("region", ""),
