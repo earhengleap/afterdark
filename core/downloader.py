@@ -491,6 +491,26 @@ class VideoDownloader:
                         state["processed"] += 1
                         return
 
+                # Check for Papalah
+                if "papalah.com" in url.lower():
+                    state["url_progress"][url] = "Papalah download..."
+                    pa_paths, pa_type, pa_info = await PapalahService.download_media(url, user_id)
+                    if pa_paths:
+                        state["video_success_count"] += 1
+                        downloaded_video_paths.extend(pa_paths)
+                        for pp in pa_paths:
+                            video_source_map[pp] = url
+                            file_size = os.path.getsize(pp)
+                            url_results.append(DownloadResult(
+                                url=url, status='success', 
+                                filename=os.path.basename(pp), 
+                                size=file_size / (1024 * 1024), 
+                                content_type='video'
+                            ))
+                        state["url_progress"][url] = "Done"
+                        state["processed"] += 1
+                        return
+
                 if "x.com" in url or "twitter.com" in url:
                     videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
                     if videy_url:

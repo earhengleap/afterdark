@@ -11,6 +11,8 @@ from config.paths import DOWNLOAD_FOLDER
 
 logger = setup_logger("PapalahService")
 
+from urllib.parse import unquote
+
 class PapalahService:
     """Service to handle video extraction from papalah.com links"""
     
@@ -40,27 +42,43 @@ class PapalahService:
             og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', html)
             title = og_title[0] if og_title else "Papalah Video"
             
-            # 3. Extract direct MP4 URL
-            # The URL is often inside a script or a source tag
-            # Based on research: https://media.aiailah.com/videos/d6/d670249b4b7e1648b685421dc7d246e3.mp4
-            mp4_urls = re.findall(r'(https?://[^\s"\']+media\.[^\s"\']+\.mp4)', html)
+            # 3. De-obfuscate direct MP4 URL
+            # The site uses dynamic variable names and a reordering loop
+            segments_match = re.search(r'const _[a-z0-9]+ = (\["[^\]]+"\]);', html)
+            mapping_match = re.search(r'const _[a-z0-9]+ = (\[[0-9, ]+\]);', html)
+            replace_match = re.search(r"\.replace\('([^']+)', ''\)", html)
+
+            video_url = None
+            if segments_match and mapping_match:
+                segments = eval(segments_match.group(1))
+                mapping = eval(mapping_match.group(1))
+                
+                # Reconstruct string by indexing into segments based on mapping's values
+                reconstructed = ""
+                for i in range(len(mapping)):
+                    try:
+                        target_idx = mapping.index(i)
+                        reconstructed += segments[target_idx]
+                    except (ValueError, IndexError):
+                        continue
+                
+                video_url = unquote(reconstructed)
+                if replace_match:
+                    suffix = replace_match.group(1)
+                    video_url = video_url.replace(suffix, '')
+                
+                # Suffix fallback: strip .mp4_xxxx
+                video_url = re.sub(r'\.mp4_[a-z0-9]+$', '.mp4', video_url)
             
-            if not mp4_urls:
-                # Search for the pattern observed in research
-                mp4_pattern = r'https?://media\.[^\s"\']+\.mp4'
-                mp4_urls = re.findall(mp4_pattern, html)
+            if not video_url:
+                # Fallback to direct search if obfuscation logic changes
+                mp4_urls = re.findall(r'(https?://[^\s"\']+media\.[^\s"\']+\.mp4)', html)
+                if mp4_urls:
+                    video_url = mp4_urls[0]
             
-            if not mp4_urls:
-                # Fallback to general find
-                all_mp4 = re.findall(r'https?://[^\s"\']+\.mp4', html)
-                if all_mp4:
-                    mp4_urls = [all_mp4[0]]
-            
-            if not mp4_urls:
+            if not video_url:
                 return {"urls": [], "error": "No direct video link found on page"}
                 
-            video_url = mp4_urls[0]
-            
             return {
                 "urls": [video_url],
                 "title": title,
