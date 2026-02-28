@@ -846,32 +846,37 @@ def setup_command_handlers(app: Client):
             logger.error(f"/x_media failed for @{username}: {e}", exc_info=True)
             await status_msg.edit_text(f"Failed to process /x_media: {str(e)[:200]}")
 
-    @app.on_message(filters.private & filters.command(["redgifs_media", "redgifsmedia", "redgifs-media"]))
+    @app.on_message(filters.private & filters.command(["redgifs_media", "redgifsmedia"]))
     async def redgifs_media_handler(client: Client, message: Message) -> None:
         """Handle /redgifs_media <username> [limit] command."""
         if len(message.command) < 2:
             await message.reply_text(
                 "Example:\n"
                 "/redgifs_media mae_triana\n"
-                "/redgifs_media mae_triana 10"
+                "/redgifs_media mae_triana 10\n\n"
+                "Tip: No limit downloads ALL media starting from the very first video!"
             )
             return
 
-        username = message.command[1].strip()
+        username = message.command[1].strip().replace("@", "")
         limit = None
-        if len(message.command) >= 3:
+        order = "oldest" # Default to oldest first as requested ("from the first begin")
+        
+        # Parse arguments
+        for arg in message.command[2:]:
             try:
-                limit = int(message.command[2])
-                if limit <= 0:
-                    raise ValueError
+                limit = int(arg)
             except ValueError:
-                await message.reply_text("Limit must be a positive number, e.g. /redgifs_media mae_triana 10")
-                return
+                if arg.lower() in ["recent", "newest"]:
+                    order = "recent"
+                elif arg.lower() in ["oldest", "first"]:
+                    order = "oldest"
 
         status_msg = await message.reply_text(
             f"Scanning RedGifs profile...\n\n"
             f"User: {username}\n"
             f"Source: https://www.redgifs.com/users/{username}\n"
+            f"Order: {'Chronological (Oldest First)' if order == 'oldest' else 'Recent First'}\n"
             f"Collecting account statistics..."
         )
 
@@ -880,12 +885,13 @@ def setup_command_handlers(app: Client):
             stats = await RedGifsMediaService.get_user_stats(username)
             error = stats.get("error")
             
-            if error:
-                error_prefix = f"Failed to fetch statistics for {username}."
-                if error == "User not found":
+            if error or (stats.get("gifs") == 0 and stats.get("images") == 0):
+                # If stats are 0, it might be a typo or private
+                error_prefix = f"Failed to fetch content for {username}."
+                if error == "User not found" or (not error and stats.get("gifs") == 0):
                     error_msg = f"❌ **User Not Found**: {username}\n\nPlease check the spelling. (Tip: Did you mean `remetskomna`?)"
                 else:
-                    error_msg = f"{error_prefix}\nReason: {error}"
+                    error_msg = f"{error_prefix}\nReason: {error if error else 'No public media found'}"
                 await status_msg.edit_text(error_msg)
                 return
 
@@ -899,41 +905,44 @@ def setup_command_handlers(app: Client):
                 f"📂 **Total Media:** {total_count}\n"
                 f"📹 **Videos:** {gif_count}\n"
                 f"🖼️ **Images:** {img_count}\n\n"
-                f"Limit: {limit if limit else 'ALL'}\n\n"
+                f"**Limit:** {limit if limit else 'ALL (Oldest First)'}\n"
+                f"**Order:** {order}\n\n"
                 f"Collecting media links..."
             )
 
             # 2. Fetch Media (Currently only fetches GIFs/Videos as per current service implementation)
             media_data = await RedGifsMediaService.fetch_user_media(
                 username=username,
-                limit=limit
+                limit=limit,
+                order=order
             )
             urls = media_data.get("post_urls", [])
             # Deduplicate
             urls = list(dict.fromkeys(urls))
-            video_count = int(media_data.get("video_count", 0) or 0)
+            video_count = len(urls)
             
             if not urls:
                 await status_msg.edit_text(
                     f"No media posts found for {username}.\n"
-                    f"Account has {gif_count} videos and {img_count} images reported, but none could be retrieved."
+                    f"Account reported {gif_count} videos, but none could be retrieved. (Maybe private?)"
                 )
                 return
 
             logger.info(
-                f"/redgifs_media scrape success for {username}: posts={len(urls)}, limit={limit or 'ALL'}"
+                f"/redgifs_media scrape success for {username}: posts={len(urls)}, limit={limit or 'ALL'}, order={order}"
             )
 
             await status_msg.edit_text(
-                f"RedGifs Profile Scrape Completed\n\n"
-                f"User: {username}\n"
-                f"Videos found: {video_count}\n"
-                f"Limit: {limit if limit else 'ALL'}\n\n"
-                f"Preparing links and starting download..."
+                f"✅ **RedGifs Profile Selected**\n\n"
+                f"👤 **User:** {username}\n"
+                f"📹 **Videos found:** {video_count}\n"
+                f"📅 **Order:** {order}\n"
+                f"📊 **Range:** Starting from the {'first' if order == 'oldest' else 'latest'} video\n\n"
+                f"🚀 Initiating download sequence..."
             )
 
             max_len = 3800
-            header = f"RedGifs media links for {username}\n\n"
+            header = f"RedGifs media links for {username} ({order}):\n\n"
             chunk = header
             for idx, link in enumerate(urls, 1):
                 line = f"{idx}. {link}\n"

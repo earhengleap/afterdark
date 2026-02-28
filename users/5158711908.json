@@ -572,5 +572,12 @@
     "status": "success",
     "content_type": "video",
     "timestamp": "2026-03-01 02:13:38"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://bad.news/t/5982796",
+    "status": "success",
+    "content_type": "bad_news",
+    "timestamp": "2026-03-01 03:08:59"
   }
 ]

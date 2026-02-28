@@ -49,8 +49,8 @@ class RedGifsMediaService:
         stats = {"gifs": 0, "images": 0}
         
         try:
-            # 1. Get GIF count
-            url_gif = f"https://api.redgifs.com/v2/users/{username}/search?count=1&type=gif"
+            # 1. Get GIF count (type 'g' is required by API)
+            url_gif = f"https://api.redgifs.com/v2/users/{username}/search?count=1&type=g"
             resp_gif = await loop.run_in_executor(
                 None,
                 lambda: requests.get(url_gif, headers=headers, timeout=10)
@@ -60,8 +60,8 @@ class RedGifsMediaService:
             elif resp_gif.status_code == 404:
                 return {"gifs": 0, "images": 0, "error": "User not found"}
                 
-            # 2. Get Image count
-            url_img = f"https://api.redgifs.com/v2/users/{username}/search?count=1&type=image"
+            # 2. Get Image count (type 'i' is required by API)
+            url_img = f"https://api.redgifs.com/v2/users/{username}/search?count=1&type=i"
             resp_img = await loop.run_in_executor(
                 None,
                 lambda: requests.get(url_img, headers=headers, timeout=10)
@@ -108,8 +108,11 @@ class RedGifsMediaService:
             return None
 
     @staticmethod
-    async def fetch_user_media(username: str, limit: Optional[int] = None) -> Dict:
-        """Fetch all GIF URLs from a user profile"""
+    async def fetch_user_media(username: str, limit: Optional[int] = None, order: str = "recent") -> Dict:
+        """
+        Fetch all GIF URLs from a user profile.
+        order: 'recent' or 'oldest'
+        """
         token = await RedGifsMediaService._get_token()
         if not token:
             return {"post_urls": [], "video_count": 0, "error": "Auth failed"}
@@ -125,8 +128,12 @@ class RedGifsMediaService:
         
         try:
             while True:
-                count = min(100, limit) if limit else 100
-                api_url = f"https://api.redgifs.com/v2/users/{username}/search?count={count}&page={page}"
+                # Optimized for bulk fetching
+                count = 100 
+                if limit and limit < 100:
+                    count = limit
+                
+                api_url = f"https://api.redgifs.com/v2/users/{username}/search?count={count}&page={page}&order={order}&type=g"
                 
                 response = await loop.run_in_executor(
                     None,
@@ -150,10 +157,13 @@ class RedGifsMediaService:
                         all_gifs.append(f"https://www.redgifs.com/watch/{gif_id.lower()}")
                 
                 total_found = data.get('total', len(all_gifs))
+                
+                # Check if we hit the limit
                 if limit and len(all_gifs) >= limit:
                     all_gifs = all_gifs[:limit]
                     break
                     
+                # Break if we reached the end
                 if len(all_gifs) >= total_found or page >= data.get('pages', 1):
                     break
                     
