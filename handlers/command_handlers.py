@@ -872,11 +872,38 @@ def setup_command_handlers(app: Client):
             f"Scanning RedGifs profile...\n\n"
             f"User: {username}\n"
             f"Source: https://www.redgifs.com/users/{username}\n"
-            f"Limit: {limit if limit else 'ALL'}\n\n"
-            f"Collecting media posts..."
+            f"Collecting account statistics..."
         )
 
         try:
+            # 1. Fetch Stats
+            stats = await RedGifsMediaService.get_user_stats(username)
+            error = stats.get("error")
+            
+            if error:
+                error_prefix = f"Failed to fetch statistics for {username}."
+                if error == "User not found":
+                    error_msg = f"❌ **User Not Found**: {username}\n\nPlease check the spelling. (Tip: Did you mean `remetskomna`?)"
+                else:
+                    error_msg = f"{error_prefix}\nReason: {error}"
+                await status_msg.edit_text(error_msg)
+                return
+
+            gif_count = stats.get("gifs", 0)
+            img_count = stats.get("images", 0)
+            total_count = gif_count + img_count
+            
+            await status_msg.edit_text(
+                f"📊 **RedGifs Account Metadata**\n\n"
+                f"👤 **User:** {username}\n"
+                f"📂 **Total Media:** {total_count}\n"
+                f"📹 **Videos:** {gif_count}\n"
+                f"🖼️ **Images:** {img_count}\n\n"
+                f"Limit: {limit if limit else 'ALL'}\n\n"
+                f"Collecting media links..."
+            )
+
+            # 2. Fetch Media (Currently only fetches GIFs/Videos as per current service implementation)
             media_data = await RedGifsMediaService.fetch_user_media(
                 username=username,
                 limit=limit
@@ -885,18 +912,12 @@ def setup_command_handlers(app: Client):
             # Deduplicate
             urls = list(dict.fromkeys(urls))
             video_count = int(media_data.get("video_count", 0) or 0)
-            error = media_data.get("error")
             
             if not urls:
-                error_prefix = f"No media posts found for {username}."
-                if error == "User not found":
-                    error_msg = f"❌ **User Not Found**: {username}\n\nPlease check the spelling. (Tip: Did you mean `remetskomna`?)"
-                elif error:
-                    error_msg = f"{error_prefix}\nReason: {error}"
-                else:
-                    error_msg = f"{error_prefix}\n\nMake sure the user exists and has public GIFs."
-                
-                await status_msg.edit_text(error_msg)
+                await status_msg.edit_text(
+                    f"No media posts found for {username}.\n"
+                    f"Account has {gif_count} videos and {img_count} images reported, but none could be retrieved."
+                )
                 return
 
             logger.info(
