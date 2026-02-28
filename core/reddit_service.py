@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from config.paths import IMAGES_FOLDER, DOWNLOAD_FOLDER
 from core.logger import setup_logger
 from core.file_manager import FileManager
+from core.redgifs_media_service import RedGifsMediaService
 
 logger = setup_logger("RedditService")
 
@@ -117,51 +118,8 @@ class RedditService:
 
     @staticmethod
     async def _get_redgifs_url(url: str) -> Optional[str]:
-        """Attempt to get direct mp4 link from a RedGifs URL using their temporary OAuth API"""
-        try:
-            # Extract ID: https://www.redgifs.com/watch/[ID]
-            match = re.search(r'redgifs\.com/watch/([a-z0-9-]+)', url, re.IGNORECASE)
-            if not match: return None
-            
-            gif_id = match.group(1)
-            
-            loop = asyncio.get_event_loop()
-            
-            # 1. Get temporary token
-            auth_url = "https://api.redgifs.com/v2/auth/temporary"
-            auth_response = await loop.run_in_executor(
-                None,
-                lambda: requests.get(auth_url, headers=RedditService._headers, timeout=10)
-            )
-            
-            if auth_response.status_code != 200:
-                logger.warning(f"Failed to get RedGifs temporary token: {auth_response.status_code}")
-                return None
-                
-            token = auth_response.json().get('token')
-            if not token: return None
-            
-            # 2. Use token to get media info
-            api_url = f"https://api.redgifs.com/v2/gifs/{gif_id}"
-            headers = RedditService._headers.copy()
-            headers['Authorization'] = f"Bearer {token}"
-            
-            api_response = await loop.run_in_executor(
-                None,
-                lambda: requests.get(api_url, headers=headers, timeout=10)
-            )
-            
-            if api_response.status_code == 200:
-                data = api_response.json()
-                gif_data = data.get('gif', {})
-                urls = gif_data.get('urls', {})
-                # Prefer HD, fallback to SD
-                return urls.get('hd') or urls.get('sd')
-            
-            return None
-        except Exception as e:
-            logger.error(f"RedGifs extraction failed for {url}: {e}")
-            return None
+        """Wrapper for RedGifsMediaService.get_direct_url"""
+        return await RedGifsMediaService.get_direct_url(url)
 
     @staticmethod
     async def download_reddit_media(url: str, user_id: int) -> Tuple[List[str], str, Dict]:

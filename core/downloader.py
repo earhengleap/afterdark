@@ -444,6 +444,27 @@ class VideoDownloader:
                             file_size = os.path.getsize(rp)
                             url_results.append(DownloadResult(url=url, status='success', filename=os.path.basename(rp), size=file_size / (1024 * 1024), content_type=reddit_type))
                         
+                    state["url_progress"][url] = "Done"
+                    state["processed"] += 1
+                    return
+
+                # Check for RedGifs
+                if "redgifs.com/watch/" in url.lower():
+                    state["url_progress"][url] = "RedGifs download..."
+                    from core.redgifs_media_service import RedGifsMediaService
+                    rg_paths, rg_type, rg_info = await RedGifsMediaService.download_media(url, user_id)
+                    if rg_paths:
+                        state["video_success_count"] += 1
+                        downloaded_video_paths.extend(rg_paths)
+                        for rp in rg_paths:
+                            video_source_map[rp] = url
+                            file_size = os.path.getsize(rp)
+                            url_results.append(DownloadResult(
+                                url=url, status='success', 
+                                filename=os.path.basename(rp), 
+                                size=file_size / (1024 * 1024), 
+                                content_type='video'
+                            ))
                         state["url_progress"][url] = "Done"
                         state["processed"] += 1
                         return

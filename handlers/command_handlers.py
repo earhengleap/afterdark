@@ -54,6 +54,7 @@ from users.users import log_user_action
 from core.get_following_service import get_following_list, parse_cookies
 from core.x_media_service import XMediaService
 from core.reddit_service import RedditService
+from core.redgifs_media_service import RedGifsMediaService
 from models.enums import user_downloads
 # Get logger
 logger = logging.getLogger("AfterDark")
@@ -844,6 +845,83 @@ def setup_command_handlers(app: Client):
         except Exception as e:
             logger.error(f"/x_media failed for @{username}: {e}", exc_info=True)
             await status_msg.edit_text(f"Failed to process /x_media: {str(e)[:200]}")
+
+    @app.on_message(filters.private & filters.command(["redgifs_media", "redgifsmedia", "redgifs-media"]))
+    async def redgifs_media_handler(client: Client, message: Message) -> None:
+        """Handle /redgifs_media <username> [limit] command."""
+        if len(message.command) < 2:
+            await message.reply_text(
+                "Example:\n"
+                "/redgifs_media mae_triana\n"
+                "/redgifs_media mae_triana 10"
+            )
+            return
+
+        username = message.command[1].strip()
+        limit = None
+        if len(message.command) >= 3:
+            try:
+                limit = int(message.command[2])
+                if limit <= 0:
+                    raise ValueError
+            except ValueError:
+                await message.reply_text("Limit must be a positive number, e.g. /redgifs_media mae_triana 10")
+                return
+
+        status_msg = await message.reply_text(
+            f"Scanning RedGifs profile...\n\n"
+            f"User: {username}\n"
+            f"Source: https://www.redgifs.com/users/{username}\n"
+            f"Limit: {limit if limit else 'ALL'}\n\n"
+            f"Collecting media posts..."
+        )
+
+        try:
+            media_data = await RedGifsMediaService.fetch_user_media(
+                username=username,
+                limit=limit
+            )
+            urls = media_data.get("post_urls", [])
+            # Deduplicate
+            urls = list(dict.fromkeys(urls))
+            video_count = int(media_data.get("video_count", 0) or 0)
+            
+            if not urls:
+                await status_msg.edit_text(
+                    f"No media posts found for {username}.\n\n"
+                    f"Make sure the user exists and has public GIFs."
+                )
+                return
+
+            logger.info(
+                f"/redgifs_media scrape success for {username}: posts={len(urls)}, limit={limit or 'ALL'}"
+            )
+
+            await status_msg.edit_text(
+                f"RedGifs Profile Scrape Completed\n\n"
+                f"User: {username}\n"
+                f"Videos found: {video_count}\n"
+                f"Limit: {limit if limit else 'ALL'}\n\n"
+                f"Preparing links and starting download..."
+            )
+
+            max_len = 3800
+            header = f"RedGifs media links for {username}\n\n"
+            chunk = header
+            for idx, link in enumerate(urls, 1):
+                line = f"{idx}. {link}\n"
+                if len(chunk) + len(line) > max_len:
+                    await message.reply_text(chunk, disable_web_page_preview=True)
+                    chunk = header + line
+                else:
+                    chunk += line
+            if chunk.strip() and chunk != header:
+                await message.reply_text(chunk, disable_web_page_preview=True)
+
+            await VideoDownloader.download_multiple(urls, message, message.from_user.id, status_msg)
+        except Exception as e:
+            logger.error(f"/redgifs_media failed for {username}: {e}", exc_info=True)
+            await status_msg.edit_text(f"Failed to process /redgifs_media: {str(e)[:200]}")
     @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
     async def chat_handler(client: Client, message: Message) -> None:
         """Handle explicit AI chat commands"""
