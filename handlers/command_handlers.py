@@ -1125,8 +1125,42 @@ def setup_command_handlers(app: Client):
                 await log_user_action(user_id, username, url, "success", f"reddit({content_type})")
                 return
             else:
-                await status_msg.edit_text("❌ **Reddit Download Failed**\n\nCould not find downloadable media or link is restricted.")
                 await log_user_action(user_id, username, url, "failed", "reddit_no_media")
+                return
+
+        # bad.news Handler
+        if "bad.news/t/" in url.lower():
+            status_msg = await message.reply_text(
+                f"🔍 **BadNews URL Detected**\n\n"
+                f"🔗 **URL:** `{url[:50]}...`\n"
+                f"⏳ Extracting video from mirror...",
+                disable_web_page_preview=True
+            )
+            
+            from core.bad_news_service import BadNewsService
+            paths, content_type, info = await BadNewsService.download_media(url, user_id)
+            
+            if paths:
+                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
+                title = info.get("title", "Video")
+                
+                await status_msg.edit_text(
+                    f"✅ **BadNews Download Complete**\n\n"
+                    f"📝 **Title:** {title[:100]}\n"
+                    f"💾 **Size:** {total_size:.2f} MB\n"
+                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"📤 Sending video to you...",
+                    disable_web_page_preview=True
+                )
+                
+                await status_msg.delete()
+                await send_videos_to_user(paths, message, user_id, "BadNews Mirror", url, username, client)
+                
+                await log_user_action(user_id, username, url, "success", "bad_news")
+                return
+            else:
+                await status_msg.edit_text("❌ **BadNews Download Failed**\n\nCould not extract video from this link.")
+                await log_user_action(user_id, username, url, "failed", "bad_news_no_media")
                 return
 
         x_username, profile_url = extract_x_username_and_url(url)

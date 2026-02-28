@@ -28,6 +28,7 @@ from core.database import history_db
 from core.videy_uploader import VideyUploader
 from core.videy_links import add_videy_link
 from utils.url_parser import extract_twitter_username
+from core.bad_news_service import BadNewsService
 
 logger = setup_logger("VideoDownloader")
 
@@ -462,6 +463,26 @@ class VideoDownloader:
                             url_results.append(DownloadResult(
                                 url=url, status='success', 
                                 filename=os.path.basename(rp), 
+                                size=file_size / (1024 * 1024), 
+                                content_type='video'
+                            ))
+                        state["url_progress"][url] = "Done"
+                        state["processed"] += 1
+                        return
+
+                # Check for bad.news
+                if "bad.news/t/" in url.lower():
+                    state["url_progress"][url] = "BadNews download..."
+                    bn_paths, bn_type, bn_info = await BadNewsService.download_media(url, user_id)
+                    if bn_paths:
+                        state["video_success_count"] += 1
+                        downloaded_video_paths.extend(bn_paths)
+                        for bp in bn_paths:
+                            video_source_map[bp] = url
+                            file_size = os.path.getsize(bp)
+                            url_results.append(DownloadResult(
+                                url=url, status='success', 
+                                filename=os.path.basename(bp), 
                                 size=file_size / (1024 * 1024), 
                                 content_type='video'
                             ))
