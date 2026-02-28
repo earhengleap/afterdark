@@ -423,9 +423,31 @@ class VideoDownloader:
             try:
                 state["url_progress"][url] = "Checking media..."
                 
-                # Check for cdn.videy.co links in X tweet
                 from utils.url_extractor import URLExtractor
+                from core.reddit_service import RedditService
                 download_url = url
+                
+                # Check for Reddit
+                if RedditService.is_reddit_url(url):
+                    state["url_progress"][url] = "Reddit download..."
+                    reddit_paths, reddit_type, _info = await RedditService.download_reddit_media(url, user_id)
+                    if reddit_paths:
+                        if reddit_type == "video":
+                            state["video_success_count"] += 1
+                            downloaded_video_paths.extend(reddit_paths)
+                        else:
+                            state["image_success_count"] += 1
+                            downloaded_image_paths.extend(reddit_paths)
+                        
+                        for rp in reddit_paths:
+                            video_source_map[rp] = url
+                            file_size = os.path.getsize(rp)
+                            url_results.append(DownloadResult(url=url, status='success', filename=os.path.basename(rp), size=file_size / (1024 * 1024), content_type=reddit_type))
+                        
+                        state["url_progress"][url] = "Done"
+                        state["processed"] += 1
+                        return
+
                 if "x.com" in url or "twitter.com" in url:
                     videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
                     if videy_url:
@@ -571,7 +593,8 @@ class VideoDownloader:
                 
                 # Track upload start time for progress
                 start_time = time.time()
-                progress_key = f"upload_{user_id}_{idx}"
+                progress_key = f"upload_{user_id}_{idx}"
+
                 videy_cdn_url = await VideyUploader.upload_video(video_path)
                 if videy_cdn_url:
                     add_videy_link(user_id, videy_cdn_url, video_source_map.get(video_path, ""))
@@ -618,10 +641,19 @@ class VideoDownloader:
             if current.strip():
                 await message.reply_text(current, disable_web_page_preview=False)
         
-        # Send images in groups of 10
+        # Send images INDIVIDUALLY per user request (Parity with Reddit flow)
         if image_paths:
-            logger.info(f"Sending {len(image_paths)} images")
-            await ImageDownloader.send_images_to_user(image_paths, message, user_id)
+            logger.info(f"Sending {len(image_paths)} images individually")
+            for i, img_path in enumerate(image_paths, 1):
+                try:
+                    if os.path.exists(img_path):
+                        await message.reply_photo(
+                            photo=img_path,
+                            caption=f"🖼️ Bulk Image {i}/{len(image_paths)}"
+                        )
+                        await asyncio.sleep(0.5)
+                except Exception as e:
+                    logger.error(f"Error sending bulk image: {e}")
     
     @staticmethod
     async def _send_summary(url_results: List[DownloadResult], video_success_count: int, 

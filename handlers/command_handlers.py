@@ -53,6 +53,8 @@ from users.users import log_user_action
 
 from core.get_following_service import get_following_list, parse_cookies
 from core.x_media_service import XMediaService
+from core.reddit_service import RedditService
+from models.enums import user_downloads
 # Get logger
 logger = logging.getLogger("AfterDark")
 
@@ -301,7 +303,7 @@ def build_status_callback(status_msg: Message, title: str):
 
 async def send_videos_to_user(video_paths: list, message: Message, user_id: int, x_username: str, url: str, username: str, app: Client):
     """Send multiple videos to user with proper formatting"""
-    from models.enums import user_downloads
+    global user_downloads
     
     total_videos = len(video_paths)
     formatted_url = format_url_for_display(url)
@@ -329,30 +331,42 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
             video_key = f"{user_id}_v_{idx}"
             user_downloads[video_key] = video_path
             
-            # Create caption based on whether it's multiple videos or single
+            # Create caption based on source
+            is_reddit = "reddit.com" in url or "redd.it" in url
+            
+            if is_reddit:
+                # x_username is passed as "subreddit" or "author" from text_handler
+                source_label = "Reddit"
+                author_prefix = "" # We'll handle prefix in source_display
+                source_display = x_username
+            else:
+                source_label = "X User"
+                author_prefix = "@"
+                source_display = f"{author_prefix}{x_username}"
+            
             if total_videos > 1:
                 caption = (
                     f"🎬 **Video {idx}/{total_videos}**\n\n"
-                    f"👤 **X User:** {x_username}\n"
+                    f"👤 **{source_label}:** {source_display}\n"
                     f"🔗 **Source:** {formatted_url}\n"
                     f"📁 **File:** `{file_name}`\n"
                     f"📏 **Resolution:** {resolution_text}\n"
                     f"💾 **Size:** {file_size:.2f} MB\n"
                     f"📥 **Downloaded by:** {username}\n"
                     f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                    f"✅ X Video Downloader Bot"
+                    f"✅ AfterDark Video Bot"
                 )
             else:
                 caption = (
                     f"🎬 **Download Successful**\n\n"
-                    f"👤 **X User:** {x_username}\n"
+                    f"👤 **{source_label}:** {source_display}\n"
                     f"🔗 **Source:** {formatted_url}\n"
                     f"📁 **File:** `{file_name}`\n"
                     f"📏 **Resolution:** {resolution_text}\n"
                     f"💾 **Size:** {file_size:.2f} MB\n"
                     f"📥 **Downloaded by:** {username}\n"
                     f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                    f"✅ X Video Downloader Bot"
+                    f"✅ AfterDark Video Bot"
                 )
 
             videy_cdn_url = await VideyUploader.upload_video(video_path)
@@ -845,6 +859,7 @@ def setup_command_handlers(app: Client):
     @app.on_message(filters.private & filters.text)
     async def text_handler(client: Client, message: Message) -> None:
         """Handle text messages (URLs) - NOW SUPPORTS MULTIPLE VIDEOS PER URL"""
+        global user_downloads
         text = message.text.strip()
         username = message.from_user.username or message.from_user.first_name
         user_id = message.from_user.id
@@ -899,8 +914,116 @@ def setup_command_handlers(app: Client):
             await VideoDownloader.download_multiple(urls, message, user_id, detection_msg)
             return
         
-        # Single URL download - NOW HANDLES MULTIPLE VIDEOS FROM ONE URL
+        # Single URL download - NOW HANDLES REDDIT
         url = urls[0]
+        
+        # Reddit Handler
+        # Reddit Handler - PARITY UPGRADE
+        if RedditService.is_reddit_url(url):
+            status_msg = await message.reply_text(
+                f"🔍 **Reddit URL Detected**\n\n"
+                f"🔗 **URL:** `{url[:50]}...`\n"
+                f"⏳ Analyzing Reddit media content...",
+                disable_web_page_preview=True
+            )
+            
+            paths, content_type, info = await RedditService.download_reddit_media(url, user_id)
+            
+            if paths:
+                total_items = len(paths)
+                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
+                
+                author = info.get("author", "Unknown")
+                subreddit = info.get("subreddit", "Unknown")
+                title = info.get("title", "")
+                reddit_display = f"r/{subreddit}" if subreddit != "Unknown" else "Reddit"
+                
+                await status_msg.edit_text(
+                    f"✅ **Reddit Download Complete**\n\n"
+                    f"👤 **Author:** u/{author}\n"
+                    f"📍 **Subreddit:** {reddit_display}\n"
+                    f"📊 **Items Found:** {total_items}\n"
+                    f"💾 **Total Size:** {total_size:.2f} MB\n"
+                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"📤 Sending {total_items} item(s) to you individually...",
+                    disable_web_page_preview=True
+                )
+                
+                # State for callbacks
+                if content_type == "video":
+                    user_downloads[f"{user_id}_bulk_videos"] = paths
+                else:
+                    user_downloads[user_id] = paths
+                
+                await status_msg.delete()
+                
+                # Send items INDIVIDUALLY per user request
+                if content_type == "video":
+                    # send_videos_to_user already sends individually
+                    # Create a nice label: u/author in r/subreddit
+                    reddit_label = f"u/{author}"
+                    if subreddit != "Unknown":
+                        reddit_label += f" in r/{subreddit}"
+                    await send_videos_to_user(paths, message, user_id, reddit_label, url, username, client)
+                else:
+                    # Send images individually (avoiding ImageDownloader.send_images_to_user which groups them)
+                    for i, img_path in enumerate(paths, 1):
+                        try:
+                            if os.path.exists(img_path):
+                                # Add simple caption to each image for premium feel
+                                caption = (
+                                    f"🖼️ **Reddit Image {i}/{len(paths)}**\n"
+                                    f"👤 **Author:** u/{author}\n"
+                                    f"📍 **Source:** {reddit_display}\n"
+                                    f"🔗 [Post Link]({url})"
+                                )
+                                await client.send_photo(
+                                    chat_id=message.chat.id, 
+                                    photo=img_path,
+                                    caption=caption
+                                )
+                                await asyncio.sleep(0.5)
+                        except Exception as e:
+                            logger.error(f"Error sending Reddit image: {e}")
+
+                # Send summary with "Upload to Group" button (Parity with X)
+                kb = Keyboards.bulk_download_complete_mixed(user_id, paths if content_type=="video" else [], paths if content_type=="image" else [])
+                if content_type == "image" and len(paths) == 1:
+                    kb = Keyboards.image_actions_with_upload(user_id)
+                elif content_type == "video" and len(paths) == 1:
+                    # For single video, we usually use video_actions_with_upload but bulk_download_complete_mixed works too
+                    pass
+
+                summary_msg = await message.reply_text(
+                    f"✅ **Reddit Media Sent Successfully**\n\n"
+                    f"👤 **Author:** u/{author}\n"
+                    f"📍 **From:** {reddit_display}\n"
+                    f"📝 **Title:** {title[:100]}{'...' if len(title) > 100 else ''}\n"
+                    f"📊 **Total Items:** {total_items}\n"
+                    f"💾 **Total Size:** {total_size:.2f} MB\n\n"
+                    f"What would you like to do next?",
+                    reply_markup=kb,
+                    disable_web_page_preview=True
+                )
+                
+                # Start Auto-Upload Timer (Parity with X)
+                from core.auto_scheduler import AutoScheduler
+                await AutoScheduler.start_timer(
+                    client=client,
+                    message=summary_msg,
+                    user_id=user_id,
+                    content_type="video_bulk" if content_type == "video" else "image_bulk",
+                    content_path=paths,
+                    duration=120
+                )
+
+                await log_user_action(user_id, username, url, "success", f"reddit({content_type})")
+                return
+            else:
+                await status_msg.edit_text("❌ **Reddit Download Failed**\n\nCould not find downloadable media or link is restricted.")
+                await log_user_action(user_id, username, url, "failed", "reddit_no_media")
+                return
+
         x_username, profile_url = extract_x_username_and_url(url)
         formatted_url = format_url_for_display(url)
         
@@ -996,7 +1119,6 @@ def setup_command_handlers(app: Client):
                     
                     # Send summary message after all videos (if multiple)
                     if total_videos > 1:
-                        from models.enums import user_downloads
                         user_downloads[f"{user_id}_bulk_videos"] = video_paths
                         
                         summary_msg = await message.reply_text(
@@ -1050,7 +1172,6 @@ def setup_command_handlers(app: Client):
                     if image_paths and len(image_paths) > 0:
                         # Image download successful
                         try:
-                            from models.enums import user_downloads
                             user_downloads[user_id] = image_paths
                             
                             total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)
@@ -1138,7 +1259,6 @@ def setup_command_handlers(app: Client):
                 
                 if image_paths and len(image_paths) > 0:
                     try:
-                        from models.enums import user_downloads
                         user_downloads[user_id] = image_paths
                         
                         total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)
@@ -1228,7 +1348,6 @@ def setup_command_handlers(app: Client):
             
             if image_paths and len(image_paths) > 0:
                 try:
-                    from models.enums import user_downloads
                     user_downloads[user_id] = image_paths
                     
                     total_size = sum(os.path.getsize(img) for img in image_paths) / (1024 * 1024)

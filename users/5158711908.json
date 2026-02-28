@@ -523,5 +523,54 @@
     "status": "failed",
     "content_type": "unknown",
     "timestamp": "2026-03-01 00:58:43"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/Puffies/s/OsLNbUCmNJ",
+    "status": "success",
+    "content_type": "reddit(image)",
+    "timestamp": "2026-03-01 01:34:42"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/NSFW_GIF/s/mTw4Ff3Cjz",
+    "status": "failed",
+    "content_type": "reddit_no_media",
+    "timestamp": "2026-03-01 01:44:53"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/NSFW_GIF/s/mTw4Ff3Cjz",
+    "status": "failed",
+    "content_type": "reddit_no_media",
+    "timestamp": "2026-03-01 01:51:50"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/NSFW_GIF/s/mTw4Ff3Cjz",
+    "status": "success",
+    "content_type": "reddit(video)",
+    "timestamp": "2026-03-01 02:02:39"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/NSFW_GIF/s/mTw4Ff3Cjz",
+    "status": "success",
+    "content_type": "reddit(video)",
+    "timestamp": "2026-03-01 02:04:36"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.reddit.com/r/NSFW_GIF/s/mTw4Ff3Cjz",
+    "status": "success",
+    "content_type": "reddit(video)",
+    "timestamp": "2026-03-01 02:12:58"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://www.redgifs.com/watch/peacefulsillymice",
+    "status": "success",
+    "content_type": "video",
+    "timestamp": "2026-03-01 02:13:38"
   }
 ]

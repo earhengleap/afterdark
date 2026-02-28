@@ -52,6 +52,11 @@ class URLExtractor:
         return unique_urls
     
     @staticmethod
+    def is_reddit_url(url: str) -> bool:
+        """Check if the URL is a Reddit URL"""
+        return bool(re.search(r'(?:reddit\.com|redd\.it)', url, re.IGNORECASE))
+    
+    @staticmethod
     def extract_twitter_urls(text: str) -> List[str]:
         """
         Extract only Twitter/X URLs from text
