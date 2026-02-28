@@ -29,6 +29,7 @@ from core.videy_uploader import VideyUploader
 from core.videy_links import add_videy_link
 from utils.url_parser import extract_twitter_username
 from core.bad_news_service import BadNewsService
+from core.papalah_service import PapalahService
 
 logger = setup_logger("VideoDownloader")
 

@@ -1,0 +1,111 @@
+import asyncio
+import logging
+import requests
+import re
+import os
+import time
+from typing import List, Dict, Optional, Tuple
+
+from core.logger import setup_logger
+from config.paths import DOWNLOAD_FOLDER
+
+logger = setup_logger("PapalahService")
+
+class PapalahService:
+    """Service to handle video extraction from papalah.com links"""
+    
+    _headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.papalah.com/'
+    }
+
+    @staticmethod
+    async def get_media_info(url: str) -> Dict:
+        """Extract video metadata and direct URL from a papalah.com link"""
+        loop = asyncio.get_event_loop()
+        try:
+            # 1. Fetch the page
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(url, headers=PapalahService._headers, timeout=15)
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Papalah API error ({response.status_code}) for {url}")
+                return {"urls": [], "error": f"Page error {response.status_code}"}
+                
+            html = response.text
+            
+            # 2. Extract Title from OG tags or HTML
+            og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', html)
+            title = og_title[0] if og_title else "Papalah Video"
+            
+            # 3. Extract direct MP4 URL
+            # The URL is often inside a script or a source tag
+            # Based on research: https://media.aiailah.com/videos/d6/d670249b4b7e1648b685421dc7d246e3.mp4
+            mp4_urls = re.findall(r'(https?://[^\s"\']+media\.[^\s"\']+\.mp4)', html)
+            
+            if not mp4_urls:
+                # Search for the pattern observed in research
+                mp4_pattern = r'https?://media\.[^\s"\']+\.mp4'
+                mp4_urls = re.findall(mp4_pattern, html)
+            
+            if not mp4_urls:
+                # Fallback to general find
+                all_mp4 = re.findall(r'https?://[^\s"\']+\.mp4', html)
+                if all_mp4:
+                    mp4_urls = [all_mp4[0]]
+            
+            if not mp4_urls:
+                return {"urls": [], "error": "No direct video link found on page"}
+                
+            video_url = mp4_urls[0]
+            
+            return {
+                "urls": [video_url],
+                "title": title,
+                "author": "Papalah User",
+                "source": "Papalah"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch Papalah media for {url}: {e}")
+            return {"urls": [], "error": str(e)}
+
+    @staticmethod
+    async def download_media(url: str, user_id: int) -> Tuple[List[str], str, Dict]:
+        """Download video from papalah and return standard format"""
+        info = await PapalahService.get_media_info(url)
+        if not info.get("urls"):
+            return [], "unknown", {"error": info.get("error", "Failed to extract video")}
+
+        video_url = info["urls"][0]
+        loop = asyncio.get_event_loop()
+        
+        try:
+            filename = f"papalah_{user_id}_{int(time.time())}.mp4"
+            file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+            
+            # CRITICAL: Must use Referer header for Papalah downloads
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(video_url, headers=PapalahService._headers, timeout=60)
+            )
+            
+            if response.status_code == 200:
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                
+                metadata = {
+                    "author": info.get("author", "Papalah"),
+                    "subreddit": "Papalah",
+                    "title": info.get("title", "Video"),
+                    "is_video": True,
+                    "source_url": url
+                }
+                return [file_path], "video", metadata
+            
+            return [], "unknown", {"error": f"Download failed ({response.status_code})"}
+        except Exception as e:
+            logger.error(f"Failed to download Papalah video {url}: {e}")
+            return [], "unknown", {"error": str(e)}

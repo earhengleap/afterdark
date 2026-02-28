@@ -21,3 +21,8 @@ x.com	FALSE	/	FALSE	0	lang	en
 .instagram.com	TRUE	/	TRUE	1803624743	ig_nrcb	1
 .reddit.com	TRUE	/	TRUE	1835373507	csv	2
 .reddit.com	TRUE	/	TRUE	1835373506	edgebucket	tWgL9QJPR99vJxpheK
+www.papalah.com	FALSE	/	FALSE	0	PHPSESSID	i5dpgkhje6t2pits4a54ldmsk2
+www.papalah.com	FALSE	/	FALSE	1772397349	country	KH
+www.papalah.com	FALSE	/	FALSE	1772314549	visit_count	9
+www.papalah.com	FALSE	/	FALSE	1772397349	v_ids	96337
+www.papalah.com	FALSE	/	FALSE	1772397349	v_count	9

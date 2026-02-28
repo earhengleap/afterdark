@@ -1172,6 +1172,41 @@ def setup_command_handlers(app: Client):
                 await log_user_action(user_id, username, url, "failed", "bad_news_no_media")
                 return
 
+        # Papalah Handler
+        if "papalah.com/v/" in url.lower():
+            status_msg = await message.reply_text(
+                f"🔍 **Papalah URL Detected**\n\n"
+                f"🔗 **URL:** `{url[:50]}...`\n"
+                f"⏳ Extracting video (handling Referer)...",
+                disable_web_page_preview=True
+            )
+            
+            from core.papalah_service import PapalahService
+            paths, content_type, info = await PapalahService.download_media(url, user_id)
+            
+            if paths:
+                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
+                title = info.get("title", "Video")
+                
+                await status_msg.edit_text(
+                    f"✅ **Papalah Download Complete**\n\n"
+                    f"📝 **Title:** {title[:100]}\n"
+                    f"💾 **Size:** {total_size:.2f} MB\n"
+                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"📤 Sending video to you...",
+                    disable_web_page_preview=True
+                )
+                
+                await status_msg.delete()
+                await send_videos_to_user(paths, message, user_id, "Papalah User", url, username, client)
+                
+                await log_user_action(user_id, username, url, "success", "papalah")
+                return
+            else:
+                await status_msg.edit_text("❌ **Papalah Download Failed**\n\nCould not extract video. Link may be dead or restricted.")
+                await log_user_action(user_id, username, url, "failed", "papalah_no_media")
+                return
+
         x_username, profile_url = extract_x_username_and_url(url)
         formatted_url = format_url_for_display(url)
         
