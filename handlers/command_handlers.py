@@ -885,12 +885,18 @@ def setup_command_handlers(app: Client):
             # Deduplicate
             urls = list(dict.fromkeys(urls))
             video_count = int(media_data.get("video_count", 0) or 0)
+            error = media_data.get("error")
             
             if not urls:
-                await status_msg.edit_text(
-                    f"No media posts found for {username}.\n\n"
-                    f"Make sure the user exists and has public GIFs."
-                )
+                error_prefix = f"No media posts found for {username}."
+                if error == "User not found":
+                    error_msg = f"❌ **User Not Found**: {username}\n\nPlease check the spelling. (Tip: Did you mean `remetskomna`?)"
+                elif error:
+                    error_msg = f"{error_prefix}\nReason: {error}"
+                else:
+                    error_msg = f"{error_prefix}\n\nMake sure the user exists and has public GIFs."
+                
+                await status_msg.edit_text(error_msg)
                 return
 
             logger.info(

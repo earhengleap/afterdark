@@ -55,15 +55,24 @@ class RedGifsMediaService:
             
             api_response = await loop.run_in_executor(
                 None,
-                lambda: requests.get(api_url, headers=headers, timeout=10)
+                lambda: requests.get(api_url, headers=headers, timeout=30) # Increased timeout
             )
             
             if api_response.status_code == 200:
                 data = api_response.json()
                 gif_data = data.get('gif', {})
                 urls = gif_data.get('urls', {})
+                if not urls:
+                    logger.warning(f"No URLs found in RedGifs API response for {gif_id}. Data: {data}") # Improved error reporting
                 return urls.get('hd') or urls.get('sd')
             
+            logger.error(f"RedGifs API error for {gif_id}. Status: {api_response.status_code}, Response: {api_response.text}") # Improved error reporting
+            return None
+        except requests.exceptions.Timeout:
+            logger.error(f"RedGifs API request for {url} timed out.")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error resolving RedGifs direct URL for {url}: {e}")
             return None
         except Exception as e:
             logger.error(f"RedGifs direct URL extraction failed for {url}: {e}")
@@ -95,9 +104,11 @@ class RedGifsMediaService:
                     lambda: requests.get(api_url, headers=headers, timeout=15)
                 )
                 
+                if response.status_code == 404:
+                    return {"post_urls": [], "video_count": 0, "error": "User not found"}
                 if response.status_code != 200:
                     logger.error(f"RedGifs API error ({response.status_code}) for user {username}")
-                    break
+                    return {"post_urls": [], "video_count": 0, "error": f"API Error {response.status_code}"}
                     
                 data = response.json()
                 gifs = data.get('gifs', [])

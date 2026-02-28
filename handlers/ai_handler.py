@@ -63,7 +63,7 @@ class AIHandler:
         
         def _poll_chat():
             req = urllib.request.Request(poll_api_url)
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=30) as response:
                 return json.loads(response.read().decode("utf-8"))
         
         while True:
