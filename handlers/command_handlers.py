@@ -276,9 +276,9 @@ def build_status_callback(status_msg: Message, title: str):
     async def _callback(percent: int, stage: str):
         now = time.time()
         # Throttle frequent updates to avoid Telegram flood limits.
-        if percent < 100 and state["last_pct"] == percent and (now - state["last_ts"]) < 1.0:
+        if percent < 100 and state["last_pct"] == percent and (now - state["last_ts"]) < 0.5:
             return
-        if percent < 100 and (now - state["last_ts"]) < 0.8:
+        if percent < 100 and (now - state["last_ts"]) < 0.4:
             return
         state["tick"] += 1
 

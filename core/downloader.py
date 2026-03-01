@@ -133,7 +133,7 @@ class VideoDownloader:
                 except Exception:
                     pass
 
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(0.8)
 
         # Emit a final "downloaded" state for this URL before sender phase.
         final_text = (
@@ -149,48 +149,51 @@ class VideoDownloader:
     @staticmethod
     async def download_with_progress(
         url: str,
-        status_msg: Optional[Message],
+        status_msg: Optional[Message] = None,
         index: int = 1,
         total: int = 1,
-        user_id: int = 0
+        user_id: int = 0,
+        item_progress_callback: Optional[callable] = None
     ) -> Tuple[Optional[List[str]], Optional[Dict]]:
-        progress_state: Dict = {
-            "downloaded": 0,
-            "total": 0,
-            "speed": 0.0,
-            "filename": "video",
-            "phase": "Analyzing URL",
-            "done": False,
-            "started_at": time.time(),
+        """Unified download handler with a progress poller UI"""
+        progress_state = {
+            "downloaded": 0, "total": 0, "speed": 0.0,
+            "filename": "video", "phase": "Analyzing...", "done": False, "started_at": time.time()
         }
 
-        progress_task = None
+        # Handle item progress callback for bulk
+        def wrapped_callback(p):
+            if item_progress_callback:
+                item_progress_callback(p)
+
+        # 1. Start the UI poller background task if status_msg is provided
+        poller_task = None
         if status_msg:
-            progress_task = asyncio.create_task(
+            poller_task = asyncio.create_task(
                 VideoDownloader._video_progress_poller(status_msg, progress_state, index, total)
             )
 
-        loop = asyncio.get_running_loop()
+        # 2. Start the actual download
         try:
-            result = await VideoDownloader.download(
+            paths, info = await VideoDownloader.download(
                 url=url,
-                message=None,
-                status_msg=None,
                 index=index,
                 total=total,
                 progress_state=progress_state,
-                user_id=user_id
+                user_id=user_id,
+                item_progress_callback=wrapped_callback
             )
-            return result
+            return paths, info
         finally:
             progress_state["done"] = True
-            if progress_task:
+            if poller_task:
                 with contextlib.suppress(Exception):
-                    await progress_task
+                    await poller_task
     
     @staticmethod
     async def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None,
-                 index: int = 1, total: int = 1, progress_state: Optional[Dict] = None, user_id: int = 0) -> Tuple[Optional[List[str]], Optional[Dict]]:
+                 index: int = 1, total: int = 1, progress_state: Optional[Dict] = None, user_id: int = 0,
+                 item_progress_callback: Optional[callable] = None) -> Tuple[Optional[List[str]], Optional[Dict]]:
         """
         Download video(s) from URL - SUPPORTS MULTIPLE VIDEOS
         Returns: (list_of_video_paths, info_dict) or (None, None)
@@ -204,6 +207,8 @@ class VideoDownloader:
                 progress_state['speed'] = d.get('speed', 0.0)
                 progress_state['filename'] = d.get('filename', 'video.mp4')
                 progress_state['phase'] = 'Downloading media'
+            if item_progress_callback:
+                item_progress_callback(d)
 
         # 2. Check for RedGifs
         if "redgifs.com/watch/" in url.lower():
@@ -271,6 +276,14 @@ class VideoDownloader:
                                 progress_state['speed'] = speed
                                 progress_state['filename'] = filename
                                 progress_state['phase'] = 'Downloading media'
+                            if item_progress_callback:
+                                item_progress_callback({
+                                    'status': 'downloading',
+                                    'downloaded_bytes': downloaded,
+                                    'total_bytes': total_bytes,
+                                    'speed': speed,
+                                    'filename': filename
+                                })
                         except Exception:
                             pass
                     elif progress_state is not None and d.get('status') == 'finished':
@@ -455,7 +468,7 @@ class VideoDownloader:
                     except Exception:
                         pass
                 
-                await asyncio.sleep(2.0)  # Polling interval to avoid FloodWait
+                await asyncio.sleep(1.0)  # Polling interval for bulk
 
         ui_task = asyncio.create_task(ui_updater())
 
@@ -499,7 +512,8 @@ class VideoDownloader:
                     status_msg=None, # Silent UI
                     index=idx,
                     total=total,
-                    user_id=user_id
+                    user_id=user_id,
+                    item_progress_callback=internal_callback
                 )
                 
                 if video_paths and len(video_paths) > 0:
