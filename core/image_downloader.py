@@ -109,7 +109,7 @@ class ImageDownloader:
             await ImageDownloader._notify_status(
                 status_callback, 50, f"🛰️ Link {index}/{total} - Downloading media"
             )
-            downloaded_files = await ImageDownloader._run_gallery_dl(url, download_folder, existing_files)
+            downloaded_files = await ImageDownloader._run_gallery_dl(url, download_folder, existing_files, status_callback, index, total)
             
             if downloaded_files:
                 logger.info(f"Download success: Retrieved {len(downloaded_files)} images")
@@ -137,13 +137,13 @@ class ImageDownloader:
             return None, None
     
     @staticmethod
-    async def _run_gallery_dl(url: str, download_folder: str, existing_files: set) -> Optional[List[str]]:
-        """Run gallery-dl with a comprehensive robust configuration once."""
+    async def _run_gallery_dl(url: str, download_folder: str, existing_files: set, status_callback=None, index=1, total=1) -> Optional[List[str]]:
+        """Run gallery-dl with real-time progress parsing."""
         try:
             config_content = {
                 "extractor": {
                     "twitter": {
-                        "syndication": True,  # Uses fast public API if possible
+                        "syndication": True,
                         "api": "syndication",
                         "include": "media,timeline",
                         "videos": False,
@@ -185,26 +185,36 @@ class ImageDownloader:
                 if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 0:
                     cmd.extend(["--cookies", COOKIE_FILE])
                 
-                logger.debug(f"Executing robust gallery-dl configuration for {url}")
+                logger.debug(f"Executing gallery-dl for {url}")
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
-                stdout, stderr = await process.communicate()
+
+                found_images = []
+                # Read stdout line by line for real-time progress
+                while True:
+                    line = await process.stdout.readline()
+                    if not line:
+                        break
+                    
+                    line_str = line.decode().strip()
+                    if line_str:
+                        # gallery-dl usually prints the image URL or Path
+                        if any(ext in line_str.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                            found_images.append(line_str)
+                            if status_callback:
+                                await ImageDownloader._notify_status(
+                                    status_callback, 
+                                    min(50 + len(found_images) * 5, 95), 
+                                    f"🛰️ Link {index}/{total} - Found {len(found_images)} images..."
+                                )
                 
-                if process.returncode != 0:
-                    logger.debug(f"gallery-dl exit code: {process.returncode}")
-                    if stderr:
-                        logger.debug(f"gallery-dl error: {stderr.decode()[:200]}")
+                await process.wait()
                 
-                # Try normal file detection first
+                # Detect the actual new files on disk
                 new_files = ImageDownloader._get_new_files(download_folder, existing_files)
-                
-                # If that fails, try parsing output
-                if not new_files and stdout:
-                    new_files = ImageDownloader._parse_gallery_dl_output(stdout.decode(), download_folder)
-                
                 return new_files
                 
             finally:
@@ -214,7 +224,7 @@ class ImageDownloader:
                     pass
                     
         except Exception as e:
-            logger.error(f"Error in robust gallery-dl execution: {e}")
+            logger.error(f"Error in gallery-dl execution: {e}")
             return None
     
     @staticmethod

@@ -91,8 +91,8 @@ class PapalahService:
             return {"urls": [], "error": str(e)}
 
     @staticmethod
-    async def download_media(url: str, user_id: int) -> Tuple[List[str], str, Dict]:
-        """Download video from papalah and return standard format"""
+    async def download_media(url: str, user_id: int, progress_callback=None) -> Tuple[List[str], str, Dict]:
+        """Download video from papalah with progress reporting"""
         info = await PapalahService.get_media_info(url)
         if not info.get("urls"):
             return [], "unknown", {"error": info.get("error", "Failed to extract video")}
@@ -104,16 +104,35 @@ class PapalahService:
             filename = f"papalah_{user_id}_{int(time.time())}.mp4"
             file_path = os.path.join(DOWNLOAD_FOLDER, filename)
             
+            # Use chunked download for progress feedback
             # CRITICAL: Must use Referer header for Papalah downloads
             response = await loop.run_in_executor(
                 None,
-                lambda: requests.get(video_url, headers=PapalahService._headers, timeout=60)
+                lambda: requests.get(video_url, headers=PapalahService._headers, stream=True, timeout=60)
             )
             
             if response.status_code == 200:
-                with open(file_path, 'wb') as f:
-                    f.write(response.content)
+                total_size = int(response.headers.get('content-length', 0))
+                downloaded = 0
+                start_time = time.time()
                 
+                with open(file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if progress_callback and total_size > 0:
+                                elapsed = time.time() - start_time
+                                speed = downloaded / elapsed if elapsed > 0 else 0
+                                # Report to progress_state
+                                progress_callback({
+                                    "status": "downloading",
+                                    "downloaded_bytes": downloaded,
+                                    "total_bytes": total_size,
+                                    "speed": speed,
+                                    "filename": filename
+                                })
+
                 metadata = {
                     "author": info.get("author", "Papalah"),
                     "subreddit": "Papalah",

@@ -476,6 +476,7 @@ async def process_shared_url(client: Client, message: Message, url: str, user_id
             status_msg=status_msg,
             index=1,
             total=1,
+            user_id=user_id
         )
         
         if video_paths and len(video_paths) > 0:
@@ -1037,6 +1038,8 @@ def setup_command_handlers(app: Client):
             status_msg = await message.reply_text(
                 f"🔍 **Reddit URL Detected**\n\n"
                 f"🔗 **URL:** `{url[:50]}...`\n"
+                f"👤 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
                 f"⏳ Analyzing Reddit media content...",
                 disable_web_page_preview=True
             )
@@ -1142,18 +1145,24 @@ def setup_command_handlers(app: Client):
             status_msg = await message.reply_text(
                 f"🔍 **BadNews URL Detected**\n\n"
                 f"🔗 **URL:** `{url[:50]}...`\n"
-                f"⏳ Extracting video from mirror...",
+                f"👤 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                f"⏳ Initializing mirror download...",
                 disable_web_page_preview=True
             )
             
-            from core.bad_news_service import BadNewsService
-            paths, content_type, info = await BadNewsService.download_media(url, user_id)
+            paths, info = await VideoDownloader.download_with_progress(
+                url=url,
+                status_msg=status_msg,
+                user_id=user_id
+            )
             
             if paths:
                 total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
                 title = info.get("title", "Video")
                 
-                await status_msg.edit_text(
+                await safe_edit_text(
+                    status_msg,
                     f"✅ **BadNews Download Complete**\n\n"
                     f"📝 **Title:** {title[:100]}\n"
                     f"💾 **Size:** {total_size:.2f} MB\n"
@@ -1164,11 +1173,10 @@ def setup_command_handlers(app: Client):
                 
                 await status_msg.delete()
                 await send_videos_to_user(paths, message, user_id, "BadNews Mirror", url, username, client)
-                
                 await log_user_action(user_id, username, url, "success", "bad_news")
                 return
             else:
-                await status_msg.edit_text("❌ **BadNews Download Failed**\n\nCould not extract video from this link.")
+                await safe_edit_text(status_msg, "❌ **BadNews Download Failed**\n\nCould not extract video from this link.")
                 await log_user_action(user_id, username, url, "failed", "bad_news_no_media")
                 return
 
@@ -1177,18 +1185,24 @@ def setup_command_handlers(app: Client):
             status_msg = await message.reply_text(
                 f"🔍 **Papalah URL Detected**\n\n"
                 f"🔗 **URL:** `{url[:50]}...`\n"
-                f"⏳ Extracting video (handling Referer)...",
+                f"👤 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                f"⏳ Initializing direct download...",
                 disable_web_page_preview=True
             )
             
-            from core.papalah_service import PapalahService
-            paths, content_type, info = await PapalahService.download_media(url, user_id)
+            paths, info = await VideoDownloader.download_with_progress(
+                url=url,
+                status_msg=status_msg,
+                user_id=user_id
+            )
             
             if paths:
                 total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
                 title = info.get("title", "Video")
                 
-                await status_msg.edit_text(
+                await safe_edit_text(
+                    status_msg,
                     f"✅ **Papalah Download Complete**\n\n"
                     f"📝 **Title:** {title[:100]}\n"
                     f"💾 **Size:** {total_size:.2f} MB\n"
@@ -1199,11 +1213,10 @@ def setup_command_handlers(app: Client):
                 
                 await status_msg.delete()
                 await send_videos_to_user(paths, message, user_id, "Papalah User", url, username, client)
-                
                 await log_user_action(user_id, username, url, "success", "papalah")
                 return
             else:
-                await status_msg.edit_text("❌ **Papalah Download Failed**\n\nCould not extract video. Link may be dead or restricted.")
+                await safe_edit_text(status_msg, "❌ **Papalah Download Failed**\n\nCould not extract video. Link may be dead or restricted.")
                 await log_user_action(user_id, username, url, "failed", "papalah_no_media")
                 return
 
@@ -1218,13 +1231,12 @@ def setup_command_handlers(app: Client):
         
         # Initial analysis message
         status_msg = await message.reply_text(
-            f"🔍 **URL Analysis Started**\n\n"
-            f"👤 **X User:** {clickable_username}\n"
+            f"🔍 **Link Detected**\n\n"
+            f"👤 **User:** {clickable_username}\n"
             f"🔗 **URL:** {formatted_url}\n"
             f"📥 **Requested by:** {username}\n"
-            f"🕒 **Start Time:** {datetime.now().strftime('%H:%M:%S')}\n"
-            f"📅 **Date:** {datetime.now().strftime('%Y-%m-%d')}\n\n"
-            f"⏳ Analyzing content type...",
+            f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+            f"⏳ Analyzing content & starting download...",
             disable_web_page_preview=False
         )
         
@@ -1252,18 +1264,7 @@ def setup_command_handlers(app: Client):
                     source_check_msg = f"\n🔗 **Videy Link:** Found in tweet caption"
                     logger.info(f"Found videy link in tweet: {videy_url}")
                 
-                # Try video download first (supports multiple videos)
-                await safe_edit_text(
-                    status_msg,
-                    f"🎬 **Video Download Started**\n\n"
-                    f"👤 **X User:** {clickable_username}\n"
-                    f"🔗 **URL:** {formatted_url}\n"
-                    f"📥 **Requested by:** {username}\n"
-                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n"
-                    f"{source_check_msg}\n\n"
-                    f"⏳ Checking for video content...",
-                    disable_web_page_preview=False
-                )
+                # Use the existing status_msg for progress
                 
                 # FIXED: download() now returns a LIST of video paths
                 video_paths, video_info = await VideoDownloader.download_with_progress(
@@ -1271,6 +1272,7 @@ def setup_command_handlers(app: Client):
                     status_msg=status_msg,
                     index=1,
                     total=1,
+                    user_id=user_id
                 )
                 
                 # FIXED: Check if video_paths is a list and has items
@@ -1610,6 +1612,7 @@ def setup_command_handlers(app: Client):
                     status_msg=status_msg,
                     index=1,
                     total=1,
+                    user_id=user_id
                 )
                 
                 if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
@@ -1652,6 +1655,7 @@ def setup_command_handlers(app: Client):
                 status_msg=status_msg,
                 index=1,
                 total=1,
+                user_id=user_id
             )
             
             if video_paths and isinstance(video_paths, list) and len(video_paths) > 0:
@@ -1667,6 +1671,46 @@ def setup_command_handlers(app: Client):
                     disable_web_page_preview=False
                 )
                 await log_user_action(user_id, username, url, "failed", "unknown")
+
+        # RedGifs Handler (Single Link)
+        if "redgifs.com/watch/" in url.lower():
+            status_msg = await message.reply_text(
+                f"🔍 **RedGifs Link Detected**\n\n"
+                f"🔗 **URL:** `{url[:50]}...`\n"
+                f"👤 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                f"⏳ Initializing RedGifs extraction...",
+                disable_web_page_preview=True
+            )
+            
+            paths, info = await VideoDownloader.download_with_progress(
+                url=url,
+                status_msg=status_msg,
+                user_id=user_id
+            )
+            
+            if paths:
+                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
+                await safe_edit_text(
+                    status_msg,
+                    f"✅ **RedGifs Download Complete**\n\n"
+                    f"💾 **Size:** {total_size:.2f} MB\n"
+                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"📤 Sending media to you...",
+                    disable_web_page_preview=True
+                )
+                await status_msg.delete()
+                # RedGifs usually provides username/title in info
+                author = info.get("userName") if info else "RedGifs User"
+                if not author: author = "RedGifs User"
+                
+                await send_videos_to_user(paths, message, user_id, author, url, username, client)
+                await log_user_action(user_id, username, url, "success", "redgifs")
+                return
+            else:
+                await safe_edit_text(status_msg, "❌ **RedGifs Download Failed**\n\nCould not extract video content.")
+                await log_user_action(user_id, username, url, "failed", "redgifs_no_media")
+                return
 
 
 

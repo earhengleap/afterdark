@@ -54,16 +54,17 @@ class VideoDownloader:
         return f"{VideoDownloader._format_bytes(int(speed))}/s"
 
     @staticmethod
-    def _progress_bar(percent: int, width: int = 14) -> str:
+    def _progress_bar(percent: int, width: int = 15) -> str:
         percent = max(0, min(100, int(percent)))
         filled = int((percent / 100) * width)
-        return ("█" * filled) + ("░" * (width - filled))
+        # Using a more premium looking bar
+        return "▰" * filled + "▱" * (width - filled)
 
     @staticmethod
     def _pretty_phase(phase: str) -> str:
         phase_text = (phase or "").lower()
         if "selecting format" in phase_text:
-            return f"🔎 {phase}"
+            return f"🔎 Selecting best quality"
         if "downloading" in phase_text:
             return "📥 Downloading media file"
         if "finalizing" in phase_text:
@@ -79,7 +80,7 @@ class VideoDownloader:
         index: int,
         total: int
     ) -> None:
-        spinner = ["⠋", "⠙", "⠸", "⠴", "⠦", "⠇"]
+        spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         spin_idx = 0
         last_text = ""
 
@@ -90,7 +91,16 @@ class VideoDownloader:
             filename = progress_state.get("filename", "video")
             phase = progress_state.get("phase", "Preparing download")
             started_at = float(progress_state.get("started_at", time.time()))
-            elapsed = max(0, time.time() - started_at)
+            elapsed = max(0.1, time.time() - started_at)
+
+            eta_text = "estimating..."
+            if total_bytes > 0 and speed > 0:
+                remaining = total_bytes - downloaded
+                eta_seconds = remaining / speed
+                if eta_seconds > 0:
+                    eta_text = Formatter.duration(eta_seconds)
+                else:
+                    eta_text = "finishing..."
 
             if total_bytes > 0:
                 pct = min(99, int((downloaded / total_bytes) * 100))
@@ -104,13 +114,14 @@ class VideoDownloader:
 
             text = (
                 "🎬 **Downloading Your Media**\n\n"
-                f"🔄 **Status:** {spinner[spin_idx % len(spinner)]} Working\n"
+                f"🔄 **Status:** {spinner[spin_idx % len(spinner)]} In Progress\n"
                 f"📌 **Item:** `{index}/{total}`\n"
                 f"🧩 **Stage:** {VideoDownloader._pretty_phase(phase)}\n"
-                f"📄 **File:** `{os.path.basename(str(filename))[:60]}`\n"
+                f"📄 **File:** `{os.path.basename(str(filename))[:50]}...`\n"
                 f"📊 **Progress:** `{VideoDownloader._progress_bar(pct)}` **{pct}%**\n"
-                f"💾 **Downloaded:** {size_line}\n"
-                f"⚡ **Speed:** {VideoDownloader._format_speed(speed)}\n"
+                f"💾 **Size:** {size_line}\n"
+                f"⚡ **Speed:** `{VideoDownloader._format_speed(speed)}`\n"
+                f"⏳ **ETA:** `{eta_text}`\n"
                 f"⏱️ **Elapsed:** {Formatter.duration(elapsed)}"
             )
             spin_idx += 1
@@ -122,13 +133,13 @@ class VideoDownloader:
                 except Exception:
                     pass
 
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(1.2)
 
         # Emit a final "downloaded" state for this URL before sender phase.
         final_text = (
             "✅ **Download Complete**\n\n"
             f"📌 **Item:** `{index}/{total}`\n"
-            "📤 **Next:** Preparing files to send to you"
+            "📤 **Next:** Preparing files to send to you..."
         )
         try:
             await status_msg.edit_text(final_text, disable_web_page_preview=True)
@@ -140,7 +151,8 @@ class VideoDownloader:
         url: str,
         status_msg: Optional[Message],
         index: int = 1,
-        total: int = 1
+        total: int = 1,
+        user_id: int = 0
     ) -> Tuple[Optional[List[str]], Optional[Dict]]:
         progress_state: Dict = {
             "downloaded": 0,
@@ -160,16 +172,14 @@ class VideoDownloader:
 
         loop = asyncio.get_running_loop()
         try:
-            result = await loop.run_in_executor(
-                None,
-                lambda: VideoDownloader.download(
-                    url=url,
-                    message=None,
-                    status_msg=None,
-                    index=index,
-                    total=total,
-                    progress_state=progress_state,
-                ),
+            result = await VideoDownloader.download(
+                url=url,
+                message=None,
+                status_msg=None,
+                index=index,
+                total=total,
+                progress_state=progress_state,
+                user_id=user_id
             )
             return result
         finally:
@@ -179,14 +189,43 @@ class VideoDownloader:
                     await progress_task
     
     @staticmethod
-    def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None,
-                 index: int = 1, total: int = 1, progress_state: Optional[Dict] = None) -> Tuple[Optional[List[str]], Optional[Dict]]:
+    async def download(url: str, message: Optional[Message] = None, status_msg: Optional[Message] = None,
+                 index: int = 1, total: int = 1, progress_state: Optional[Dict] = None, user_id: int = 0) -> Tuple[Optional[List[str]], Optional[Dict]]:
         """
         Download video(s) from URL - SUPPORTS MULTIPLE VIDEOS
         Returns: (list_of_video_paths, info_dict) or (None, None)
         """
         
-        # Define quality profiles to try in order
+        # 1. Custom Progress Callback for Services
+        def service_progress_callback(d):
+            if progress_state is not None:
+                progress_state['downloaded'] = d.get('downloaded_bytes', 0)
+                progress_state['total'] = d.get('total_bytes', 0)
+                progress_state['speed'] = d.get('speed', 0.0)
+                progress_state['filename'] = d.get('filename', 'video.mp4')
+                progress_state['phase'] = 'Downloading media'
+
+        # 2. Check for RedGifs
+        if "redgifs.com/watch/" in url.lower():
+            if progress_state is not None: progress_state["phase"] = "Analyzing RedGifs..."
+            from core.redgifs_media_service import RedGifsMediaService
+            # RedGifs downloader doesn't support progress callback yet, but we'll add it if needed
+            paths, ctype, info = await RedGifsMediaService.download_media(url, user_id)
+            return paths, info
+
+        # 3. Check for bad.news
+        if "bad.news/t/" in url.lower():
+            if progress_state is not None: progress_state["phase"] = "Analyzing BadNews mirror..."
+            paths, ctype, info = await BadNewsService.download_media(url, user_id, service_progress_callback)
+            return paths, info
+
+        # 4. Check for Papalah
+        if "papalah.com" in url.lower():
+            if progress_state is not None: progress_state["phase"] = "Analyzing Papalah mirror..."
+            paths, ctype, info = await PapalahService.download_media(url, user_id, service_progress_callback)
+            return paths, info
+
+        # 5. Default YT-DLP Quality profiles
         quality_profiles = [
             {
                 'name': 'High Quality',
@@ -421,122 +460,58 @@ class VideoDownloader:
         ui_task = asyncio.create_task(ui_updater())
 
         # Worker for a single URL
+        # Worker for a single URL
         async def process_url(url: str, idx: int):
             try:
-                state["url_progress"][url] = "Checking media..."
+                # 1. Update overall status for this URL
+                state["url_progress"][url] = "Preparing..."
                 
+                # 2. Extract videy link if applicable (optimization for X)
                 from utils.url_extractor import URLExtractor
-                from core.reddit_service import RedditService
                 download_url = url
-                
-                # Check for Reddit
-                if RedditService.is_reddit_url(url):
-                    state["url_progress"][url] = "Reddit download..."
-                    reddit_paths, reddit_type, _info = await RedditService.download_reddit_media(url, user_id)
-                    if reddit_paths:
-                        if reddit_type == "video":
-                            state["video_success_count"] += 1
-                            downloaded_video_paths.extend(reddit_paths)
-                        else:
-                            state["image_success_count"] += 1
-                            downloaded_image_paths.extend(reddit_paths)
-                        
-                        for rp in reddit_paths:
-                            video_source_map[rp] = url
-                            file_size = os.path.getsize(rp)
-                            url_results.append(DownloadResult(url=url, status='success', filename=os.path.basename(rp), size=file_size / (1024 * 1024), content_type=reddit_type))
-                        
-                    state["url_progress"][url] = "Done"
-                    state["processed"] += 1
-                    return
-
-                # Check for RedGifs
-                if "redgifs.com/watch/" in url.lower():
-                    state["url_progress"][url] = "RedGifs download..."
-                    from core.redgifs_media_service import RedGifsMediaService
-                    rg_paths, rg_type, rg_info = await RedGifsMediaService.download_media(url, user_id)
-                    if rg_paths:
-                        state["video_success_count"] += 1
-                        downloaded_video_paths.extend(rg_paths)
-                        for rp in rg_paths:
-                            video_source_map[rp] = url
-                            file_size = os.path.getsize(rp)
-                            url_results.append(DownloadResult(
-                                url=url, status='success', 
-                                filename=os.path.basename(rp), 
-                                size=file_size / (1024 * 1024), 
-                                content_type='video'
-                            ))
-                        state["url_progress"][url] = "Done"
-                        state["processed"] += 1
-                        return
-
-                # Check for bad.news
-                if "bad.news/t/" in url.lower():
-                    state["url_progress"][url] = "BadNews download..."
-                    bn_paths, bn_type, bn_info = await BadNewsService.download_media(url, user_id)
-                    if bn_paths:
-                        state["video_success_count"] += 1
-                        downloaded_video_paths.extend(bn_paths)
-                        for bp in bn_paths:
-                            video_source_map[bp] = url
-                            file_size = os.path.getsize(bp)
-                            url_results.append(DownloadResult(
-                                url=url, status='success', 
-                                filename=os.path.basename(bp), 
-                                size=file_size / (1024 * 1024), 
-                                content_type='video'
-                            ))
-                        state["url_progress"][url] = "Done"
-                        state["processed"] += 1
-                        return
-
-                # Check for Papalah
-                if "papalah.com" in url.lower():
-                    state["url_progress"][url] = "Papalah download..."
-                    pa_paths, pa_type, pa_info = await PapalahService.download_media(url, user_id)
-                    if pa_paths:
-                        state["video_success_count"] += 1
-                        downloaded_video_paths.extend(pa_paths)
-                        for pp in pa_paths:
-                            video_source_map[pp] = url
-                            file_size = os.path.getsize(pp)
-                            url_results.append(DownloadResult(
-                                url=url, status='success', 
-                                filename=os.path.basename(pp), 
-                                size=file_size / (1024 * 1024), 
-                                content_type='video'
-                            ))
-                        state["url_progress"][url] = "Done"
-                        state["processed"] += 1
-                        return
-
                 if "x.com" in url or "twitter.com" in url:
                     videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
                     if videy_url:
                         download_url = videy_url
                         logger.info(f"Bulk download: Found videy link in tweet: {videy_url}")
-                
-                # We do not pass status_msg to download_with_progress to prevent multiple 
-                # routines from fighting over editing the same Telegram message.
-                # It will run silently in the background while UI poller updates overall state.
+
+                # 3. Define a granular progress state for this specific URL
+                # This could be used by UI updater to show current item details
+                item_progress: Dict = {
+                    "downloaded": 0, "total": 0, "speed": 0.0,
+                    "filename": "video", "phase": "Starting", "done": False, "started_at": time.time()
+                }
+
+                # Helper to update both item and overall state
+                def internal_callback(p):
+                    item_progress["downloaded"] = p.get("downloaded_bytes", 0)
+                    item_progress["total"] = p.get("total_bytes", 0)
+                    item_progress["speed"] = p.get("speed", 0.0)
+                    item_progress["phase"] = p.get("status", "downloading")
+                    # Update overall state for the UI polling
+                    pct = int((item_progress["downloaded"] / item_progress["total"] * 100)) if item_progress["total"] > 0 else 0
+                    state["url_progress"][url] = f"Downloading ({pct}%)"
+
+                # 4. Use unified download_with_progress (silent mode for bulk)
+                state["url_progress"][url] = "Analyzing..."
                 video_paths, video_info = await VideoDownloader.download_with_progress(
                     url=download_url,
-                    status_msg=None, 
+                    status_msg=None, # Silent UI
                     index=idx,
                     total=total,
+                    user_id=user_id
                 )
                 
                 if video_paths and len(video_paths) > 0:
                     state["video_success_count"] += 1
                     downloaded_video_paths.extend(video_paths)
-                    for video_path in video_paths:
-                        video_source_map[video_path] = url
-                    
-                    source_username = extract_twitter_username(url)
-                    for video_path in video_paths:
-                        file_size = os.path.getsize(video_path)
-                        filename = os.path.basename(video_path)
+                    for vp in video_paths:
+                        video_source_map[vp] = url
+                        file_size = os.path.getsize(vp)
+                        filename = os.path.basename(vp)
+                        # Add to history
+                        from utils.url_parser import extract_twitter_username
+                        source_username = extract_twitter_username(url) if "twitter" in url or "x.com" in url else "Bulk User"
                         history_db.add_entry(
                             user_id=user_id, url=url, source_username=source_username,
                             filename=filename, status='success', content_type='video', file_size=file_size
@@ -544,36 +519,27 @@ class VideoDownloader:
                         url_results.append(DownloadResult(url=url, status='success', filename=filename, size=file_size / (1024 * 1024), content_type='video'))
                     state["url_progress"][url] = "Done"
                 else:
-                    # Video failed, try Image
-                    state["url_progress"][url] = "Trying image..."
-                    image_paths, image_info = await ImageDownloader.download(
-                        url, message=None, status_callback=None, index=idx, total=total
-                    )
-                    
-                    if image_paths and len(image_paths) > 0:
-                        state["image_success_count"] += 1
-                        downloaded_image_paths.extend(image_paths)
-                        
-                        source_username = extract_twitter_username(url)
-                        total_size = sum(os.path.getsize(img) for img in image_paths if os.path.exists(img))
-                        history_db.add_entry(
-                            user_id=user_id, url=url, source_username=source_username,
-                            filename=f"{len(image_paths)} images", status='success', content_type='image', file_size=total_size
+                    # Check if it was images (Reddit/X only)
+                    from core.reddit_service import RedditService
+                    if RedditService.is_reddit_url(url) or "x.com" in url or "twitter.com" in url:
+                        state["url_progress"][url] = "Checking images..."
+                        image_paths, image_info = await ImageDownloader.download(
+                            url, message=None, status_callback=None, index=idx, total=total
                         )
-                        for img_path in image_paths:
-                            url_results.append(DownloadResult(url=url, status='success', filename=os.path.basename(img_path), size=os.path.getsize(img_path) / (1024 * 1024), content_type='image'))
-                        state["url_progress"][url] = "Done"
-                    else:
-                        state["failed_count"] += 1
-                        url_results.append(DownloadResult(url=url, status='failed', error='No video or images found', content_type='unknown'))
-                        state["url_progress"][url] = "Failed"
+                        if image_paths:
+                            state["image_success_count"] += 1
+                            downloaded_image_paths.extend(image_paths)
+                            state["url_progress"][url] = "Done"
+                            return
+                    
+                    state["failed_count"] += 1
+                    url_results.append(DownloadResult(url=url, status='failed', error='No media found', content_type='video'))
+                    state["url_progress"][url] = "Failed"
             except Exception as e:
-                error_msg = VideoDownloader._parse_error(str(e))
+                logger.error(f"Error processing {url} in bulk: {e}")
                 state["failed_count"] += 1
-                source_username = extract_twitter_username(url)
-                history_db.add_entry(user_id=user_id, url=url, source_username=source_username, filename=None, status='failed', content_type='unknown', file_size=0, error_message=error_msg)
-                url_results.append(DownloadResult(url=url, status='failed', error=error_msg, content_type='unknown'))
-                state["url_progress"][url] = "Failed"
+                state["url_progress"][url] = "Error"
+                url_results.append(DownloadResult(url=url, status='failed', error=str(e), content_type='unknown'))
             finally:
                 state["processed"] += 1
 
