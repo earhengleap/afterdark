@@ -1,0 +1,11 @@
+[38;20m2026-03-02 13:12:37[0m | [32;20mINFO    [0m | [36;20mHistoryDB                   [0m | Database initialized successfully
+[38;20m2026-03-02 13:12:37[0m | [31;20mERROR   [0m | [36;20mRedGifsMediaService         [0m | Failed to get RedGifs token: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+https://www.redgifs.com/watch/bowedsleepynandine -> None
+[38;20m2026-03-02 13:12:37[0m | [31;20mERROR   [0m | [36;20mRedGifsMediaService         [0m | Failed to get RedGifs token: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+https://www.redgifs.com/watch/wellinformedwasteful -> None
+[38;20m2026-03-02 13:12:37[0m | [31;20mERROR   [0m | [36;20mRedGifsMediaService         [0m | Failed to get RedGifs token: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+[38;20m2026-03-02 13:12:37[0m | [31;20mERROR   [0m | [36;20mRedGifsMediaService         [0m | Failed to get RedGifs token: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+
+Download Results:
+([], 'unknown', {'error': 'Failed to resolve direct URL'})
+([], 'unknown', {'error': 'Failed to resolve direct URL'})

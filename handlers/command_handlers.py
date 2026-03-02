@@ -959,6 +959,88 @@ def setup_command_handlers(app: Client):
         except Exception as e:
             logger.error(f"/redgifs_media failed for {username}: {e}", exc_info=True)
             await status_msg.edit_text(f"Failed to process /redgifs_media: {str(e)[:200]}")
+
+    @app.on_message(filters.private & filters.command(["papalah_media", "papalahmedia"]))
+    async def papalah_media_handler(client: Client, message: Message) -> None:
+        """Handle /papalah_media <user_id> [limit] command."""
+        if len(message.command) < 2:
+            await message.reply_text(
+                "Example:\n"
+                "/papalah_media 102812\n"
+                "/papalah_media 102812 10\n\n"
+                "Tip: The ID is the number found in their profile URL (e.g. papalah.com/v/102812)"
+            )
+            return
+
+        username = message.command[1].strip()
+        limit = None
+        
+        # Parse limit if provided
+        if len(message.command) >= 3:
+            try:
+                limit = int(message.command[2])
+            except ValueError:
+                pass
+
+        status_msg = await message.reply_text(
+            f"Scanning Papalah profile...\n\n"
+            f"User ID: {username}\n"
+            f"Source: https://www.papalah.com/v/{username}\n\n"
+            f"Collecting media links..."
+        )
+
+        try:
+            # Fetch Media via Playwright stealth scraper
+            media_data = await PapalahService.scrape_user_media(
+                username=username,
+                limit=limit
+            )
+            
+            err = media_data.get("error")
+            if err:
+                await status_msg.edit_text(f"❌ **Error:** {err}")
+                return
+
+            urls = media_data.get("post_urls", [])
+            video_count = len(urls)
+            
+            if not urls:
+                await status_msg.edit_text(
+                    f"No media posts found for user {username}.\n"
+                    f"Make sure the User ID is correct or that they have public uploads."
+                )
+                return
+
+            logger.info(
+                f"/papalah_media scrape success for {username}: posts={len(urls)}, limit={limit or 'ALL'}"
+            )
+
+            await status_msg.edit_text(
+                f"✅ **Papalah Profile Selected**\n\n"
+                f"👤 **User ID:** {username}\n"
+                f"📹 **Videos found:** {video_count}\n"
+                f"📊 **Limit:** {limit if limit else 'ALL'}\n\n"
+                f"🚀 Initiating download sequence..."
+            )
+
+            max_len = 3800
+            header = f"Papalah media links for {username}:\n\n"
+            chunk = header
+            for idx, link in enumerate(urls, 1):
+                line = f"{idx}. {link}\n"
+                if len(chunk) + len(line) > max_len:
+                    await message.reply_text(chunk, disable_web_page_preview=True)
+                    chunk = header + line
+                else:
+                    chunk += line
+            if chunk.strip() and chunk != header:
+                await message.reply_text(chunk, disable_web_page_preview=True)
+
+            await VideoDownloader.download_multiple(urls, message, message.from_user.id, status_msg)
+        except Exception as e:
+            logger.error(f"/papalah_media failed for {username}: {e}", exc_info=True)
+            await status_msg.edit_text(f"Failed to process /papalah_media: {str(e)[:200]}")
+
     @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
     async def chat_handler(client: Client, message: Message) -> None:
         """Handle explicit AI chat commands"""

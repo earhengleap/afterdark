@@ -5,6 +5,7 @@ import re
 import os
 import time
 from typing import List, Dict, Optional, Tuple
+import uuid
 
 from core.logger import setup_logger
 from config.paths import DOWNLOAD_FOLDER
@@ -72,7 +73,7 @@ class BadNewsService:
         loop = asyncio.get_event_loop()
         
         try:
-            filename = f"badnews_{user_id}_{int(time.time())}.mp4"
+            filename = f"badnews_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.mp4"
             file_path = os.path.join(DOWNLOAD_FOLDER, filename)
             
             # Use chunked download for progress feedback
