@@ -230,6 +230,21 @@ class VideoDownloader:
             paths, ctype, info = await PapalahService.download_media(url, user_id, service_progress_callback)
             return paths, info
 
+        # 5. Check for Reddit
+        from core.reddit_service import RedditService
+        if RedditService.is_reddit_url(url):
+            if progress_state is not None: progress_state["phase"] = "Analyzing Reddit..."
+            paths, ctype, info = await RedditService.download_reddit_media(url, user_id)
+            # Reddit service currently handles both video and image depending on the post type.
+            return paths, info
+
+        # 6. Check for 91porn
+        from core.porn91_service import Porn91Service
+        if Porn91Service.is_91porn_url(url):
+            if progress_state is not None: progress_state["phase"] = "Analyzing 91porn (Cloudflare bypass)..."
+            paths, ctype, info = await Porn91Service.download_media(url, user_id, service_progress_callback)
+            return paths, info
+
         # 5. Default YT-DLP Quality profiles
         quality_profiles = [
             {
@@ -517,20 +532,38 @@ class VideoDownloader:
                 )
                 
                 if video_paths and len(video_paths) > 0:
-                    state["video_success_count"] += 1
-                    downloaded_video_paths.extend(video_paths)
+                    actual_videos = []
+                    actual_images = []
                     for vp in video_paths:
-                        video_source_map[vp] = url
-                        file_size = os.path.getsize(vp)
-                        filename = os.path.basename(vp)
-                        # Add to history
-                        from utils.url_parser import extract_twitter_username
-                        source_username = extract_twitter_username(url) if "twitter" in url or "x.com" in url else "Bulk User"
-                        history_db.add_entry(
-                            user_id=user_id, url=url, source_username=source_username,
-                            filename=filename, status='success', content_type='video', file_size=file_size
-                        )
-                        url_results.append(DownloadResult(url=url, status='success', filename=filename, size=file_size / (1024 * 1024), content_type='video'))
+                        if vp.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                            actual_images.append(vp)
+                        else:
+                            actual_videos.append(vp)
+                            
+                    if actual_videos:
+                        state["video_success_count"] += 1
+                        downloaded_video_paths.extend(actual_videos)
+                        for vp in actual_videos:
+                            video_source_map[vp] = url
+                            file_size = os.path.getsize(vp)
+                            filename = os.path.basename(vp)
+                            # Add to history
+                            from utils.url_parser import extract_twitter_username
+                            source_username = extract_twitter_username(url) if "twitter" in url or "x.com" in url else "Bulk User"
+                            history_db.add_entry(
+                                user_id=user_id, url=url, source_username=source_username,
+                                filename=filename, status='success', content_type='video', file_size=file_size
+                            )
+                            url_results.append(DownloadResult(url=url, status='success', filename=filename, size=file_size / (1024 * 1024), content_type='video'))
+                            
+                    if actual_images:
+                        state["image_success_count"] += 1
+                        downloaded_image_paths.extend(actual_images)
+                        for ip in actual_images:
+                            file_size = os.path.getsize(ip)
+                            filename = os.path.basename(ip)
+                            url_results.append(DownloadResult(url=url, status='success', filename=filename, size=file_size / (1024 * 1024), content_type='image'))
+                            
                     state["url_progress"][url] = "Done"
                 else:
                     # Check if it was images (Reddit/X only)

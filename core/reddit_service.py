@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+import uuid
 import asyncio
 import logging
 import requests
@@ -151,7 +152,8 @@ class RedditService:
                 elif '.gif' in active_url.lower(): ext = '.gif'
                 elif '.mp4' in active_url.lower() or 'video' in active_url.lower() or 'redgifs' in m_url.lower(): ext = '.mp4'
                 
-                filename = f"reddit_{user_id}_{int(time.time())}_{idx}{ext}"
+                unique_id = uuid.uuid4().hex[:8]
+                filename = f"reddit_{user_id}_{int(time.time())}_{unique_id}_{idx}{ext}"
                 file_path = os.path.join(target_folder, filename)
                 
                 response = await loop.run_in_executor(
