@@ -104,7 +104,7 @@ def _check_single_instance() -> bool:
             logger.info("-" * 60)
             logger.error("  Another instance of AfterDark is already running!")
             logger.error("  Please stop the existing instance first:")
-            logger.error(f"     Windows: Taskkill /PID {existing_pid} /F")
+            logger.error(f"     Windows: Taskkill //PID {existing_pid} //F")
             logger.error(f"     Linux:   kill -9 {existing_pid}")
             logger.error("=" * 60)
             return False
@@ -1490,6 +1490,29 @@ if __name__ == "__main__":
     # For better cross-platform support, we just rely on KeyboardInterrupt for local dev, 
     # but for production on Linux, add_signal_handler is better.
     
+    def handle_exception(loop, context):
+        msg = context.get("exception", context["message"])
+        logger.error(f"Caught exception: {msg}")
+        
+    async def shutdown(signal_name, loop):
+        logger.info(f"Received exit signal {signal_name}...")
+        try:
+            if app.is_connected:
+                logger.info("Disconnecting bot...")
+                await app.stop()
+                logger.info("âœ“ Bot disconnected")
+        except Exception as e:
+            logger.error(f"Error during shutdown disconnect: {e}")
+        finally:
+            _stop_aux_processes()
+            
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+        
+        await asyncio.gather(*tasks, return_exceptions=True)
+        loop.stop()
+
     if os.name != 'nt':
         signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
         for s in signals:
@@ -1501,7 +1524,18 @@ if __name__ == "__main__":
     try:
         loop.run_until_complete(main())
     except KeyboardInterrupt:
-        logger.warning("Bot stopped by user interrupt (KeyboardInterrupt)")
+        logger.warning("\nBot stopped by user interrupt (KeyboardInterrupt)")
+        # On Windows or when signal handlers don't catch it first, ensure cleanup runs
+        try:
+            if loop.is_running():
+                # If loop is still running, schedule shutdown
+                loop.create_task(shutdown("SIGINT", loop))
+            else:
+                # If loop stopped, run shutdown explicitly
+                loop.run_until_complete(shutdown("SIGINT", loop))
+        except Exception as e:
+            logger.critical(f"Error executing emergency shutdown: {e}")
+            _stop_aux_processes()
     finally:
         logger.info("System shutdown complete")
 

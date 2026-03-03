@@ -824,5 +824,33 @@
     "status": "success",
     "content_type": "redgifs",
     "timestamp": "2026-03-02 16:04:35"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://bad.news/t/5986416",
+    "status": "success",
+    "content_type": "bad_news",
+    "timestamp": "2026-03-03 12:17:06"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://bad.news/t/5986416",
+    "status": "success",
+    "content_type": "bad_news",
+    "timestamp": "2026-03-03 12:29:18"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://bad.news/t/5986416",
+    "status": "success",
+    "content_type": "bad_news",
+    "timestamp": "2026-03-03 12:40:06"
+  },
+  {
+    "username": "arekushisu_2001",
+    "url": "https://bad.news/t/5986416",
+    "status": "success",
+    "content_type": "bad_news",
+    "timestamp": "2026-03-03 13:00:15"
   }
 ]
