@@ -1004,7 +1004,7 @@ def _kill_port_process(port: int) -> bool:
                         pid = parts[-1]
                         if pid.isdigit() and int(pid) > 0:
                             logger.info(f"Force killing process {pid} occupying port {port}...")
-                            subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            subprocess.run(f"taskkill //PID {pid} //F", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                             killed_any = True
         else:
             output = subprocess.check_output(f"lsof -i:{port} -t", shell=True, text=True)
