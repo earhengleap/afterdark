@@ -245,6 +245,49 @@ def get_version_info() -> str:
 ━━━━━━━━━━━━━━━━━━━━
 *Stable Release • Production Ready*"""
 
+
+def get_save_folder_display(file_path: str) -> str:
+    """Return a human-readable platform save folder from a file path.
+    
+    Examples:
+        .../media/videos/X/01-video.mp4   → 📂 media/videos/X/
+        .../media/images/Reddit/01-a.jpg  → 📂 media/images/Reddit/
+    """
+    try:
+        from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER
+        norm = os.path.normpath(file_path)
+        folder = os.path.dirname(norm)
+        # Try expressing as relative to the project root (cwd)
+        try:
+            rel = os.path.relpath(folder, os.getcwd())
+        except ValueError:
+            rel = folder
+        return f"📂 `{rel}`"
+    except Exception:
+        return ""
+
+
+def get_platform_from_url(url: str) -> str:
+    """Return a platform display label from a URL string."""
+    u = (url or "").lower()
+    if 'x.com' in u or 'twitter.com' in u:
+        return '𝕏 (Twitter)'
+    if 'reddit.com' in u or 'redd.it' in u:
+        return 'Reddit'
+    if 'redgifs.com' in u:
+        return 'RedGifs'
+    if '91porn' in u or '91.porn' in u:
+        return '91Porn'
+    if 'papalah.com' in u:
+        return 'Papalah'
+    if 'bad.news' in u:
+        return 'Bad.news'
+    if 'videy.co' in u:
+        return 'Videy'
+    return 'Unknown'
+
+
+
 def extract_x_username_and_url(url: str) -> tuple:
     """Extract X/Twitter username and profile URL from post URL"""
     try:
@@ -345,28 +388,35 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 author_prefix = "@"
                 source_display = f"{author_prefix}{x_username}"
             
+            platform_label = get_platform_from_url(url)
+            save_folder = get_save_folder_display(video_path)
+
             if total_videos > 1:
                 caption = (
                     f"🎬 **Video {idx}/{total_videos}**\n\n"
+                    f"🌐 **Platform:** {platform_label}\n"
                     f"👤 **{source_label}:** {source_display}\n"
                     f"🔗 **Source:** {formatted_url}\n"
                     f"📁 **File:** `{file_name}`\n"
                     f"📏 **Resolution:** {resolution_text}\n"
                     f"💾 **Size:** {file_size:.2f} MB\n"
                     f"📥 **Downloaded by:** {username}\n"
-                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n"
+                    f"🗂️ **Saved to:** {save_folder}\n\n"
                     f"✅ AfterDark Video Bot"
                 )
             else:
                 caption = (
                     f"🎬 **Download Successful**\n\n"
+                    f"🌐 **Platform:** {platform_label}\n"
                     f"👤 **{source_label}:** {source_display}\n"
                     f"🔗 **Source:** {formatted_url}\n"
                     f"📁 **File:** `{file_name}`\n"
                     f"📏 **Resolution:** {resolution_text}\n"
                     f"💾 **Size:** {file_size:.2f} MB\n"
                     f"📥 **Downloaded by:** {username}\n"
-                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n"
+                    f"🗂️ **Saved to:** {save_folder}\n\n"
                     f"✅ AfterDark Video Bot"
                 )
 

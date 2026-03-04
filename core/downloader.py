@@ -12,7 +12,7 @@ import yt_dlp
 from pyrogram.types import Message
 
 from config.settings import COOKIE_FILE, FFMPEG_PATH
-from config.paths import DOWNLOAD_FOLDER
+from config.paths import DOWNLOAD_FOLDER, get_platform_folder, apply_sequence_prefix
 from models.data_models import DownloadResult, VideoInfo
 from core.file_manager import FileManager
 from core.log_manager import LogManager
@@ -210,42 +210,84 @@ class VideoDownloader:
             if item_progress_callback:
                 item_progress_callback(d)
 
-        # 2. Check for RedGifs
+        # 2. Determine platform and resolve destination folder
+        def _infer_platform(u: str) -> str:
+            u = u.lower()
+            if 'x.com' in u or 'twitter.com' in u:
+                return 'X'
+            if 'videy.co' in u:
+                return 'Videy'
+            if 'redgifs.com' in u:
+                return 'RedGifs'
+            if 'bad.news' in u:
+                return 'BadNews'
+            if 'papalah.com' in u:
+                return 'Papalah'
+            if 'reddit.com' in u or 'redd.it' in u:
+                return 'Reddit'
+            if '91porn' in u or '91.porn' in u:
+                return '91Porn'
+            return 'Generic'
+
+        platform = _infer_platform(url)
+
+        # For X (Twitter), further subdivide by username
+        if platform == 'X':
+            from core.parsing.url_parser import extract_twitter_username
+            from config.paths import get_x_user_folder
+            x_username = extract_twitter_username(url)
+            if x_username:
+                platform_video_folder = get_x_user_folder(x_username, 'video')
+            else:
+                platform_video_folder = get_platform_folder('X', 'video')
+        else:
+            platform_video_folder = get_platform_folder(platform, 'video')
+
+
+        # 3. Check for RedGifs
         if "redgifs.com/watch/" in url.lower():
             if progress_state is not None: progress_state["phase"] = "Analyzing RedGifs..."
             from core.redgifs_media_service import RedGifsMediaService
-            # RedGifs downloader doesn't support progress callback yet, but we'll add it if needed
             paths, ctype, info = await RedGifsMediaService.download_media(url, user_id)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
 
-        # 3. Check for bad.news
+        # 4. Check for bad.news
         if "bad.news/t/" in url.lower():
             if progress_state is not None: progress_state["phase"] = "Analyzing BadNews mirror..."
             paths, ctype, info = await BadNewsService.download_media(url, user_id, service_progress_callback)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
 
-        # 4. Check for Papalah
+        # 5. Check for Papalah
         if "papalah.com" in url.lower():
             if progress_state is not None: progress_state["phase"] = "Analyzing Papalah mirror..."
             paths, ctype, info = await PapalahService.download_media(url, user_id, service_progress_callback)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
 
-        # 5. Check for Reddit
+        # 6. Check for Reddit
         from core.reddit_service import RedditService
         if RedditService.is_reddit_url(url):
             if progress_state is not None: progress_state["phase"] = "Analyzing Reddit..."
             paths, ctype, info = await RedditService.download_reddit_media(url, user_id)
-            # Reddit service currently handles both video and image depending on the post type.
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
 
-        # 6. Check for 91porn
+        # 7. Check for 91porn
         from core.porn91_service import Porn91Service
         if Porn91Service.is_91porn_url(url):
             if progress_state is not None: progress_state["phase"] = "Analyzing 91porn (Cloudflare bypass)..."
             paths, ctype, info = await Porn91Service.download_media(url, user_id, service_progress_callback)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
 
-        # 5. Default YT-DLP Quality profiles
+        # 8. Default YT-DLP Quality profiles
         quality_profiles = [
             {
                 'name': 'High Quality',
@@ -314,7 +356,7 @@ class VideoDownloader:
                     'format': profile['format'],
                     'merge_output_format': profile['merge_output_format'],
                     'ffmpeg_location': FFMPEG_PATH,
-                    'outtmpl': os.path.join(DOWNLOAD_FOLDER, f'%(title).120B_{job_token}_%(autonumber)s.%(ext)s'),
+                    'outtmpl': os.path.join(platform_video_folder, f'%(title).120B_{job_token}_%(autonumber)s.%(ext)s'),
                     'noplaylist': False,  # Changed to False to allow multiple videos
                     'quiet': True,
                     'no_warnings': True,
@@ -804,7 +846,22 @@ class VideoDownloader:
             f"• ❌ Failed: {failed_count}\n"
             f"• ⏱️ Time: {Formatter.duration(total_time)}\n\n"
         )
-        
+
+        # Build set of unique save folders to show user where files went
+        all_paths = (video_paths or []) + (image_paths or [])
+        if all_paths:
+            seen_folders = {}
+            for p in all_paths:
+                folder = os.path.dirname(os.path.normpath(p))
+                try:
+                    rel = os.path.relpath(folder, os.getcwd())
+                except ValueError:
+                    rel = folder
+                seen_folders[rel] = seen_folders.get(rel, 0) + 1
+            folder_lines = "\n".join(f"  📂 `{f}` ({n} file{'s' if n > 1 else ''})" for f, n in seen_folders.items())
+            summary_text += f"🗂️ **Saved to:**\n{folder_lines}\n\n"
+
+
         total_success = video_success_count + image_success_count
         total_files = len(video_paths) + len(image_paths)
         

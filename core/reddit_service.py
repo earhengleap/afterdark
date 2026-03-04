@@ -9,7 +9,7 @@ import requests
 from typing import List, Tuple, Optional, Dict
 from urllib.parse import urlparse
 
-from config.paths import IMAGES_FOLDER, DOWNLOAD_FOLDER
+from config.paths import IMAGES_FOLDER, DOWNLOAD_FOLDER, get_platform_folder, apply_sequence_prefix
 from core.logger import setup_logger
 from core.file_manager import FileManager
 from core.redgifs_media_service import RedGifsMediaService
@@ -134,7 +134,7 @@ class RedditService:
         downloaded_paths = []
         is_video = info.get("is_video", False)
         content_type = "video" if is_video else "image"
-        target_folder = DOWNLOAD_FOLDER if is_video else IMAGES_FOLDER
+        target_folder = get_platform_folder("Reddit", "video" if is_video else "image")
 
         loop = asyncio.get_event_loop()
         for idx, m_url in enumerate(media_urls):
@@ -164,10 +164,7 @@ class RedditService:
                 if response.status_code == 200:
                     with open(file_path, 'wb') as f:
                         f.write(response.content)
-                    
-                    # Rename for uniqueness if needed
-                    from core.image_downloader import ImageDownloader
-                    final_path = ImageDownloader._safe_rename_with_number(file_path) if not is_video else file_path
+                    final_path = apply_sequence_prefix(file_path)
                     downloaded_paths.append(final_path)
             except Exception as e:
                 logger.error(f"Failed to download Reddit item {m_url}: {e}")

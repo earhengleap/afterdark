@@ -16,7 +16,7 @@ from urllib.parse import urlparse, parse_qs
 from pyrogram.types import Message, InputMediaPhoto
 
 from config.settings import COOKIE_FILE
-from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER
+from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER, get_platform_folder, get_x_user_folder, apply_sequence_prefix
 from models.data_models import DownloadResult
 from core.file_manager import FileManager
 from core.log_manager import LogManager
@@ -83,8 +83,13 @@ class ImageDownloader:
                 status_callback, 12, f"🔗 Link {index}/{total} - Link checked"
             )
             
-            # Use separate images folder (not inside videos)
-            download_folder = IMAGES_FOLDER
+            # Use the X platform per-user images subfolder
+            x_username = extract_twitter_username(url)
+            if x_username:
+                download_folder = get_x_user_folder(x_username, "image")
+                logger.debug(f"X image folder: {download_folder}")
+            else:
+                download_folder = get_platform_folder("X", "image")
             
             # Get list of existing files BEFORE download
             existing_files = set()

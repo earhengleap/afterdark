@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Tuple
 import yt_dlp
 
 from core.logger import setup_logger
-from config.paths import DOWNLOAD_FOLDER
+from config.paths import DOWNLOAD_FOLDER, get_platform_folder, apply_sequence_prefix
 
 logger = setup_logger("RedGifsMediaService")
 
@@ -360,21 +360,25 @@ class RedGifsMediaService:
             if not direct_url:
                 gif_id = RedGifsMediaService._extract_gif_id(url)
                 if gif_id:
+                    _folder = get_platform_folder("RedGifs", "video")
                     filename = f"redgifs_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.mp4"
-                    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+                    file_path = os.path.join(_folder, filename)
                     if await RedGifsMediaService._download_direct_file(
                         RedGifsMediaService._build_direct_url_candidates(gif_id)[0],
                         file_path,
                     ):
+                        file_path = apply_sequence_prefix(file_path)
                         info = {"author": "RedGifs User", "subreddit": "RedGifs", "title": os.path.basename(url), "is_video": True}
                         return [file_path], "video", info
                 return await RedGifsMediaService._download_with_ytdlp(url, user_id)
 
             try:
+                _folder = get_platform_folder("RedGifs", "video")
                 filename = f"redgifs_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.mp4"
-                file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+                file_path = os.path.join(_folder, filename)
 
                 if await RedGifsMediaService._download_direct_file(direct_url, file_path):
+                    file_path = apply_sequence_prefix(file_path)
                     info = {"author": "RedGifs User", "subreddit": "RedGifs", "title": os.path.basename(url), "is_video": True}
                     return [file_path], "video", info
 
@@ -382,6 +386,7 @@ class RedGifsMediaService:
                 if gif_id:
                     for candidate in RedGifsMediaService._build_direct_url_candidates(gif_id):
                         if await RedGifsMediaService._download_direct_file(candidate, file_path):
+                            file_path = apply_sequence_prefix(file_path)
                             info = {"author": "RedGifs User", "subreddit": "RedGifs", "title": os.path.basename(url), "is_video": True}
                             return [file_path], "video", info
 
@@ -397,8 +402,9 @@ class RedGifsMediaService:
         loop = asyncio.get_event_loop()
 
         def _run_ytdlp() -> Tuple[List[str], str, Dict]:
+            _folder = get_platform_folder("RedGifs", "video")
             outtmpl = os.path.join(
-                DOWNLOAD_FOLDER,
+                _folder,
                 f"redgifs_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.%(ext)s",
             )
             ydl_opts = {
