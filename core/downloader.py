@@ -225,7 +225,11 @@ class VideoDownloader:
                 return 'Papalah'
             if 'reddit.com' in u or 'redd.it' in u:
                 return 'Reddit'
-            if '91porn' in u or '91.porn' in u:
+            if '91porny.com' in u:
+                return '91Porny'
+            if '91porna.com' in u:
+                return '91Porna'
+            if '91porn' in u or '91.porn' in u or '91p52.com' in u or '91p.com' in u:
                 return '91Porn'
             return 'Generic'
 
@@ -283,6 +287,24 @@ class VideoDownloader:
         if Porn91Service.is_91porn_url(url):
             if progress_state is not None: progress_state["phase"] = "Analyzing 91porn (Cloudflare bypass)..."
             paths, ctype, info = await Porn91Service.download_media(url, user_id, service_progress_callback)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
+            return paths, info
+
+        # 7.2 Check for 91porny
+        from core.porny91_service import Porny91Service
+        if Porny91Service.is_91porny_url(url):
+            if progress_state is not None: progress_state["phase"] = "Analyzing 91porny (HLS interception)..."
+            paths, ctype, info = await Porny91Service.download_media(url, user_id, service_progress_callback)
+            if paths:
+                paths = [apply_sequence_prefix(p) for p in paths]
+            return paths, info
+
+        # 7.5 Check for 91porna
+        from core.porna91_service import Porna91Service
+        if Porna91Service.is_91porna_url(url):
+            if progress_state is not None: progress_state["phase"] = "Analyzing 91porna (HLS bypass)..."
+            paths, ctype, info = await Porna91Service.download_media(url, user_id, service_progress_callback)
             if paths:
                 paths = [apply_sequence_prefix(p) for p in paths]
             return paths, info
@@ -405,7 +427,7 @@ class VideoDownloader:
                                     downloaded_file = (info.get('requested_downloads') or [])[0].get('filepath')
                                 else:
                                     title = info.get('title', 'video') if isinstance(info, dict) else 'video'
-                                    downloaded_file = os.path.join(DOWNLOAD_FOLDER, f"{title}.mp4")
+                                    downloaded_file = os.path.join(platform_video_folder, f"{title}.mp4")
                                 
                                 if downloaded_file and os.path.exists(downloaded_file):
                                     new_path = FileManager.rename_with_number(downloaded_file)

@@ -23,6 +23,8 @@ PLATFORM_FOLDER_NAMES = {
     "Reddit":   "Reddit",
     "RedGifs":  "RedGifs",
     "91Porn":   "91Porn",
+    "91Porna":  "91Porna",
+    "91Porny":  "91Porny",
     "Papalah":  "Papalah",
     "BadNews":  "Bad.news",
     "Videy":    "Videy",

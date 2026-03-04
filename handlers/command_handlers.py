@@ -1352,6 +1352,46 @@ def setup_command_handlers(app: Client):
                 await log_user_action(user_id, username, url, "failed", "papalah_no_media")
                 return
 
+        # RedGifs Handler
+        if "redgifs.com/watch/" in url.lower():
+            status_msg = await message.reply_text(
+                f"🔍 **RedGifs Link Detected**\n\n"
+                f"🔗 **URL:** `{url[:50]}...`\n"
+                f"👤 **Requested by:** {username}\n"
+                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                f"⏳ Initializing RedGifs extraction...",
+                disable_web_page_preview=True
+            )
+            
+            paths, info = await VideoDownloader.download_with_progress(
+                url=url,
+                status_msg=status_msg,
+                user_id=user_id
+            )
+            
+            if paths:
+                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
+                await safe_edit_text(
+                    status_msg,
+                    f"✅ **RedGifs Download Complete**\n\n"
+                    f"💾 **Size:** {total_size:.2f} MB\n"
+                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+                    f"📤 Sending media to you...",
+                    disable_web_page_preview=True
+                )
+                await status_msg.delete()
+                # RedGifs usually provides username/title in info
+                author = info.get("userName") if info else "RedGifs User"
+                if not author: author = "RedGifs User"
+                
+                await send_videos_to_user(paths, message, user_id, author, url, username, client)
+                await log_user_action(user_id, username, url, "success", "redgifs")
+                return
+            else:
+                await safe_edit_text(status_msg, "❌ **RedGifs Download Failed**\n\nCould not extract video content.")
+                await log_user_action(user_id, username, url, "failed", "redgifs_no_media")
+                return
+
         x_username, profile_url = extract_x_username_and_url(url)
         formatted_url = format_url_for_display(url)
         
@@ -1804,45 +1844,6 @@ def setup_command_handlers(app: Client):
                 )
                 await log_user_action(user_id, username, url, "failed", "unknown")
 
-        # RedGifs Handler (Single Link)
-        if "redgifs.com/watch/" in url.lower():
-            status_msg = await message.reply_text(
-                f"🔍 **RedGifs Link Detected**\n\n"
-                f"🔗 **URL:** `{url[:50]}...`\n"
-                f"👤 **Requested by:** {username}\n"
-                f"🕒 **Time:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                f"⏳ Initializing RedGifs extraction...",
-                disable_web_page_preview=True
-            )
-            
-            paths, info = await VideoDownloader.download_with_progress(
-                url=url,
-                status_msg=status_msg,
-                user_id=user_id
-            )
-            
-            if paths:
-                total_size = sum(os.path.getsize(p) for p in paths if os.path.exists(p)) / (1024 * 1024)
-                await safe_edit_text(
-                    status_msg,
-                    f"✅ **RedGifs Download Complete**\n\n"
-                    f"💾 **Size:** {total_size:.2f} MB\n"
-                    f"🕒 **Completed:** {datetime.now().strftime('%H:%M:%S')}\n\n"
-                    f"📤 Sending media to you...",
-                    disable_web_page_preview=True
-                )
-                await status_msg.delete()
-                # RedGifs usually provides username/title in info
-                author = info.get("userName") if info else "RedGifs User"
-                if not author: author = "RedGifs User"
-                
-                await send_videos_to_user(paths, message, user_id, author, url, username, client)
-                await log_user_action(user_id, username, url, "success", "redgifs")
-                return
-            else:
-                await safe_edit_text(status_msg, "❌ **RedGifs Download Failed**\n\nCould not extract video content.")
-                await log_user_action(user_id, username, url, "failed", "redgifs_no_media")
-                return
 
 
 

@@ -9,7 +9,7 @@ import uuid
 from typing import List, Dict, Optional, Tuple
 
 from core.logger import setup_logger
-from config.paths import DOWNLOAD_FOLDER
+from config.paths import get_platform_folder
 
 logger = setup_logger("PapalahService")
 
@@ -327,7 +327,7 @@ class PapalahService:
 
         video_url = info["urls"][0]
         filename  = f"papalah_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.mp4"
-        file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+        file_path = os.path.join(get_platform_folder("Papalah", "video"), filename)
 
         loop = asyncio.get_event_loop()
 

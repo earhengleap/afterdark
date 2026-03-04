@@ -1,4 +1,5 @@
 # Media files - DO NOT UPLOAD
+/media/
 videos/
 images/
 audio/
@@ -24,6 +25,8 @@ telegram_sessions/
 data/*.db
 data/runtime/
 data/twa_public_url.txt
+data/*.lock
+data/*.pid
 users/*.json
 config/twitter_cookies.txt
 twitter_cookies.txt

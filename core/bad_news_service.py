@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Tuple
 import uuid
 
 from core.logger import setup_logger
-from config.paths import DOWNLOAD_FOLDER
+from config.paths import get_platform_folder
 
 logger = setup_logger("BadNewsService")
 
@@ -114,7 +114,7 @@ class BadNewsService:
         
         try:
             filename = f"badnews_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:6]}.mp4"
-            file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+            file_path = os.path.join(get_platform_folder("BadNews", "video"), filename)
             
             # Check if this is an HLS (m3u8) stream
             if video_url.endswith('.m3u8'):

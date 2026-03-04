@@ -213,6 +213,8 @@ NO_LIMIT_TOKENS = {"", "all", "none", "nolimit", "no-limit", "0", "-1", "inf", "
 # Suppress verbose Pyrogram rate limit messages
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("pyrogram.session.session").setLevel(logging.WARNING)
+# Suppress "socket.send() raised exception" from harmless disconnections
+logging.getLogger("pyrogram.connection.connection").setLevel(logging.ERROR)
 
 logger = logging.getLogger("twa.gallery")
 
@@ -2908,7 +2910,8 @@ class TelegramGalleryService:
             while retry_count < max_retries:
                 try:
                     # Try to generate title
-                    title = await self._generate_ai_title_for_item(item, mode="missing")
+                    # mode="fallback" allows items that only have fallback metadata to be retried
+                    title = await self._generate_ai_title_for_item(item, mode="fallback")
                     
                     if title:
                         # Success! Update the item
