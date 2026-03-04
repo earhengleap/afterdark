@@ -1,13 +1,0 @@
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0* Host media.redgifs.com:443 was resolved.
-* IPv6: (none)
-* IPv4: 79.127.235.3, 79.127.235.5, 79.127.235.9, 79.127.235.52, 89.187.162.13, 79.127.235.11, 79.127.170.195, 79.127.213.228, 207.211.208.174, 89.187.163.19
-*   Trying 79.127.235.3:443...
-* schannel: disabled automatic use of client certificate
-* ALPN: curl offers http/1.1
-* Recv failure: Connection was reset
-* schannel: failed to receive handshake, SSL/TLS connection failed
-  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
-* closing connection #0
-curl: (35) Recv failure: Connection was reset
