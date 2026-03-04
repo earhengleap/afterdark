@@ -9,6 +9,7 @@ from datetime import datetime
 from pyrogram import Client
 from pyrogram.types import CallbackQuery, Message
 import logging
+from pyrogram.errors import MessageNotModified
 
 # Get logger
 logger = logging.getLogger("AfterDark")
@@ -20,15 +21,16 @@ from resources.messages import Messages
 from resources.keyboards import Keyboards
 from resources.languages import language_manager
 from models.enums import user_downloads, user_selections
-from utils.formatters import Formatter
+from core.formatting.formatters import Formatter
 from core.image_uploader import ImageUploader
 from core.videy_links import get_videy_links
-from utils.videy_formatter import format_videy_message, format_videy_export_message
-from utils.videy_exporter import export_videy_to_csv, export_videy_to_text
+from core.formatting.videy_formatter import format_videy_message, format_videy_export_message
+from core.export.videy_exporter import export_videy_to_csv, export_videy_to_text
 
-def get_text(user_id: int, key: str) -> str:
+def get_text(user_id: int, key: str, default: str = None) -> str:
     """Helper function to get localized text"""
-    return language_manager.get_text(user_id, key)
+    return language_manager.translate(user_id, key, default)
+
 
 
 def _fallback_video_paths() -> list:
@@ -55,25 +57,25 @@ def setup_callback_handlers(app: Client):
         
         # Navigation callbacks
         if data == "download":
-            keyboard = Keyboards.cancel_button()
+            keyboard = Keyboards.cancel_button(user_id=user_id)
             await callback_query.message.edit_text(Messages.download_prompt(), reply_markup=keyboard)
         
         elif data == "download_images":
-            keyboard = Keyboards.cancel_button()
+            keyboard = Keyboards.cancel_button(user_id=user_id)
             await callback_query.message.edit_text(Messages.image_download_prompt(), reply_markup=keyboard)
         
         elif data == "about":
-            keyboard = Keyboards.back_to_main()
+            keyboard = Keyboards.back_to_main(user_id=user_id)
             await callback_query.message.edit_text(Messages.about_text(), reply_markup=keyboard)
         
         elif data == "help":
             help_text = Messages.help_text()
-            await callback_query.message.edit_text(help_text, reply_markup=Keyboards.back_to_main())
+            await callback_query.message.edit_text(help_text, reply_markup=Keyboards.back_to_main(user_id=user_id))
         
         elif data == "bulk_content":
             await callback_query.message.edit_text(
                 Messages.bulk_content_prompt(),
-                reply_markup=Keyboards.back_to_main()
+                reply_markup=Keyboards.back_to_main(user_id=user_id)
             )
         
         # ==================== BULK QUEUE HANDLERS ====================
@@ -88,7 +90,7 @@ def setup_callback_handlers(app: Client):
                 f"?? **Items in Queue:** {queue_count}\n"
                 f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
-                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode, user_id=user_id)
             )
             
         elif data.startswith("toggle_bulk:"):
@@ -107,7 +109,7 @@ def setup_callback_handlers(app: Client):
                 f"?? **Items in Queue:** {queue_count}\n"
                 f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Enable Bulk Mode to queue up links instead of downloading immediately.__",
-                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode)
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, is_bulk_mode, user_id=user_id)
             )
             
         elif data == "process_queue":
@@ -147,12 +149,12 @@ def setup_callback_handlers(app: Client):
                 f"?? **Items in Queue:** 0\n"
                 f"?? **Bulk Mode:** {'? Enabled' if is_bulk_mode else '? Disabled'}\n\n"
                 f"__Queue cleared successfully.__",
-                reply_markup=Keyboards.bulk_queue_menu(0, is_bulk_mode)
+                reply_markup=Keyboards.bulk_queue_menu(0, is_bulk_mode, user_id=user_id)
             )
         
         elif data == "get_share_link":
             from config.settings import BOT_USERNAME, BOT_NAME
-            from utils.deep_link import DeepLinkHelper
+            from core.parsing.deep_link import DeepLinkHelper
             
             share_link = DeepLinkHelper.generate_share_link(BOT_USERNAME)
             
@@ -168,7 +170,7 @@ def setup_callback_handlers(app: Client):
                 f"Add this link to your X bio:\n"
                 f"`{share_link}`\n\n"
                 f"Anyone who clicks it can send you videos!",
-                reply_markup=Keyboards.back_to_main()
+                reply_markup=Keyboards.back_to_main(user_id=user_id)
             )
 
         elif data == "socials":
@@ -179,7 +181,7 @@ def setup_callback_handlers(app: Client):
                 "?? **Support Group:** @XDownloaderPro_Support\n"
                 "??? **Developer:** @DevMoonlight\n\n"
                 "Feel free to report bugs or suggest features!",
-                reply_markup=Keyboards.back_to_main()
+                reply_markup=Keyboards.back_to_main(user_id=user_id)
             )
         
         elif data == "stats":
@@ -189,7 +191,7 @@ def setup_callback_handlers(app: Client):
             sync_status = ""
             if not stats_info['synced']:
                 sync_status = f"\n\n?? Log entries: {stats_info['log_entries']} | Folder videos: {stats_info['actual_videos']}"
-            keyboard = Keyboards.back_to_main()
+            keyboard = Keyboards.back_to_main(user_id=user_id)
             await callback_query.message.edit_text(Messages.stats_text(log) + sync_status, reply_markup=keyboard)
 
         elif data == "videy_links" or data.startswith("videy:"):
@@ -200,14 +202,14 @@ def setup_callback_handlers(app: Client):
             if not links:
                 await callback_query.message.edit_text(
                     "?? **Videy Links**\n\nNo links found yet.\n\nDownload a video first, then use this menu again.",
-                    reply_markup=Keyboards.back_to_main(),
+                    reply_markup=Keyboards.back_to_main(user_id=user_id),
                     disable_web_page_preview=False,
                 )
                 return
 
             links = list(reversed(links))
             if action == "export":
-                keyboard = Keyboards.videy_export_format_selection()
+                keyboard = Keyboards.videy_export_format_selection(user_id=user_id)
                 await callback_query.message.edit_text(
                     format_videy_export_message(len(links)),
                     reply_markup=keyboard
@@ -227,7 +229,7 @@ def setup_callback_handlers(app: Client):
             page_entries = links[offset:offset + per_page]
 
             text = format_videy_message(page_entries, page, total_pages, total_count)
-            keyboard = Keyboards.videy_pagination(page, total_pages)
+            keyboard = Keyboards.videy_pagination(page, total_pages, user_id=user_id)
             await callback_query.message.edit_text(
                 text,
                 reply_markup=keyboard,
@@ -274,7 +276,7 @@ def setup_callback_handlers(app: Client):
             new_enabled = not is_enabled
             history_db.set_setting(user_id, "tunnel_notifications", "1" if new_enabled else "0")
 
-            keyboard = Keyboards.settings_menu(new_enabled)
+            keyboard = Keyboards.settings_menu(new_enabled, user_id=user_id)
             status_text = "ON" if new_enabled else "OFF"
             await callback_query.message.edit_text(
                 Messages.settings_text() + f"\n\nTunnel notifications: **{status_text}**",
@@ -286,25 +288,117 @@ def setup_callback_handlers(app: Client):
             from core.database import history_db
             current = history_db.get_setting(user_id, "tunnel_notifications", "1")
             is_enabled = str(current).strip().lower() in {"1", "true", "yes", "on"}
-            keyboard = Keyboards.settings_menu(is_enabled)
+            keyboard = Keyboards.settings_menu(is_enabled, user_id=user_id)
             status_text = "ON" if is_enabled else "OFF"
             await callback_query.message.edit_text(
                 Messages.settings_text() + f"\n\nTunnel notifications: **{status_text}**",
                 reply_markup=keyboard
             )
         
+
+
+        elif data == "settings_language":
+            from resources.languages import language_manager
+            from pyrogram.errors import MessageNotModified
+            
+            keyboard = language_manager.get_language_keyboard(user_id=user_id)
+            current_lang_name = language_manager.LANGUAGES.get(language_manager.get_user_language(user_id), 'English')
+            lang_header = get_text(user_id, 'select_language', 'Select Your Language')
+            
+            try:
+                await callback_query.message.edit_text(
+                    Messages.settings_text(user_id=user_id) + f"\n\n🌐 **{lang_header}**\n_Current: {current_lang_name}_",
+                    reply_markup=keyboard
+                )
+            except MessageNotModified:
+                pass
+            await callback_query.answer()
+            
+        elif data.startswith("lang_"):
+            from core.database import history_db
+            from resources.languages import language_manager
+            from pyrogram.errors import MessageNotModified
+            
+            new_lang = data[5:]  # strip 'lang_' prefix
+            old_lang = language_manager.get_user_language(user_id)
+            
+            if new_lang in language_manager.LANGUAGES:
+                language_manager.set_user_language(user_id, new_lang)
+                lang_name = language_manager.LANGUAGES[new_lang]
+                changed_text = get_text(user_id, 'language_changed', 'Language changed successfully! ✅')
+                await callback_query.answer(f"{changed_text} ({lang_name})", show_alert=(new_lang != old_lang))
+            else:
+                await callback_query.answer("Unknown language.", show_alert=True)
+                return
+            
+            # Rebuild the keyboard and message in the NEW language
+            keyboard = language_manager.get_language_keyboard(user_id=user_id)
+            lang_header = get_text(user_id, 'select_language', 'Select Your Language')
+            current_lang_name = language_manager.LANGUAGES.get(new_lang, 'English')
+            
+            try:
+                await callback_query.message.edit_text(
+                    Messages.settings_text(user_id=user_id) + f"\n\n🌐 **{lang_header}**\n_Current: {current_lang_name}_",
+                    reply_markup=keyboard
+                )
+            except MessageNotModified:
+                # Same language re-selected; just update the markup to keep checkmark fresh
+                try:
+                    await callback_query.message.edit_reply_markup(reply_markup=keyboard)
+                except Exception:
+                    pass
+
+        elif data == "settings_theme":
+            from core.database import history_db
+            current_theme = history_db.get_setting(user_id, "bot_theme", "default")
+            keyboard = Keyboards.theme_selection_menu(current_theme, user_id=user_id)
+            
+            await callback_query.message.edit_text(
+                Messages.settings_text(user_id=user_id) + "\n\n🎨 **Choose a Theme:**",
+                reply_markup=keyboard
+            )
+            
+        elif data.startswith("set_theme:"):
+            from core.database import history_db
+            from resources.themes import theme_manager
+            
+            new_theme = data.split(":")[1]
+            if new_theme in theme_manager.THEMES:
+                history_db.set_setting(user_id, "bot_theme", new_theme)
+                await callback_query.answer(f"✅ Theme changed to {theme_manager.THEMES[new_theme]['name']}!")
+            
+            # Rehydrate with new theme immediately
+            current_theme = history_db.get_setting(user_id, "bot_theme", "default")
+            keyboard = Keyboards.theme_selection_menu(current_theme, user_id=user_id)
+            
+            try:
+                await callback_query.message.edit_text(
+                    Messages.settings_text(user_id=user_id) + "\n\n🎨 **Choose a Theme:**",
+                    reply_markup=keyboard
+                )
+            except Exception:
+                pass
+
         elif data == "main_menu":
-            keyboard = Keyboards.main_menu()
+            keyboard = Keyboards.main_menu(user_id=user_id)
             user_name = callback_query.from_user.first_name
-            await callback_query.message.edit_text(Messages.welcome(user_name, user_id=user_id), reply_markup=keyboard)
+            try:
+                await callback_query.message.edit_text(Messages.welcome(user_name, user_id=user_id), reply_markup=keyboard)
+            except MessageNotModified:
+                pass
+            await callback_query.answer()
         
         elif data == "cancel":
-            keyboard = Keyboards.main_menu()
-            await callback_query.message.edit_text(Messages.action_cancelled(), reply_markup=keyboard)
+            keyboard = Keyboards.main_menu(user_id=user_id)
+            try:
+                await callback_query.message.edit_text(Messages.action_cancelled(), reply_markup=keyboard)
+            except MessageNotModified:
+                pass
+            await callback_query.answer()
         
         elif data == "version":
             from handlers.command_handlers import get_version_info
-            keyboard = Keyboards.back_to_main()
+            keyboard = Keyboards.back_to_main(user_id=user_id)
             await callback_query.message.edit_text(get_version_info(), reply_markup=keyboard)
         
         # Bulk upload callbacks
@@ -320,7 +414,7 @@ def setup_callback_handlers(app: Client):
                 user_selections[user_id] = set()
             
             current_page = user_downloads.get(f"{user_id}_page", 0)
-            keyboard = Keyboards.video_list_keyboard(video_dicts, user_selections.get(user_id, set()), page=current_page)
+            keyboard = Keyboards.video_list_keyboard(video_dicts, user_selections.get(user_id, set()), page=current_page, user_id=user_id)
             await callback_query.message.edit_text(Messages.bulk_upload_prompt(len(videos)), reply_markup=keyboard)
         
         elif data == "bulk_upload_images":
@@ -335,7 +429,7 @@ def setup_callback_handlers(app: Client):
                 user_selections[user_id] = set()
             
             current_page = user_downloads.get(f"{user_id}_image_page", 0)
-            keyboard = Keyboards.image_list_keyboard(image_dicts, user_selections.get(user_id, set()), page=current_page)
+            keyboard = Keyboards.image_list_keyboard(image_dicts, user_selections.get(user_id, set()), page=current_page, user_id=user_id)
             await callback_query.message.edit_text(Messages.bulk_image_upload_prompt(len(images)), reply_markup=keyboard)
         
         elif data.startswith("sel_") and data != "sel_all":
@@ -357,7 +451,7 @@ def setup_callback_handlers(app: Client):
             
             videos = user_downloads.get(f"{user_id}_videos", [])
             current_page = user_downloads.get(f"{user_id}_page", 0)
-            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=current_page)
+            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=current_page, user_id=user_id)
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
@@ -383,7 +477,7 @@ def setup_callback_handlers(app: Client):
             
             images = user_downloads.get(f"{user_id}_images", [])
             current_page = user_downloads.get(f"{user_id}_image_page", 0)
-            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=current_page)
+            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=current_page, user_id=user_id)
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
@@ -393,28 +487,28 @@ def setup_callback_handlers(app: Client):
         elif data == "sel_all":
             videos = user_downloads.get(f"{user_id}_videos", [])
             user_selections[user_id] = set(range(len(videos)))
-            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0)
+            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0, user_id=user_id)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
             await callback_query.answer(f"? Selected all {len(videos)} videos")
         
         elif data == "img_sel_all":
             images = user_downloads.get(f"{user_id}_images", [])
             user_selections[user_id] = set(range(len(images)))
-            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0)
+            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0, user_id=user_id)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
             await callback_query.answer(f"? Selected all {len(images)} images")
         
         elif data == "desel_all":
             videos = user_downloads.get(f"{user_id}_videos", [])
             user_selections[user_id] = set()
-            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0)
+            keyboard = Keyboards.video_list_keyboard(videos, user_selections[user_id], page=0, user_id=user_id)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
             await callback_query.answer("? Deselected all videos")
         
         elif data == "img_desel_all":
             images = user_downloads.get(f"{user_id}_images", [])
             user_selections[user_id] = set()
-            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0)
+            keyboard = Keyboards.image_list_keyboard(images, user_selections[user_id], page=0, user_id=user_id)
             await callback_query.message.edit_reply_markup(reply_markup=keyboard)
             await callback_query.answer("? Deselected all images")
         
@@ -425,7 +519,7 @@ def setup_callback_handlers(app: Client):
                 return
             
             videos = user_downloads.get(f"{user_id}_videos", [])
-            keyboard = Keyboards.video_list_keyboard(videos, user_selections.get(user_id, set()), page=page)
+            keyboard = Keyboards.video_list_keyboard(videos, user_selections.get(user_id, set()), page=page, user_id=user_id)
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
@@ -440,7 +534,7 @@ def setup_callback_handlers(app: Client):
                 return
             
             images = user_downloads.get(f"{user_id}_images", [])
-            keyboard = Keyboards.image_list_keyboard(images, user_selections.get(user_id, set()), page=page)
+            keyboard = Keyboards.image_list_keyboard(images, user_selections.get(user_id, set()), page=page, user_id=user_id)
             
             try:
                 await callback_query.message.edit_reply_markup(reply_markup=keyboard)
@@ -541,14 +635,14 @@ def setup_callback_handlers(app: Client):
                         f"?? Size: {Formatter.size(file_size)}\n\n"
                         "The video has been shared with the group.\n\n"
                         "Want to download another video?",
-                        reply_markup=Keyboards.back_to_main()
+                        reply_markup=Keyboards.back_to_main(user_id=user_id)
                     )
                 else:
                     await status_msg.edit_text(
                         f"? **Upload Failed**\n\n"
                         f"Error: {message}\n\n"
                         "Please try again later.",
-                        reply_markup=Keyboards.back_to_main()
+                        reply_markup=Keyboards.back_to_main(user_id=user_id)
                     )
             else:
                 await callback_query.answer("? Video file not found. Please download again.", show_alert=True)
@@ -588,14 +682,14 @@ def setup_callback_handlers(app: Client):
                     f"??? Uploaded: {len(image_paths)} images\n\n"
                     "The images have been shared with the group.\n\n"
                     "Want to download more images?",
-                    reply_markup=Keyboards.back_to_main()
+                    reply_markup=Keyboards.back_to_main(user_id=user_id)
                 )
             else:
                 await status_msg.edit_text(
                     f"? **Upload Failed**\n\n"
                     f"Error: {message}\n\n"
                     "Please try again later.",
-                    reply_markup=Keyboards.back_to_main()
+                    reply_markup=Keyboards.back_to_main(user_id=user_id)
                 )
 
         elif data == "upload_bulk_downloaded" or data == "upload_bulk_videos_downloaded":
@@ -757,7 +851,7 @@ def setup_callback_handlers(app: Client):
                         "? **Video Uploaded Successfully!**\n\n"
                         f"?? File: `{video_name}`\n"
                         f"?? Size: {Formatter.size(file_size)}",
-                        reply_markup=Keyboards.back_to_main()
+                        reply_markup=Keyboards.back_to_main(user_id=user_id)
                     )
                     try:
                         await callback_query.message.edit_reply_markup(reply_markup=None)
@@ -767,7 +861,7 @@ def setup_callback_handlers(app: Client):
                     await status_msg.edit_text(
                         f"? **Upload Failed**\n\n"
                         f"Error: {message}",
-                        reply_markup=Keyboards.back_to_main()
+                        reply_markup=Keyboards.back_to_main(user_id=user_id)
                     )
             else:
                 await callback_query.answer("? Video file not found.", show_alert=True)
@@ -804,18 +898,18 @@ def setup_callback_handlers(app: Client):
                     "? **Image Uploaded Successfully!**\n\n"
                     f"??? File: `{image_name}`\n"
                     f"?? Size: {Formatter.size(file_size)}",
-                    reply_markup=Keyboards.back_to_main()
+                    reply_markup=Keyboards.back_to_main(user_id=user_id)
                 )
             else:
                 await status_msg.edit_text(
                     f"? **Upload Failed**\n\n"
                     f"Error: {message}",
-                    reply_markup=Keyboards.back_to_main()
+                    reply_markup=Keyboards.back_to_main(user_id=user_id)
                 )
         
         elif data.startswith("history:"):
             from core.database import history_db
-            from utils.history_formatter import format_history_message, format_export_message, format_clear_confirmation
+            from core.formatting.history_formatter import format_history_message, format_export_message, format_clear_confirmation
             
             parts = data.split(":")
             
@@ -824,7 +918,7 @@ def setup_callback_handlers(app: Client):
                 total_count = history_db.get_total_count(user_id)
                 if history_db.clear_user_history(user_id):
                     await callback_query.answer("? History cleared!", show_alert=True)
-                    keyboard = Keyboards.main_menu()
+                    keyboard = Keyboards.main_menu(user_id=user_id)
                     await callback_query.message.edit_text(
                         f"??? **History Cleared**\n\n"
                         f"Successfully deleted {total_count} entries.\n\n"
@@ -842,7 +936,7 @@ def setup_callback_handlers(app: Client):
                     await callback_query.answer("No history to clear!", show_alert=True)
                     return
                 
-                keyboard = Keyboards.clear_history_confirmation()
+                keyboard = Keyboards.clear_history_confirmation(user_id=user_id)
                 await callback_query.message.edit_text(
                     format_clear_confirmation(total_count),
                     reply_markup=keyboard
@@ -856,7 +950,7 @@ def setup_callback_handlers(app: Client):
                     await callback_query.answer("No history to export!", show_alert=True)
                     return
                 
-                keyboard = Keyboards.export_format_selection()
+                keyboard = Keyboards.export_format_selection(user_id=user_id)
                 await callback_query.message.edit_text(
                     format_export_message(len(all_history)),
                     reply_markup=keyboard
@@ -880,7 +974,7 @@ def setup_callback_handlers(app: Client):
                 message = format_history_message(history, page, total_pages, total_count)
                 
                 # Send with pagination keyboard
-                keyboard = Keyboards.history_pagination(page, total_pages)
+                keyboard = Keyboards.history_pagination(page, total_pages, user_id=user_id)
                 await callback_query.message.edit_text(
                     message,
                     reply_markup=keyboard,
@@ -892,7 +986,7 @@ def setup_callback_handlers(app: Client):
         # Export format selection
         elif data.startswith("export:"):
             from core.database import history_db
-            from utils.history_exporter import export_to_csv, export_to_text
+            from core.export.history_exporter import export_to_csv, export_to_text
             
             format_type = data.split(":")[1]
             

@@ -502,6 +502,30 @@ class TelegramGalleryService:
             "error": error,
         }
 
+    async def _media_cleanup_loop(self) -> None:
+        """Background task to delete media cache files older than 48 hours to save disk space."""
+        while self._started:
+            try:
+                # 48 hours = 172800 seconds
+                cutoff = time.time() - 172800
+                deleted_count = 0
+                for file_path in self.cache_dir.iterdir():
+                    if file_path.is_file() and not file_path.name.endswith('.json') and not file_path.name.endswith('.session') and not file_path.name.endswith('-journal') and not file_path.name.endswith('-wal') and not file_path.name.endswith('-shm'):
+                        try:
+                            # Verify timestamp
+                            if file_path.stat().st_mtime < cutoff:
+                                file_path.unlink(missing_ok=True)
+                                deleted_count += 1
+                        except OSError:
+                            pass
+                if deleted_count > 0:
+                    logger.info(f"[CACHE CLEANUP] Deleted {deleted_count} stale media files.")
+            except Exception as e:
+                logger.warning(f"[CACHE CLEANUP] Error during cleanup cycle: {e}")
+            
+            # Wait 12 hours before next check
+            await asyncio.sleep(43200)
+
     async def start(self) -> None:
         async with self._start_lock:
             if self._started:
@@ -569,6 +593,10 @@ class TelegramGalleryService:
                     )
 
             self._started = True
+            
+            # Start background cache eviction
+            asyncio.create_task(self._media_cleanup_loop())
+            
             self._load_index()
 
             # Register realtime message handler for instant media detection
@@ -2902,7 +2930,7 @@ class TelegramGalleryService:
                             # Save after each success
                             self._save_index()
                         
-                        logger.info(f"âœ“ Generated title for message_id={message_id}: {title[:50]}...")
+                        logger.info(f"✓ Generated title for message_id={message_id}: {title[:50]}...")
                         processed += 1
                         break  # Success! Move to next item
                     else:

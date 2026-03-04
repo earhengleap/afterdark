@@ -3,7 +3,7 @@ Format download history for display in Telegram
 """
 
 from typing import List, Dict
-from utils.url_parser import shorten_url
+from core.parsing.url_parser import shorten_url
 
 
 def format_history_message(history_entries: List[Dict], page: int, total_pages: int, total_count: int) -> str:

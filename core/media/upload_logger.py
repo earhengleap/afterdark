@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from utils.formatters import Formatter
+from core.formatting.formatters import Formatter
 
 class UploadLogger:
     """Log upload activities"""

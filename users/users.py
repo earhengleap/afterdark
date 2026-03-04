@@ -3,68 +3,17 @@ User Activity Manager
 Handles user logging and history management asynchronously.
 """
 
-import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-import aiofiles
+from core.database import history_db
 
 # Configure logging
 logger = logging.getLogger("AfterDark.Users")
 
 class UserManager:
     """
-    Manages user logs and activity history asynchronously.
+    Manages user logs and activity history by delegating to SQLite HistoryDB.
     """
     
-    USERS_FOLDER = Path("users")
-    
-    @classmethod
-    def ensure_directory(cls):
-        """Ensure users directory exists"""
-        cls.USERS_FOLDER.mkdir(parents=True, exist_ok=True)
-
-    @classmethod
-    def _get_user_file(cls, user_id: int) -> Path:
-        """Get path to user's log file"""
-        return cls.USERS_FOLDER / f"{user_id}.json"
-
-    @classmethod
-    async def load_user_log(cls, user_id: int) -> List[Dict[str, Any]]:
-        """
-        Load user's history log asynchronously.
-        Returns empty list if file doesn't exist or is invalid.
-        """
-        cls.ensure_directory()
-        user_file = cls._get_user_file(user_id)
-        
-        if not user_file.exists():
-            return []
-            
-        try:
-            async with aiofiles.open(user_file, mode='r', encoding='utf-8') as f:
-                content = await f.read()
-                return json.loads(content)
-        except json.JSONDecodeError:
-            logger.error(f"Corrupted log file for user {user_id}")
-            return []
-        except Exception as e:
-            logger.error(f"Error loading log for user {user_id}: {e}")
-            return []
-
-    @classmethod
-    async def save_user_log(cls, user_id: int, log_data: List[Dict[str, Any]]) -> None:
-        """Save user's history log asynchronously"""
-        cls.ensure_directory()
-        user_file = cls._get_user_file(user_id)
-        
-        try:
-            async with aiofiles.open(user_file, mode='w', encoding='utf-8') as f:
-                await f.write(json.dumps(log_data, indent=2, ensure_ascii=False))
-        except Exception as e:
-            logger.error(f"Error saving log for user {user_id}: {e}")
-
     @classmethod
     async def log_action(cls, user_id: int, username: str, url: str, 
                         status: str, content_type: str = "unknown") -> None:
@@ -78,24 +27,16 @@ class UserManager:
             status: Status of action ('success', 'failed', 'invalid_input')
             content_type: Type of content ('video', 'image', 'unknown')
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        log_entry = {
-            "username": username,
-            "url": url,
-            "status": status,
-            "content_type": content_type,
-            "timestamp": timestamp
-        }
+        # Save to SQLite HistoryDB directly
+        history_db.add_entry(
+            user_id=user_id,
+            url=url,
+            source_username=username,
+            filename=None,
+            status=status,
+            content_type=content_type
+        )
 
-        # Load, append, save
-        history = await cls.load_user_log(user_id)
-        history.append(log_entry)
-        
-        # Save full history - Never truncate
-        await cls.save_user_log(user_id, history)
-
-        
         # Professional Logging
         cls._log_to_console(username, url, status, content_type)
 
@@ -121,6 +62,6 @@ class UserManager:
             if "No video could be found" not in url and "Unsupported URL" not in url:
                 logger.warning(f"❌ Download failed for {username}: {short_url}")
 
-# For backward compatibility (optional, but good for transition)
+# For backward compatibility
 async def log_user_action(user_id: int, username: str, url: str, status: str, content_type: str = "unknown"):
     await UserManager.log_action(user_id, username, url, status, content_type)

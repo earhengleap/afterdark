@@ -37,15 +37,15 @@ async def track_bot_action(action: str, user_id: int, username: str = None):
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
         logger.debug(f"Bot tracking error: {e}")
-from utils.url_extractor import URLExtractor
+from core.parsing.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
 from core.database import history_db
 from core.uploader import safe_edit_text
 from core.videy_uploader import VideyUploader
 from core.videy_links import add_videy_link, get_videy_links
-from utils.video_processor import VideoProcessor
-from utils.videy_formatter import format_videy_message
+from core.media.video_processor import VideoProcessor
+from core.formatting.videy_formatter import format_videy_message
 from handlers.ai_handler import AIHandler
 from resources.messages import Messages
 from resources.keyboards import Keyboards
@@ -382,7 +382,7 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                 logger.info(f"Videy CDN link not created for {file_name}")
 
             # Generate thumbnail for better UX
-            from utils.video_processor import VideoProcessor
+            from core.media.video_processor import VideoProcessor
             thumb_path = await VideoProcessor.generate_thumbnail(video_path)
             
             try:
@@ -394,7 +394,7 @@ async def send_videos_to_user(video_paths: list, message: Message, user_id: int,
                     height=height,
                     supports_streaming=True,
                     caption=caption,
-                    reply_markup=Keyboards.single_video_upload(video_key)
+                    reply_markup=Keyboards.single_video_upload(video_key, user_id=user_id)
                 )
             finally:
                 if thumb_path and os.path.exists(thumb_path):
@@ -560,7 +560,7 @@ def setup_command_handlers(app: Client):
             param = message.command[1]
             
             # Import deep link helper
-            from utils.deep_link import DeepLinkHelper
+            from core.parsing.deep_link import DeepLinkHelper
             
             # Try to decode URL from deep link
             decoded_url = DeepLinkHelper.decode_url(param)
@@ -579,7 +579,7 @@ def setup_command_handlers(app: Client):
                         f"🔗 Source: `{decoded_url[:50]}...`\n"
                         f"📊 **Queue Size:** {queue_count}\n\n"
                         f"__Link saved for later processing.__",
-                        reply_markup=Keyboards.bulk_queue_menu(queue_count, True)
+                        reply_markup=Keyboards.bulk_queue_menu(queue_count, True, user_id=user_id)
                     )
                     return
 
@@ -596,7 +596,7 @@ def setup_command_handlers(app: Client):
                 return
         
         # Normal start message
-        keyboard = Keyboards.main_menu()
+        keyboard = Keyboards.main_menu(user_id=user_id)
         welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"
         await message.reply_text(welcome_text + version_footer, reply_markup=keyboard)
@@ -618,7 +618,7 @@ def setup_command_handlers(app: Client):
         metrics.increment_commands("help")
         
         text = Messages.help_text()
-        keyboard = Keyboards.back_to_main()
+        keyboard = Keyboards.back_to_main(user_id=message.from_user.id)
         await message.reply_text(text, reply_markup=keyboard)
 
     @app.on_message(filters.private & filters.command(["videy", "links"]))
@@ -642,7 +642,7 @@ def setup_command_handlers(app: Client):
         total_pages = max(1, (total_count + per_page - 1) // per_page)
         page_entries = links[:per_page]
         text = format_videy_message(page_entries, page, total_pages, total_count)
-        keyboard = Keyboards.videy_pagination(page, total_pages)
+        keyboard = Keyboards.videy_pagination(page, total_pages, user_id=user_id)
         await message.reply_text(text, reply_markup=keyboard, disable_web_page_preview=False)
 
     @app.on_message(filters.private & filters.command(["stats", "stat"]))
@@ -661,7 +661,7 @@ def setup_command_handlers(app: Client):
         bot_metrics = f"\n\n{metrics.get_summary()}"
         
         text = Messages.stats_text(log) + sync_status + bot_metrics
-        keyboard = Keyboards.back_to_main()
+        keyboard = Keyboards.back_to_main(user_id=message.from_user.id)
         await message.reply_text(text, reply_markup=keyboard)
 
     @app.on_message(filters.private & filters.command(["version", "ver"]))
@@ -670,7 +670,7 @@ def setup_command_handlers(app: Client):
         metrics.increment_commands("version")
         
         version_text = get_version_info()
-        keyboard = Keyboards.back_to_main()
+        keyboard = Keyboards.back_to_main(user_id=message.from_user.id)
         await message.reply_text(version_text, reply_markup=keyboard)
     
     @app.on_message(filters.private & filters.command(["health", "status"]))
@@ -689,7 +689,7 @@ def setup_command_handlers(app: Client):
         
         # Just show health summary without rate limits
         text = summary
-        keyboard = Keyboards.back_to_main()
+        keyboard = Keyboards.back_to_main(user_id=message.from_user.id)
         await message.reply_text(text, reply_markup=keyboard)
 
     @app.on_message(filters.private & filters.command("get_following"))
@@ -1091,7 +1091,7 @@ def setup_command_handlers(app: Client):
                 f"📊 **Added:** {len(urls)} links\n"
                 f"🔢 **Total in Queue:** {queue_count}\n\n"
                 f"__Links saved. Use /bulk_queue or menu to process.__",
-                reply_markup=Keyboards.bulk_queue_menu(queue_count, True)
+                reply_markup=Keyboards.bulk_queue_menu(queue_count, True, user_id=user_id)
             )
             return
         

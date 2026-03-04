@@ -14,9 +14,9 @@ from pyrogram.types import Message
 from config.settings import CHAT_ID
 from core.logger import setup_logger
 from core.progress_tracker import ProgressTracker
-from utils.formatters import Formatter
-from utils.upload_logger import UploadLogger
-from utils.video_processor import VideoProcessor
+from core.formatting.formatters import Formatter
+from core.media.upload_logger import UploadLogger
+from core.media.video_processor import VideoProcessor
 
 logger = setup_logger("VideoUploader")
 

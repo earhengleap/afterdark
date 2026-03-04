@@ -175,7 +175,7 @@ class AutoScheduler:
                     filename = content_path.split("/")[-1] if "/" in content_path else content_path
                     try:
                         import os
-                        from utils.formatters import Formatter
+                        from core.formatting.formatters import Formatter
                         file_size = os.path.getsize(content_path)
                         size_text = Formatter.size(file_size)
                     except:

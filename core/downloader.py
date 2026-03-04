@@ -17,17 +17,17 @@ from models.data_models import DownloadResult, VideoInfo
 from core.file_manager import FileManager
 from core.log_manager import LogManager
 from core.image_downloader import ImageDownloader
-from utils.formatters import Formatter
-from utils.video_processor import VideoProcessor
+from core.formatting.formatters import Formatter
+from core.media.video_processor import VideoProcessor
 from models.enums import user_downloads
 from resources.keyboards import Keyboards
 from core.logger import setup_logger
 from core.progress_tracker import download_tracker, ProgressTracker
-from utils.media_info import MediaInfo
+from core.media.media_info import MediaInfo
 from core.database import history_db
 from core.videy_uploader import VideyUploader
 from core.videy_links import add_videy_link
-from utils.url_parser import extract_twitter_username
+from core.parsing.url_parser import extract_twitter_username
 from core.bad_news_service import BadNewsService
 from core.papalah_service import PapalahService
 
@@ -495,7 +495,7 @@ class VideoDownloader:
                 state["url_progress"][url] = "Preparing..."
                 
                 # 2. Extract videy link if applicable (optimization for X)
-                from utils.url_extractor import URLExtractor
+                from core.parsing.url_extractor import URLExtractor
                 download_url = url
                 if "x.com" in url or "twitter.com" in url:
                     videy_url = URLExtractor.get_videy_link_from_x_tweet(url)
@@ -548,7 +548,7 @@ class VideoDownloader:
                             file_size = os.path.getsize(vp)
                             filename = os.path.basename(vp)
                             # Add to history
-                            from utils.url_parser import extract_twitter_username
+                            from core.parsing.url_parser import extract_twitter_username
                             source_username = extract_twitter_username(url) if "twitter" in url or "x.com" in url else "Bulk User"
                             history_db.add_entry(
                                 user_id=user_id, url=url, source_username=source_username,
@@ -684,7 +684,7 @@ class VideoDownloader:
                     height=height if height else 1280,
                     supports_streaming=True,
                     caption=caption,
-                    reply_markup=Keyboards.single_video_upload(video_key),
+                    reply_markup=Keyboards.single_video_upload(video_key, user_id=user_id),
                     progress=ProgressTracker.callback,
                     progress_args=(progress_key, upload_msg, video_name, start_time)
                 )
@@ -737,7 +737,7 @@ class VideoDownloader:
                      total_time: float, message: Message, user_id: int, 
                      video_paths: List[str], image_paths: List[str]) -> None:
         """Send download summary with results"""
-        from ui.keyboards import Keyboards
+        from resources.keyboards import Keyboards
         
         MAX_MESSAGE_LENGTH = 4000
         
@@ -817,7 +817,7 @@ class VideoDownloader:
         else:
             summary_text += "No videos or images were downloaded successfully.\n\n"
             summary_text += "💡 **Tip:** Check if the link exists in the dashboard/media_cache folder and are publicly accessible."
-            keyboard = Keyboards.back_to_main()
+            keyboard = Keyboards.back_to_main(user_id=user_id)
         
         sent_msg = await message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)
         

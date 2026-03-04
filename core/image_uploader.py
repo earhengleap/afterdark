@@ -12,7 +12,7 @@ from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 
 from config.settings import CHAT_ID
-from utils.formatters import Formatter
+from core.formatting.formatters import Formatter
 from models.enums import user_downloads
 from core.logger import setup_logger
 from core.uploader import safe_edit_text

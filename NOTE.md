@@ -1,0 +1,1 @@
+cat data/afterdark.pid | xargs -I {} taskkill //F //PID {}

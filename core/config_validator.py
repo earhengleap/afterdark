@@ -136,9 +136,9 @@ class ConfigValidator:
                 print(f"  {i}. {warning}")
         
         if is_valid and not warnings:
-            print("\nâœ… Configuration is valid.")
+            print("\n✅ Configuration is valid.")
         elif is_valid:
-            print(f"\nâœ… Configuration is valid (with {len(warnings)} warnings)")
+            print(f"\n✅ Configuration is valid (with {len(warnings)} warnings)")
         else:
             print(f"\nâŒ Configuration is INVALID ({len(errors)} errors)")
         

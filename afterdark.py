@@ -1246,7 +1246,7 @@ async def shutdown(signal_name, loop):
         # Stop accepting new requests
         logger.info("Stopping bot client...")
         await asyncio.wait_for(app.stop(), timeout=10)
-        logger.info("âœ“ Telegram client stopped successfully")
+        logger.info("✓ Telegram client stopped successfully")
     except asyncio.TimeoutError:
         logger.error("â±ï¸ Timeout while stopping client - forcing shutdown")
     except Exception as e:
@@ -1266,15 +1266,15 @@ async def shutdown(signal_name, loop):
                 asyncio.gather(*tasks, return_exceptions=True),
                 timeout=10
             )
-            logger.info("âœ“ All tasks cancelled successfully")
+            logger.info("✓ All tasks cancelled successfully")
         except asyncio.TimeoutError:
             logger.warning("â±ï¸ Some tasks did not cancel in time")
     
     # Log final metrics
-    logger.info("ðŸ“Š Final metrics:")
+    logger.info("📊 Final metrics:")
     logger.info(f"\n{metrics.get_summary()}")
     
-    logger.info("Goodbye! ðŸ‘‹")
+    logger.info("Goodbye! 👋")
     _stop_aux_processes()
     loop.stop()
 
@@ -1337,7 +1337,7 @@ async def main():
     logger.info("Validating configuration...")
     try:
         validate_configuration(raise_on_error=True)
-        logger.info("âœ“ Configuration validated successfully")
+        logger.info("✓ Configuration validated successfully")
     except ValueError as e:
         logger.critical(f"Configuration validation failed: {e}")
         return
@@ -1345,13 +1345,13 @@ async def main():
     # Step 2: Setup directories
     logger.info("Initializing system directories...")
     setup_directories()
-    logger.info("âœ“ Directories initialized")
+    logger.info("✓ Directories initialized")
     
     # Step 3: Setup handlers
     logger.info("Setting up command and callback handlers...")
     setup_command_handlers(app)
     setup_callback_handlers(app)
-    logger.info("âœ“ Handlers configured")
+    logger.info("✓ Handlers configured")
     # Step 3.5: Start Mini App backend stack
     try:
         _start_twa_stack()
@@ -1412,7 +1412,7 @@ async def main():
                         continue
                     try:
                         await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
-                        logger.info(f"âœ… Tunnel URL properly delivered to {chat_target_str}")
+                        logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")
                     except Exception as e:
                         logger.error(f"âŒ Could not deliver tunnel URL to {chat_target_str}: {e}")
             
@@ -1424,7 +1424,7 @@ async def main():
             asyncio.create_task(tunnel_watchdog(app))
             
             # Step 6: Log initial metrics
-            logger.info("ðŸ“Š Metrics tracking enabled")
+            logger.info("📊 Metrics tracking enabled")
             
             # Keep the bot running
             await idle()
@@ -1474,7 +1474,7 @@ async def main():
         if app.is_connected:
             logger.info("Disconnecting bot...")
             await app.stop()
-            logger.info("âœ“ Bot disconnected")
+            logger.info("✓ Bot disconnected")
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
     finally:
@@ -1500,7 +1500,7 @@ if __name__ == "__main__":
             if app.is_connected:
                 logger.info("Disconnecting bot...")
                 await app.stop()
-                logger.info("âœ“ Bot disconnected")
+                logger.info("✓ Bot disconnected")
         except Exception as e:
             logger.error(f"Error during shutdown disconnect: {e}")
         finally:

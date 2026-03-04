@@ -6,15 +6,11 @@ Contains all text messages and templates for the bot with multi-language support
 """
 
 from datetime import datetime
+from resources.themes import theme_manager
 
 # Import language system if available
-try:
-    from .languages import get_text
-    LANG_SUPPORT = True
-except ImportError:
-    LANG_SUPPORT = False
-    def get_text(user_id, key, default=None):
-        return default or key
+from .languages import get_text
+LANG_SUPPORT = True
 
 
 class Messages:
@@ -34,6 +30,8 @@ class Messages:
     @staticmethod
     def welcome(user_name, user_id=None):
         """Welcome message for /start command"""
+
+        theme = theme_manager.get_theme(user_id)
         welcome_text = get_text(user_id, 'welcome_title', 'Welcome')
         bot_name = get_text(user_id, 'bot_name', 'AfterDark Vault')
         description = get_text(user_id, 'welcome_description', 'Your premium companion for downloading and managing media across X (Twitter), RedGifs, Videy, and more!')
@@ -45,14 +43,14 @@ class Messages:
         
         return f"""👋 **{welcome_text} {user_name}!**
 
-{Messages.LOGO} **{bot_name}**
+{theme.get('logo', '🎬')} **{bot_name}**
 
 {description}
 
 **{quick_actions}**
-• Click **{Messages.DOWNLOAD} {download_video}** or **🖼️ {download_images}**
-• Use **{Messages.UPLOAD} {bulk_upload}** to organize and sync media batches
-• View your **{Messages.STATS} {statistics}** to review download history
+• Click **{theme.get('download', '📥')} {download_video}** or **🖼️ {download_images}**
+• Use **{theme.get('upload', '📤')} {bulk_upload}** to organize and sync media batches
+• View your **{theme.get('stats', '📊')} {statistics}** to review download history
 • Need help? Check the **❓ Help** section
 
 Simply drop any supported media URL here and I'll handle the rest! ✨
@@ -63,6 +61,8 @@ Simply drop any supported media URL here and I'll handle the rest! ✨
     @staticmethod
     def help_text(user_id=None):
         """Comprehensive help message"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             help_title = get_text(user_id, 'help', 'Help')
         else:
@@ -73,7 +73,7 @@ Simply drop any supported media URL here and I'll handle the rest! ✨
 **Step-by-Step Guide:**
 
 **Single Media Download:**
-1️⃣ Click the **'{Messages.DOWNLOAD} Download Media'** button or simply drop a supported media URL directly in the chat
+1️⃣ Click the **'{theme.get('download', '📥')} Download Media'** button or simply drop a supported media URL directly in the chat
 
 2️⃣ Supported Platforms:
    • **X (Twitter):** `https://x.com/username/status/...`
@@ -84,10 +84,10 @@ Simply drop any supported media URL here and I'll handle the rest! ✨
 
 4️⃣ Receive your files directly in chat!
 
-5️⃣ Use **{Messages.UPLOAD} Upload to Group** button to push straight to the gallery
+5️⃣ Use **{theme.get('upload', '📤')} Upload to Group** button to push straight to the gallery
 
 **Bulk Media Processing:**
-1️⃣ Click **'{Messages.DOWNLOAD} Download Media'** button
+1️⃣ Click **'{theme.get('download', '📥')} Download Media'** button
 
 2️⃣ Send multiple URLs simultaneously:
 
@@ -104,16 +104,16 @@ Simply drop any supported media URL here and I'll handle the rest! ✨
 3️⃣ Watch the real-time progress indicators
 
 4️⃣ After completion, choose:
-   • **{Messages.UPLOAD} Upload All to Group**
-   • **{Messages.DOWNLOAD} Download More**
-   • **{Messages.STATS} View All History**
+   • **{theme.get('upload', '📤')} Upload All to Group**
+   • **{theme.get('download', '📥')} Download More**
+   • **{theme.get('stats', '📊')} View All History**
 
 ━━━━━━━━━━━━━━━━━━━━
 
 **Tips:**
-{Messages.INFO} Large files may take slightly longer due to high-quality retention.
-{Messages.INFO} The Dashboard Mini App organizes downloaded media by AI category.
-{Messages.INFO} Upload progress shows realtime analytics and ETAs.
+{theme.get('info', 'ℹ️')} Large files may take slightly longer due to high-quality retention.
+{theme.get('info', 'ℹ️')} The Dashboard Mini App organizes downloaded media by AI category.
+{theme.get('info', 'ℹ️')} Upload progress shows realtime analytics and ETAs.
 
 ━━━━━━━━━━━━━━━━━━━━
 *Need more help? Let support know!*"""
@@ -121,18 +121,20 @@ Simply drop any supported media URL here and I'll handle the rest! ✨
     @staticmethod
     def about_text(user_id=None):
         """About bot information"""
-        return f"""{Messages.INFO} **About This Bot**
+
+        theme = theme_manager.get_theme(user_id)
+        return f"""{theme.get('info', 'ℹ️')} **About This Bot**
 
 **AfterDark** is a premium Telegram integration suite designed to simplify gathering, processing, and categorizing your favorite media uniformly from across the Web.
 
 **Key Features:**
-{Messages.SUCCESS} Original Quality Media Acquisition
-{Messages.SUCCESS} Comprehensive Multi-platform reach
-{Messages.SUCCESS} Seamless Background Syncing
-{Messages.SUCCESS} Local First-AI Auto Categorization (via Ollama)
-{Messages.SUCCESS} Telegram Mini App Dashboard Integration
-{Messages.SUCCESS} High-fidelity Tunnel Connectivity
-{Messages.SUCCESS} Smart Bulk Queuing Operations
+{theme.get('success', '✅')} Original Quality Media Acquisition
+{theme.get('success', '✅')} Comprehensive Multi-platform reach
+{theme.get('success', '✅')} Seamless Background Syncing
+{theme.get('success', '✅')} Local First-AI Auto Categorization (via Ollama)
+{theme.get('success', '✅')} Telegram Mini App Dashboard Integration
+{theme.get('success', '✅')} High-fidelity Tunnel Connectivity
+{theme.get('success', '✅')} Smart Bulk Queuing Operations
 
 **Technology Stack:**
 • **Backend Framework:** Pyrogram + FastAPI
@@ -151,6 +153,8 @@ Developed with ❤️ for media connoisseurs.
     @staticmethod
     def settings_text(user_id=None):
         """Settings menu text"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             settings = get_text(user_id, 'settings', 'Settings')
             language = get_text(user_id, 'language', 'Language')
@@ -158,7 +162,7 @@ Developed with ❤️ for media connoisseurs.
             settings = 'Settings'
             language = 'Language'
             
-        return f"""{Messages.SETTINGS} **Bot {settings}**
+        return f"""{theme.get('settings', '⚙️')} **Bot {settings}**
 
 Customize your download experience:
 
@@ -173,6 +177,8 @@ Customize your download experience:
     @staticmethod
     def stats_text(log_data, user_id=None):
         """Generate statistics message from log data"""
+
+        theme = theme_manager.get_theme(user_id)
         total_downloads = len(log_data)
         
         if user_id and LANG_SUPPORT:
@@ -183,11 +189,11 @@ Customize your download experience:
             download_video = 'Download Video'
         
         if total_downloads == 0:
-            return f"""{Messages.STATS} **Your {stats}**
+            return f"""{theme.get('stats', '📊')} **Your {stats}**
 
 You haven't downloaded any videos yet!
 
-Click **{Messages.DOWNLOAD} {download_video}** to get started."""
+Click **{theme.get('download', '📥')} {download_video}** to get started."""
         
         total_size = sum(entry.get('filesize', 0) for entry in log_data)
         total_duration = sum(entry.get('duration', 0) for entry in log_data)
@@ -200,7 +206,7 @@ Click **{Messages.DOWNLOAD} {download_video}** to get started."""
         if latest_download:
             latest_info = f"\n**Latest Download:**\n📹 {latest_download.get('title', 'Unknown')[:50]}..."
         
-        return f"""{Messages.STATS} **Your {stats}**
+        return f"""{theme.get('stats', '📊')} **Your {stats}**
 
 **Total Downloads:** {total_downloads} videos
 **Total Size:** {size_mb:.2f} MB
@@ -217,6 +223,8 @@ Click **{Messages.DOWNLOAD} {download_video}** to get started."""
     @staticmethod
     def download_prompt(user_id=None):
         """Prompt user to send URL"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             ready = get_text(user_id, 'ready_to_download', 'Ready to Download')
             send_url = get_text(user_id, 'send_url', 'Please send me the X/Twitter video URL(s) now.')
@@ -228,7 +236,7 @@ Click **{Messages.DOWNLOAD} {download_video}** to get started."""
             single_url = 'Single URL:'
             multiple_urls = 'Multiple URLs (choose any format):'
             
-        return f"""{Messages.DOWNLOAD} **{ready}**
+        return f"""{theme.get('download', '📥')} **{ready}**
 
 {send_url}
 
@@ -250,7 +258,7 @@ https://x.com/user/status/222
 https://x.com/user/status/333
 ```
 
-{Messages.INFO} You can mix formats too!
+{theme.get('info', 'ℹ️')} You can mix formats too!
 
 ━━━━━━━━━━━━━━━━━━━━
 *Waiting for your URL(s)...*"""
@@ -258,6 +266,8 @@ https://x.com/user/status/333
     @staticmethod
     def bulk_upload_prompt(video_count, user_id=None):
         """Prompt for bulk upload"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
             select_all = get_text(user_id, 'select_all', 'Select All')
@@ -269,7 +279,7 @@ https://x.com/user/status/333
             deselect_all = 'Deselect All'
             confirm_upload = 'Confirm Upload'
             
-        return f"""{Messages.UPLOAD} **{bulk_upload} Videos**
+        return f"""{theme.get('upload', '📤')} **{bulk_upload} Videos**
 
 📁 Found **{video_count}** video{'s' if video_count != 1 else ''} in your download folder.
 
@@ -278,7 +288,7 @@ https://x.com/user/status/333
 2️⃣ Use **✅ {select_all}** or **❌ {deselect_all}** buttons
 3️⃣ Click **📤 {confirm_upload}** to send selected videos to group
 
-{Messages.INFO} Videos will be sent one by one with progress tracking
+{theme.get('info', 'ℹ️')} Videos will be sent one by one with progress tracking
 
 ━━━━━━━━━━━━━━━━━━━━
 *Select the videos you want to upload below:*"""
@@ -286,6 +296,8 @@ https://x.com/user/status/333
     @staticmethod
     def downloading(url, user_id=None):
         """Message shown during download"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             downloading = get_text(user_id, 'downloading', 'Downloading Video')
             processing = get_text(user_id, 'processing', 'Processing your request...')
@@ -295,7 +307,7 @@ https://x.com/user/status/333
             processing = 'Processing your request...'
             please_wait = 'Please wait'
             
-        return f"""{Messages.DOWNLOAD} **{downloading}**
+        return f"""{theme.get('download', '📥')} **{downloading}**
 
 ⏳ {processing}
 🔗 Source: `{url[:50]}...`
@@ -307,6 +319,8 @@ https://x.com/user/status/333
     @staticmethod
     def uploading(user_id=None):
         """Message shown during upload"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             uploading = get_text(user_id, 'uploading', 'Uploading Video')
             please_wait = get_text(user_id, 'please_wait', 'Please wait...')
@@ -314,7 +328,7 @@ https://x.com/user/status/333
             uploading = 'Uploading Video'
             please_wait = 'Please wait...'
             
-        return f"""{Messages.UPLOAD} **{uploading}**
+        return f"""{theme.get('upload', '📤')} **{uploading}**
 
 ⏳ Almost done! Sending video to you...
 
@@ -323,12 +337,14 @@ https://x.com/user/status/333
     @staticmethod
     def download_failed(user_id=None):
         """Error message for failed downloads"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             failed = get_text(user_id, 'download_failed', 'Download Failed')
         else:
             failed = 'Download Failed'
             
-        return f"""{Messages.ERROR} **{failed}**
+        return f"""{theme.get('error', '❌')} **{failed}**
 
 I couldn't download the video. This might be because:
 
@@ -337,7 +353,7 @@ I couldn't download the video. This might be because:
 • The video is too large or restricted
 • Network/server issues
 
-{Messages.INFO} **Try again with:**
+{theme.get('info', 'ℹ️')} **Try again with:**
 • A public tweet with a video
 • A different video URL
 • Checking if the link is correct
@@ -348,18 +364,20 @@ I couldn't download the video. This might be because:
     @staticmethod
     def upload_failed(error_msg, user_id=None):
         """Error message for failed uploads"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             failed = get_text(user_id, 'upload_failed', 'Upload Failed')
         else:
             failed = 'Upload Failed'
             
-        return f"""{Messages.ERROR} **{failed}**
+        return f"""{theme.get('error', '❌')} **{failed}**
 
 The video was downloaded but couldn't be sent.
 
 **Error details:** `{error_msg[:100]}`
 
-{Messages.WARNING} This might be due to:
+{theme.get('warning', '⚠️')} This might be due to:
 • Video file size too large
 • Network issues
 • Telegram API limits
@@ -370,12 +388,14 @@ The video was downloaded but couldn't be sent.
     @staticmethod
     def video_caption(filename, user_id=None):
         """Caption for uploaded video"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             complete = get_text(user_id, 'download_complete', 'Download Complete')
         else:
             complete = 'Download Complete'
             
-        return f"""{Messages.SUCCESS} **{complete}**
+        return f"""{theme.get('success', '✅')} **{complete}**
 
 📁 File: `{filename}`
 ⚡ Downloaded with X Video Downloader Bot v1.0.0
@@ -386,12 +406,14 @@ Download another? Send a new URL!"""
     @staticmethod
     def action_cancelled(user_id=None):
         """Message when user cancels an action"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             cancel = get_text(user_id, 'cancel', 'Cancel')
         else:
             cancel = 'Cancel'
             
-        return f"""{Messages.INFO} **Action Cancelled**
+        return f"""{theme.get('info', 'ℹ️')} **Action Cancelled**
 
 No problem! What would you like to do next?
 
@@ -400,14 +422,16 @@ Choose an option from the menu below."""
     @staticmethod
     def invalid_url(user_id=None):
         """Error for invalid URL format"""
-        return f"""{Messages.ERROR} **Invalid URL**
+
+        theme = theme_manager.get_theme(user_id)
+        return f"""{theme.get('error', '❌')} **Invalid URL**
 
 Please send a valid X/Twitter video URL.
 
 **Correct format:**
 `https://x.com/username/status/1234567890`
 
-{Messages.INFO} The URL must start with `http://` or `https://`
+{theme.get('info', 'ℹ️')} The URL must start with `http://` or `https://`
 
 **For multiple URLs, use:**
 • Spaces: `url1 url2 url3`
@@ -417,7 +441,9 @@ Please send a valid X/Twitter video URL.
     @staticmethod
     def maintenance(user_id=None):
         """Maintenance mode message"""
-        return f"""{Messages.WARNING} **Maintenance Mode**
+
+        theme = theme_manager.get_theme(user_id)
+        return f"""{theme.get('warning', '⚠️')} **Maintenance Mode**
 
 The bot is currently under maintenance.
 
@@ -429,7 +455,9 @@ We'll be back shortly. Thank you for your patience!
     @staticmethod
     def rate_limit(user_id=None):
         """Rate limit message"""
-        return f"""{Messages.WARNING} **Slow Down!**
+
+        theme = theme_manager.get_theme(user_id)
+        return f"""{theme.get('warning', '⚠️')} **Slow Down!**
 
 You're sending requests too quickly.
 
@@ -440,6 +468,8 @@ Please wait a moment before trying again.
     @staticmethod
     def image_download_prompt(user_id=None):
         """Prompt user to send URL for image download"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             ready = get_text(user_id, 'ready_to_download', 'Ready to Download')
             send_url = get_text(user_id, 'send_url', 'Please send me the X/Twitter image URL(s) now.')
@@ -480,6 +510,8 @@ https://x.com/user/status/333
     @staticmethod
     def bulk_image_upload_prompt(image_count, user_id=None):
         """Prompt for bulk image upload"""
+
+        theme = theme_manager.get_theme(user_id)
         if user_id and LANG_SUPPORT:
             bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
             select_all = get_text(user_id, 'select_all', 'Select All')
@@ -508,6 +540,8 @@ https://x.com/user/status/333
     @staticmethod
     def bulk_content_prompt(user_id=None):
         """Prompt for bulk content detection"""
+
+        theme = theme_manager.get_theme(user_id)
         return f"""🔍 **Bulk Content Detection**
 
 This feature automatically detects and processes multiple URLs containing both **Videos** and **Images**.

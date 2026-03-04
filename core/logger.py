@@ -68,6 +68,12 @@ def setup_logger(name="AfterDark", level=logging.INFO):
         return logger
     logger.propagate = False
 
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except AttributeError:
+            pass
+
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(ColoredFormatter())
     logger.addHandler(console_handler)

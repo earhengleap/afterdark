@@ -20,12 +20,12 @@ from config.paths import DOWNLOAD_FOLDER, IMAGES_FOLDER
 from models.data_models import DownloadResult
 from core.file_manager import FileManager
 from core.log_manager import LogManager
-from utils.formatters import Formatter
+from core.formatting.formatters import Formatter
 from models.enums import user_downloads
 from resources.keyboards import Keyboards
 from core.logger import setup_logger
 from core.database import history_db
-from utils.url_parser import extract_twitter_username
+from core.parsing.url_parser import extract_twitter_username
 
 logger = setup_logger("ImageDownloader")
 
@@ -145,15 +145,9 @@ class ImageDownloader:
                     "twitter": {
                         "syndication": True,
                         "api": "syndication",
-                        "include": "media,timeline",
                         "videos": False,
                         "retweets": True,
-                        "quoted": True,
-                        "replies": False,
-                        "cards": True,
-                        "text-tweets": False,
-                        "conversations": True,
-                        "unique": True
+                        "quoted": True
                     }
                 },
                 "downloader": {

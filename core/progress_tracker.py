@@ -8,7 +8,7 @@ from typing import Dict, Optional
 
 from pyrogram.types import Message
 
-from utils.formatters import Formatter
+from core.formatting.formatters import Formatter
 from models.enums import upload_progress
 from core.logger import setup_logger
 
