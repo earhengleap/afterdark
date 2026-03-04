@@ -1,4 +1,4 @@
-# X Video Downloader Pro - Telegram Bot
+# AfterDark - Telegram Bot
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
@@ -6,38 +6,34 @@
   <img src="https://img.shields.io/badge/Telegram-Bot_API-v20-orange.svg" alt="Telegram API">
 </p>
 
-A powerful Telegram bot for downloading and managing media from X (Twitter). Features include bulk downloads, AI-powered media categorization, and a beautiful Telegram Mini App (TWA) gallery for browsing your media collection.
+A robust and feature-rich Telegram bot platform designed originally for downloading media from X (Twitter), expanded into a comprehensive media management system. Features include bulk downloads, AI-powered media categorization, advanced tunnel setups, and a beautiful locally-hosted Telegram Mini App (TWA) gallery dashboard for browsing your synced media.
 
-![AfterDark Vault](https://img.shields.io/badge/AfterDark_Vault-TWA_Gallery-blueviolet)
+![AfterDark Vault](https://img.shields.io/badge/AfterDark_Vault-TWA_Dashboard-blueviolet)
 
 ## Features
 
-### Core Functionality
-- **Media Downloads**: Download videos and images from X (Twitter) links
-- **Bulk Processing**: Process multiple URLs simultaneously with queue management
-- **Telegram Group Sync**: Automatically sync media from configured Telegram groups
-- **AI-Powered Organization**: Auto-generate titles and descriptions using local AI (Ollama)
+### Core Capabilities
+- **Multi-Platform Media Support**: Download videos and images from X (Twitter), RedGifs, Porn91, Videy, and more.
+- **Bulk Processing & Queues**: Process multiple links concurrently with rate limiting and progress tracking.
+- **Group Synchronization**: Automatically scrape and cache media from specified Telegram groups.
+- **Auto-Scheduler**: Periodic scheduling for health checks and synchronizations. 
 
-### Telegram Mini App (TWA) Gallery
-- **Web-based Gallery**: Beautiful responsive gallery interface accessible via Telegram
-- **Filter & Search**: Filter by media type (video/image), search by AI titles
-- **Media Viewer**: Full-screen viewer with video playback support
-- **Auto-Sync**: Background synchronization of new media from Telegram
-- **AI Enhancement**: Generate intelligent titles and descriptions for your media
+### Telegram Mini App (TWA) Dashboard
+- **Web-based Gallery**: A responsive Mini App Dashboard deployed directly through the bot for intuitive media browsing.
+- **Filtering & AI Search**: Filter media explicitly by type (video/image), and search collections using an AI-generated title and description base.
+- **Background Sync**: Live-syncs new media dropped in your configured groups directly into the dashboard.
+- **Secure Authentication Options**: Selectable session handling between bot auth or explicit user auth for greater history retention.
 
-### Technical Features
-- **Pyrogram Client**: Modern Telegram client with full API support
-- **FastAPI Backend**: High-performance API for the Mini App
-- **SQLite Persistence**: Local database for user settings and download history
-- **Async Processing**: Non-blocking operations for optimal performance
-- **CDN Mode**: Stream media directly from Telegram CDN for faster loading
+### Tunnels and Connectivity
+Built-in advanced tunnel proxies (`Serveo`, `Localhost.run`, `Pinggy`, `Localtunnel`, and Cloudflare options) allow you to serve the TWA locally while securely exposing it to Telegram, managed directly through the bot runner (`afterdark.py`).
 
 ## Prerequisites
 
 - Python 3.10 or higher
-- Telegram API credentials (API_ID, API_HASH)
+- FFmpeg (for media processing and thumbnail generation)
 - Telegram Bot Token
-- (Optional) Ollama server for AI features
+- Telegram API credentials (API_ID, API_HASH)
+- *(Optional)* Ollama server for AI categorization
 
 ## Installation
 
@@ -68,163 +64,88 @@ pip install -r requirements.txt
 
 ### 4. Configure Environment
 
-Create a `.env` file or set environment variables:
+Create a `.env` file referencing the needed parameters. Here's a quick startup setup:
 
 ```env
-# Required
+# Required Telegram Credentials
 API_ID=your_api_id
 API_HASH=your_api_hash
 BOT_TOKEN=your_bot_token
 CHAT_ID=your_chat_id
 
-# Optional - For AI features
-TWITTER_COOKIES=your_twitter_cookies
-TELEGRAM_GALLERY_AUTH=user
-TWA_AI_TITLES=1
+# Mini App Tunnel and Hosting 
+TWA_PORT=5000
+TWA_MENU_SYNC_AUTOSTART=1
+TWA_GALLERY_AUTH=auto
 
-# Optional - Ollama settings
+# Optional - Tunnel Providers (serveo, localhost.run, pinggy)
+TWA_TUNNEL_PROVIDER=serveo
+
+# Optional - AI features (Ollama)
+TWA_AI_TITLES=1
 TWA_AI_OLLAMA_URL=http://127.0.0.1:11434/api/generate
 TWA_AI_MODEL=moondream:latest
 ```
 
-### 5. Run the Bot
+### 5. Start the Bot & Mini App Server
+
+Running the primary bot startup will invoke both the Telegram MTProto client and the background dashboard web server, initializing your configured tunnels automatically.
 
 ```bash
 python afterdark.py
 ```
 
-## Telegram Mini App Setup
-
-### Running the TWA Server
-
+*For manual control over the Mini App server independently:*
 ```bash
-# Basic usage
-python telegram-bot-websites/server.py
-
-# With custom port
-TWA_PORT=5000 python telegram-bot-websites/server.py
-
-# With ngrok tunnel for testing
-python telegram-bot-websites/start_with_tunnel.py
+python dashboard/server.py
 ```
-
-### Configuration Options
-
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `TWA_PORT` | 5000 | Server port |
-| `TELEGRAM_GALLERY_AUTH` | auto | Auth mode: auto, bot, or user |
-| `TWA_CDN_ONLY` | 1 | Use Telegram CDN for streaming |
-| `TWA_LIVE_SYNC` | 1 | Enable background sync |
-| `TWA_AI_TITLES` | 1 | Enable AI title generation |
-| `TWA_STARTUP_SYNC_LIMIT` | all | Media to sync on startup |
+*To test tunnels directly via the dashboard backend:*
+```bash
+python dashboard/scripts/start_with_tunnel.py
+```
 
 ## Project Structure
 
 ```
-Telegram-Bot/
-├── afterdark.py            # Main bot entrypoint
-├── config/
-│   ├── settings.py         # Configuration management
-│   └── config_loader.py    # Config loading utilities
-├── core/
-│   ├── downloader.py       # Media download pipeline
-│   ├── database.py          # SQLite persistence
-│   └── logger.py           # Logging utilities
-├── handlers/
-│   ├── command_handlers.py # Bot commands
-│   └── callback_handlers.py # Callback queries
-├── telegram-bot-websites/
-│   ├── server.py           # TWA API server
-│   ├── script.js           # Frontend JavaScript
-│   ├── style.css           # Frontend styles
-│   ├── index.html          # TWA HTML entry
-│   └── media_cache/        # Downloaded media storage
-├── ui/
-│   └── keyboards.py        # Telegram keyboards
-├── utils/                  # Utility functions
-├── models/                 # Data models
-└── tests/                  # Unit tests
+AfterDark/
+├── afterdark.py            # Primary bot entrypoint & multi-process bootstrapper
+├── config/                 # Core settings, constants, and Path validations
+├── core/                   # Service layer and internal systems
+│   ├── downloader.py       # Core media download pipeline
+│   ├── database.py         # SQLite persistence operations
+│   ├── auto_scheduler.py   # Background job management
+│   ├── health_monitor.py   # TWA Server & Tunnel health checks
+│   └── *_service.py        # Independent downloaders (Twitter, Redgifs, etc.)
+├── dashboard/              # TWA Backend and Web components (Replaced 'telegram-bot-websites')
+│   ├── server.py           # FastAPI Web Server for Mini App
+│   ├── scripts/            # Build pipelines, index rebuilders, auth login
+│   ├── public/             # CSS/JS frontend components
+│   └── media_cache/        # Target disk for downloaded files
+├── data/                   # PIDs, state files, tunnel URLs
+├── handlers/               # Command and Callback pyrogram callbacks
+├── media/                  # Shared thumbnail definitions
+├── models/                 # Data Enums and typing 
+├── resources/              # External copy & keyboards structures
+├── scripts/                # External tools and manual execution scripts
+├── tests/                  # Unit test framework
+└── ui/                     # Shared UI/Keyboards elements
 ```
 
-## Usage
+## API Highlights (Dashboard)
 
-### Bot Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Start the bot |
-| `/help` | Show help message |
-| `/sync` | Sync media from Telegram group |
-| `/status` | Show bot status |
-
-### TWA Gallery
-
-1. Open your bot in Telegram
-2. Click the menu button (three lines)
-3. Select "Gallery" or use the inline button
-4. Browse, search, and view your media collection
-
-## API Endpoints
-
-### Mini App API
+The `dashboard/server.py` runs a FastAPI service exposing routes to your Mini App.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/health` | GET | Server health check |
-| `/api/media` | GET | Get all media items |
-| `/api/media/page` | GET | Paginated media list |
-| `/api/media/recent` | GET | Recent media items |
-| `/api/sync` | POST | Trigger media sync |
-| `/api/ai-titles` | POST | Generate AI titles |
-| `/api/file/{id}` | GET | Get media file |
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-python -m unittest discover -s tests
-
-# Run specific test
-python -m unittest tests.test_image_downloader_rename
-```
-
-### Code Quality
-
-```bash
-# Install linters
-pip install ruff mypy
-
-# Run ruff
-ruff check .
-
-# Run mypy
-mypy .
-```
-
-## Tech Stack
-
-- **Bot Framework**: [Pyrogram](https://docs.pyrogram.org/) / [pyrofork](https://pyrofork.mahdul.com/)
-- **Web Framework**: [FastAPI](https://fastapi.tiangolo.com/)
-- **Database**: SQLite
-- **AI**: [Ollama](https://ollama.ai/) (local LLMs)
-- **Media Processing**: FFmpeg, PIL
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- [Pyrogram](https://github.com/pyrogram/pyrogram) - Telegram client
-- [gallery-dl](https://github.com/mikf/gallery-dl) - Media downloading
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Video downloading
+| `/api/health` | GET | Validates server routing & tunnel stability |
+| `/api/media` | GET | Generates the active media list for the TWA |
+| `/api/sync` | POST | Triggers forced history alignment from the Chat |
+| `/api/ai-titles`| POST | Manually invokes Ollama for pending items |
+| `/api/file/{id}`| GET | Serves media proxy from Local System/CDN |
 
 ## Support
 
-For issues and feature requests, please [open an issue](https://github.com/earhengleap/Telegram-Bot/issues) on GitHub.
+For issues, configurations, and feature requests, please [open an issue](https://github.com/earhengleap/Telegram-Bot/issues) on GitHub.
 
 ---
 

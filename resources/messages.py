@@ -35,10 +35,10 @@ class Messages:
     def welcome(user_name, user_id=None):
         """Welcome message for /start command"""
         welcome_text = get_text(user_id, 'welcome_title', 'Welcome')
-        bot_name = get_text(user_id, 'bot_name', 'X Video Downloader Bot')
-        description = get_text(user_id, 'welcome_description', 'I help you download videos and images from X (Twitter) quickly and easily!')
+        bot_name = get_text(user_id, 'bot_name', 'AfterDark Vault')
+        description = get_text(user_id, 'welcome_description', 'Your premium companion for downloading and managing media across X (Twitter), RedGifs, Videy, and more!')
         quick_actions = get_text(user_id, 'quick_actions', 'Quick Actions:')
-        download_video = get_text(user_id, 'download_video', 'Download Video')
+        download_video = get_text(user_id, 'download_video', 'Download Media')
         download_images = get_text(user_id, 'download_images', 'Download Images')
         bulk_upload = get_text(user_id, 'bulk_upload', 'Bulk Upload')
         statistics = get_text(user_id, 'statistics', 'Statistics')
@@ -51,14 +51,14 @@ class Messages:
 
 **{quick_actions}**
 • Click **{Messages.DOWNLOAD} {download_video}** or **🖼️ {download_images}**
-• Use **{Messages.UPLOAD} {bulk_upload}** to send multiple files to group
-• View your **{Messages.STATS} {statistics}** to see history
-• Need help? Check **❓ Help** section
+• Use **{Messages.UPLOAD} {bulk_upload}** to organize and sync media batches
+• View your **{Messages.STATS} {statistics}** to review download history
+• Need help? Check the **❓ Help** section
 
-Simply send me any X/Twitter URL and I'll handle the rest!
+Simply drop any supported media URL here and I'll handle the rest! ✨
 
 ━━━━━━━━━━━━━━━━━━━━
-*Powered by Moonlight • Fast & Reliable*"""
+*Powered by AfterDark • Fast & Reliable*"""
     
     @staticmethod
     def help_text(user_id=None):
@@ -72,22 +72,24 @@ Simply send me any X/Twitter URL and I'll handle the rest!
 
 **Step-by-Step Guide:**
 
-**Single Video Download:**
-1️⃣ Click the **'{Messages.DOWNLOAD} Download Video'** button or simply send a video URL
+**Single Media Download:**
+1️⃣ Click the **'{Messages.DOWNLOAD} Download Media'** button or simply drop a supported media URL directly in the chat
 
-2️⃣ Send a valid X/Twitter video link
-   Example: `https://x.com/username/status/1234567890`
+2️⃣ Supported Platforms:
+   • **X (Twitter):** `https://x.com/username/status/...`
+   • **RedGifs:** `https://www.redgifs.com/watch/...`
+   • **Videy / Porn91** etc.
 
-3️⃣ Wait while I download the video
+3️⃣ Wait while I download and process the media
 
-4️⃣ Receive your video directly in chat!
+4️⃣ Receive your files directly in chat!
 
-5️⃣ Use **{Messages.UPLOAD} Upload to Group** button to send to your group
+5️⃣ Use **{Messages.UPLOAD} Upload to Group** button to push straight to the gallery
 
-**Bulk Video Download:**
-1️⃣ Click **'{Messages.DOWNLOAD} Download Video'** button
+**Bulk Media Processing:**
+1️⃣ Click **'{Messages.DOWNLOAD} Download Media'** button
 
-2️⃣ Send multiple URLs in one message:
+2️⃣ Send multiple URLs simultaneously:
 
    **Formats supported:**
    • Space-separated: `url1 url2 url3`
@@ -98,66 +100,53 @@ Simply send me any X/Twitter URL and I'll handle the rest!
      url2
      url3
      ```
-   • Mixed format: `url1 | url2 url3`
 
-3️⃣ Watch the progress as videos download
+3️⃣ Watch the real-time progress indicators
 
 4️⃣ After completion, choose:
-   • **{Messages.UPLOAD} Upload All to Group** - Send all downloaded videos
-   • **{Messages.DOWNLOAD} Download More** - Download more videos
-   • **{Messages.STATS} View All Videos** - Manage all videos
+   • **{Messages.UPLOAD} Upload All to Group**
+   • **{Messages.DOWNLOAD} Download More**
+   • **{Messages.STATS} View All History**
 
 ━━━━━━━━━━━━━━━━━━━━
-
-**Supported Formats:**
-• Single videos from posts
-• Videos with multiple quality options
-• Both X.com and Twitter.com links
 
 **Tips:**
-{Messages.INFO} Make sure the tweet contains a video
-{Messages.INFO} The bot works best with public tweets
-{Messages.INFO} Large videos may take longer to process
-{Messages.INFO} You can select multiple videos for bulk upload
-{Messages.INFO} Upload progress shows speed and ETA
+{Messages.INFO} Large files may take slightly longer due to high-quality retention.
+{Messages.INFO} The Dashboard Mini App organizes downloaded media by AI category.
+{Messages.INFO} Upload progress shows realtime analytics and ETAs.
 
 ━━━━━━━━━━━━━━━━━━━━
-*Need more help? Contact support in Settings*"""
+*Need more help? Let support know!*"""
     
     @staticmethod
     def about_text(user_id=None):
         """About bot information"""
         return f"""{Messages.INFO} **About This Bot**
 
-**X Video Downloader Bot** is a professional tool designed to make downloading videos from X (formerly Twitter) effortless and fast.
+**AfterDark** is a premium Telegram integration suite designed to simplify gathering, processing, and categorizing your favorite media uniformly from across the Web.
 
 **Key Features:**
-{Messages.SUCCESS} High-quality video downloads
-{Messages.SUCCESS} Bulk download support (multiple URLs)
-{Messages.SUCCESS} Fast processing with yt-dlp
-{Messages.SUCCESS} Automatic format conversion
-{Messages.SUCCESS} Upload progress tracking with ETA
-{Messages.SUCCESS} Download history tracking
-{Messages.SUCCESS} Bulk upload to groups
-{Messages.SUCCESS} Multi-language support (11 languages)
-{Messages.SUCCESS} User-friendly interface
+{Messages.SUCCESS} Original Quality Media Acquisition
+{Messages.SUCCESS} Comprehensive Multi-platform reach
+{Messages.SUCCESS} Seamless Background Syncing
+{Messages.SUCCESS} Local First-AI Auto Categorization (via Ollama)
+{Messages.SUCCESS} Telegram Mini App Dashboard Integration
+{Messages.SUCCESS} High-fidelity Tunnel Connectivity
+{Messages.SUCCESS} Smart Bulk Queuing Operations
 
 **Technology Stack:**
-• **Framework:** Pyrogram
-• **Downloader:** yt-dlp
-• **Video Processing:** FFmpeg
-• **Language:** Python 3.x
+• **Backend Framework:** Pyrogram + FastAPI
+• **Download Engines:** yt-dlp, native API scrapers
+• **Computer Vision:** Local Ollama Pipelines
 
 ━━━━━━━━━━━━━━━━━━━━
 
-**Version:** 1.0.0
-**Release Date:** October 2024
-**Status:** Stable Release
+**Status:** AfterDark Stable Release v{__import__('config.settings', fromlist=['BOT_VERSION']).BOT_VERSION}
 
-Developed with ❤️ for the Telegram community
+Developed with ❤️ for media connoisseurs.
 
 ━━━━━━━━━━━━━━━━━━━━
-*Free • Fast • Reliable*"""
+*Private • Seamless • Beautiful*"""
     
     @staticmethod
     def settings_text(user_id=None):

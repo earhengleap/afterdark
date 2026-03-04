@@ -27,7 +27,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python telegram-bot-websites/server.py"
+args = "python dashboard/server.py"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -39,7 +39,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python x_telegram.py"
+args = "python afterdark.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -50,7 +50,7 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "python telegram-bot-websites/server.py & python x_telegram.py"]
+run = ["bash", "-c", "python dashboard/server.py & python afterdark.py"]
 
 [userenv]
 
