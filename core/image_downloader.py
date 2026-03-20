@@ -12,6 +12,7 @@ import tempfile
 import asyncio
 from typing import List, Tuple, Optional, Dict
 from urllib.parse import urlparse, parse_qs
+import requests
 
 from pyrogram.types import Message, InputMediaPhoto
 
@@ -49,14 +50,12 @@ class ImageDownloader:
         Normalize Twitter/X URLs to their cleanest form.
         Removes query parameters and ensures consistent format.
         """
-        # Remove query parameters that can interfere
-        url = url.split('?')[0]
-        
-        # Replace x.com with twitter.com for better compatibility
-        url = url.replace('x.com', 'twitter.com')
-        
-        # Ensure URL ends cleanly (no trailing slashes or fragments)
-        url = url.rstrip('/').split('#')[0]
+        # Remove query parameters/fragments that can interfere.
+        url = url.split('#', 1)[0].split('?', 1)[0].rstrip('/')
+
+        # Canonicalize all Twitter/X hosts to x.com so cookie domains match.
+        url = re.sub(r'(?i)://(?:www\.|mobile\.)?twitter\.com/', '://x.com/', url, count=1)
+        url = re.sub(r'(?i)://(?:www\.|mobile\.)?x\.com/', '://x.com/', url, count=1)
         
         logger.debug(f"URL normalized: {url}")
         return url
@@ -114,7 +113,16 @@ class ImageDownloader:
             await ImageDownloader._notify_status(
                 status_callback, 50, f"🛰️ Link {index}/{total} - Downloading media"
             )
-            downloaded_files = await ImageDownloader._run_gallery_dl(url, download_folder, existing_files, status_callback, index, total)
+            downloaded_files = await ImageDownloader._run_gallery_dl(
+                url, download_folder, existing_files, status_callback, index, total
+            )
+
+            # Fallback for cases where gallery-dl fails to resolve X images.
+            if not downloaded_files and ("x.com/" in url or "twitter.com/" in url):
+                logger.info("gallery-dl returned no images; trying fxtwitter fallback")
+                downloaded_files = await ImageDownloader._run_fxtwitter_fallback(
+                    url, download_folder, status_callback, index, total
+                )
             
             if downloaded_files:
                 logger.info(f"Download success: Retrieved {len(downloaded_files)} images")
@@ -275,6 +283,84 @@ class ImageDownloader:
                         else:
                             downloaded_files.append(file_path)
         return downloaded_files if downloaded_files else None
+
+    @staticmethod
+    async def _run_fxtwitter_fallback(
+        url: str,
+        download_folder: str,
+        status_callback=None,
+        index: int = 1,
+        total: int = 1,
+    ) -> Optional[List[str]]:
+        """Download X images via fxtwitter API when gallery-dl returns no files."""
+        try:
+            status_match = re.search(r"/status/(\d+)", url)
+            if not status_match:
+                return None
+
+            tweet_id = status_match.group(1)
+            api_url = f"https://api.fxtwitter.com/status/{tweet_id}"
+            response = await asyncio.to_thread(requests.get, api_url, timeout=15)
+            if response.status_code != 200:
+                logger.warning(f"fxtwitter fallback failed ({response.status_code}) for {url}")
+                return None
+
+            payload = response.json()
+            tweet = payload.get("tweet", {}) if isinstance(payload, dict) else {}
+            media = tweet.get("media", {}) if isinstance(tweet, dict) else {}
+            all_media = media.get("all", []) if isinstance(media, dict) else []
+
+            image_urls = []
+            for item in all_media:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("type", "")).lower() != "photo":
+                    continue
+                image_url = item.get("url")
+                if image_url:
+                    image_urls.append(image_url)
+
+            if not image_urls:
+                return None
+
+            os.makedirs(download_folder, exist_ok=True)
+            downloaded_files = []
+
+            for i, image_url in enumerate(image_urls, 1):
+                if status_callback:
+                    await ImageDownloader._notify_status(
+                        status_callback,
+                        min(60 + i * 10, 95),
+                        f"Fallback image {i}/{len(image_urls)}",
+                    )
+
+                parsed = urlparse(image_url)
+                ext = os.path.splitext(parsed.path)[1].lower() or ".jpg"
+                if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+                    ext = ".jpg"
+
+                base_name = f"x_{tweet_id}_{i}{ext}"
+                target_path = os.path.join(download_folder, base_name)
+                suffix = 1
+                while os.path.exists(target_path):
+                    target_path = os.path.join(download_folder, f"x_{tweet_id}_{i}_{suffix}{ext}")
+                    suffix += 1
+
+                img_response = await asyncio.to_thread(requests.get, image_url, timeout=20)
+                if img_response.status_code != 200 or not img_response.content:
+                    logger.warning(f"fxtwitter image fetch failed ({img_response.status_code}) for {image_url}")
+                    continue
+
+                with open(target_path, "wb") as f:
+                    f.write(img_response.content)
+
+                final_path = ImageDownloader._safe_rename_with_number(target_path) or target_path
+                downloaded_files.append(final_path)
+
+            return downloaded_files if downloaded_files else None
+        except Exception as e:
+            logger.warning(f"fxtwitter fallback failed for {url}: {e}")
+            return None
 
     @staticmethod
     async def send_images_to_user(image_paths: List[str], message: Message, user_id: int) -> None:
