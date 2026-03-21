@@ -1,4 +1,4 @@
-﻿# afterdark.py
+# afterdark.py
 
 """
 X Video Downloader Bot - Clean Architecture Implementation
@@ -1021,15 +1021,15 @@ def _kill_port_process(port: int) -> bool:
         return False
 
 
-def _start_twa_stack() -> None:
+def _start_twa_stack() -> str | None:
     if not _is_true(os.getenv("TWA_AUTOSTART", "1")):
-        return
+        return None
 
     root_dir = Path(__file__).resolve().parent
     server_script = root_dir / "dashboard/server.py"
     if not server_script.exists():
         logger.warning("TWA server script not found, skipping Mini App bootstrap")
-        return
+        return None
 
     twa_port = os.getenv("TWA_PORT", "5000").strip() or "5000"
     try:
@@ -1088,7 +1088,7 @@ def _start_twa_stack() -> None:
         time.sleep(2)
         if server_proc.poll() is not None:
             logger.warning("Mini App backend exited early. Check server logs.")
-            return
+            return None
 
     explicit_public_url = os.getenv("TWA_PUBLIC_URL", "").strip()
     if explicit_public_url.startswith("https://"):
@@ -1096,7 +1096,7 @@ def _start_twa_stack() -> None:
             logger.info(f"Using explicit TWA_PUBLIC_URL: {explicit_public_url}")
             _persist_twa_public_url(root_dir, explicit_public_url)
             _sync_twa_menu_button(explicit_public_url, root_dir)
-            return
+            return None
         logger.warning(
             "Ignoring explicit TWA_PUBLIC_URL because /api/health is unreachable. "
             "Starting tunnel provider flow."
@@ -1106,9 +1106,9 @@ def _start_twa_stack() -> None:
     if persisted_url and _is_public_url_healthy(persisted_url):
         logger.info(f"Using existing persisted TWA URL: {persisted_url}")
         _sync_twa_menu_button(persisted_url, root_dir)
-        return
+        return None
 
-    _start_tunnel_provider_flow(root_dir, twa_port)
+    return twa_port
 
 
 def _stop_aux_processes() -> None:
@@ -1327,6 +1327,46 @@ def print_banner():
         print("+===============================+\n")
 
 
+async def _notify_admins_of_tunnel(app, public_url: str):
+    message_text = (
+        f"ðŸŒ  **Tunnel Active**\n\n"
+        f"URL: {public_url}\n\n"
+        f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+    for target in _NOTIFY_USERNAMES:
+        chat_target_str = target if target.startswith("@") else f"@{target}"
+        notify_enabled = True
+        try:
+            user_obj = await app.get_users(chat_target_str)
+            target_user_id = getattr(user_obj, "id", None)
+            if target_user_id:
+                setting = history_db.get_setting(target_user_id, "tunnel_notifications", "1")
+                notify_enabled = str(setting).strip().lower() in {"1", "true", "yes", "on"}
+        except Exception as e:
+            logger.warning(f"Could not resolve user settings for {chat_target_str}: {e}")
+        if not notify_enabled:
+            logger.info(f"Tunnel notification skipped (disabled) for {chat_target_str}")
+            continue
+        try:
+            await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
+            logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")
+        except Exception as e:
+            error_str = str(e)
+            if "USER_IS_BLOCKED" in error_str:
+                logger.warning(f"âš ï¸  Tunnel notice omitted: {chat_target_str} has not started the bot or blocked it.")
+            elif "PEER_ID_INVALID" in error_str:
+                logger.warning(f"âš ï¸  Tunnel notice omitted: {chat_target_str} hasn't interacted with the bot yet.")
+            else:
+                logger.error(f"â Œ Could not deliver tunnel URL to {chat_target_str}: {e}")
+
+async def boot_tunnel_in_background(app, root_dir: Path, twa_port: str):
+    success = await asyncio.to_thread(_start_tunnel_provider_flow, root_dir, twa_port)
+    if success:
+        public_url = await asyncio.to_thread(_read_persisted_twa_public_url, root_dir)
+        if public_url:
+            await _notify_admins_of_tunnel(app, public_url)
+
+
 async def main():
     """Main bot entry point with enhanced error handling and monitoring"""
     print_banner()
@@ -1352,9 +1392,11 @@ async def main():
     setup_command_handlers(app)
     setup_callback_handlers(app)
     logger.info("✓ Handlers configured")
+
     # Step 3.5: Start Mini App backend stack
+    twa_tunnel_port = None
     try:
-        _start_twa_stack()
+        twa_tunnel_port = _start_twa_stack()
     except Exception as e:
         logger.warning(f"TWA bootstrap failed, continuing bot-only mode: {e}")
 
@@ -1388,33 +1430,15 @@ async def main():
             logger.info(f"📅 Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             logger.info("⌨️ Press Ctrl+C to stop")
             
-            # Send Notification using Pyrogram
-            public_url = _read_persisted_twa_public_url(Path(os.getcwd()))
-            if public_url:
-                message_text = (
-                    f"ðŸŒ **Tunnel Active**\n\n"
-                    f"URL: {public_url}\n\n"
-                    f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-                for target in _NOTIFY_USERNAMES:
-                    chat_target_str = target if target.startswith("@") else f"@{target}"
-                    notify_enabled = True
-                    try:
-                        user_obj = await app.get_users(chat_target_str)
-                        target_user_id = getattr(user_obj, "id", None)
-                        if target_user_id:
-                            setting = history_db.get_setting(target_user_id, "tunnel_notifications", "1")
-                            notify_enabled = str(setting).strip().lower() in {"1", "true", "yes", "on"}
-                    except Exception as e:
-                        logger.warning(f"Could not resolve user settings for {chat_target_str}: {e}")
-                    if not notify_enabled:
-                        logger.info(f"Tunnel notification skipped (disabled) for {chat_target_str}")
-                        continue
-                    try:
-                        await app.send_message(chat_id=chat_target_str, text=message_text, disable_web_page_preview=True)
-                        logger.info(f"✅ Tunnel URL properly delivered to {chat_target_str}")
-                    except Exception as e:
-                        logger.error(f"âŒ Could not deliver tunnel URL to {chat_target_str}: {e}")
+            # Formally check if we need to start the tunnel in the background
+            if twa_tunnel_port:
+                root_dir = Path(os.getcwd())
+                asyncio.create_task(boot_tunnel_in_background(app, root_dir, twa_tunnel_port))
+            else:
+                # If tunnel was skipped or already alive, notify from persisted directly!
+                public_url = _read_persisted_twa_public_url(Path(os.getcwd()))
+                if public_url:
+                    await _notify_admins_of_tunnel(app, public_url)
             
             # Step 5: Start health monitoring
             logger.info("Starting health monitor...")

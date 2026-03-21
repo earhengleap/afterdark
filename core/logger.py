@@ -20,6 +20,27 @@ class ColoredFormatter(logging.Formatter):
     BOLD_RED = "\x1b[31;1m"
     RESET = "\x1b[0m"
     
+    EMOJI_MAP = {
+        "✅": "[OK]",
+        "❌": "[ERR]",
+        "⚠️": "[WARN]",
+        "📊": "[METRICS]",
+        "🆔": "[ID]",
+        "📅": "[DATE]",
+        "⌨️": "[CMD]",
+        "🔌": "[CONN]",
+        "⚡": "[CPU]",
+        "💾": "[MEM]",
+        "🕐": "[TIME]",
+        "🌐": "[WEB]",
+        "ðŸŒ ": "[WEB]",
+        "â Œ": "[ERR]",
+        "âš ï¸ ": "[WARN]",
+        "\\u2705": "[OK]",
+        "\\u274c": "[ERR]",
+        "\\u26a0": "[WARN]",
+    }
+    
     BASE_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-28s | %(message)s"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     LEVEL_COLORS = {
@@ -35,6 +56,11 @@ class ColoredFormatter(logging.Formatter):
         level = f"{record.levelname:<8}"
         name = f"{record.name:<28}"
         msg = record.getMessage()
+        
+        if not ENABLE_LOG_EMOJIS and os.name == 'nt':
+            for emj, text in self.EMOJI_MAP.items():
+                msg = msg.replace(emj, text)
+                
         level_color = self.LEVEL_COLORS.get(record.levelno, self.GREY)
         return (
             f"{self.GREY}{ts}{self.RESET} | "
@@ -59,6 +85,33 @@ class PlainAlignedFormatter(logging.Formatter):
         text = super().format(record)
         return self.ANSI_RE.sub("", text)
 
+
+class PyrogramSpamFilter(logging.Filter):
+    """Filters out connection lost retries from pyrogram session logs"""
+    def filter(self, record):
+        msg = record.getMessage()
+        if "Retrying" in msg and "due to: Connection lost" in msg:
+            return False
+        return True
+
+
+class SuppressStdoutSpam:
+    """Wraps sys.stdout to prevent pyrofork native print() socket errors from spamming"""
+    def __init__(self, original_stdout):
+        self.original_stdout = original_stdout
+
+    def write(self, text):
+        if "socket.send() raised exception." in text:
+            return
+        self.original_stdout.write(text)
+
+    def flush(self):
+        self.original_stdout.flush()
+
+    def __getattr__(self, attr):
+        return getattr(self.original_stdout, attr)
+
+
 def setup_logger(name="AfterDark", level=logging.INFO):
     """Setup and return a logger with console and file handlers"""
     logger = logging.getLogger(name)
@@ -67,6 +120,16 @@ def setup_logger(name="AfterDark", level=logging.INFO):
     if logger.handlers:
         return logger
     logger.propagate = False
+
+    # Apply global stdout spam suppressor
+    if not isinstance(sys.stdout, SuppressStdoutSpam):
+        sys.stdout = SuppressStdoutSpam(sys.stdout)
+
+    # Apply Pyrogram logger filter
+    pyrogram_logger = logging.getLogger("pyrogram")
+    spam_filter = PyrogramSpamFilter()
+    if not any(isinstance(f, PyrogramSpamFilter) for f in pyrogram_logger.filters):
+        pyrogram_logger.addFilter(spam_filter)
 
     if hasattr(sys.stdout, "reconfigure"):
         try:

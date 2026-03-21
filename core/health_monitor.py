@@ -19,7 +19,33 @@ class HealthMonitor:
         self.app = app
         self.last_check = None
         self.health_status = "unknown"
-        self.process = psutil.Process(os.getpid())
+        try:
+            self.process = psutil.Process(os.getpid())
+        except Exception as e:
+            logger.error(f"Failed to initialize health monitor process: {e}")
+            self.process = None
+
+    def _get_safe_metric(self, func, *args, default=0, **kwargs):
+        """
+        Safely execute a psutil metric function
+        """
+        if self.process is None:
+            return default
+            
+        try:
+            return func(*args, **kwargs)
+        except (RuntimeError, psutil.Error) as e:
+            # Specifically handle Windows handle information buffer overflow
+            if "SystemExtendedHandleInformation" in str(e):
+                logger.debug(f"Handle buffer overflow: {e}")
+            else:
+                func_name = getattr(func, "__name__", str(func))
+                logger.warning(f"Failed to get metric {func_name}: {e}")
+            return default
+        except Exception as e:
+            func_name = getattr(func, "__name__", str(func))
+            logger.error(f"Unexpected error getting metric {func_name}: {e}")
+            return default
     
     async def check_health(self) -> Dict:
         """
@@ -35,9 +61,9 @@ class HealthMonitor:
             bot_connected = self.app.is_connected if hasattr(self.app, 'is_connected') else False
             
             # Get system metrics
-            cpu_percent = self.process.cpu_percent(interval=0.1)
-            memory_info = self.process.memory_info()
-            memory_mb = memory_info.rss / 1024 / 1024
+            cpu_percent = self._get_safe_metric(self.process.cpu_percent, interval=0.1) if self.process else 0
+            memory_info = self.process.memory_info() if self.process else None
+            memory_mb = (memory_info.rss / 1024 / 1024) if memory_info else 0
             
             # Get system-wide stats
             system_cpu = psutil.cpu_percent(interval=0.1)
@@ -64,9 +90,9 @@ class HealthMonitor:
                 "process": {
                     "cpu_percent": round(cpu_percent, 2),
                     "memory_mb": round(memory_mb, 2),
-                    "memory_percent": round(memory_info.rss / system_memory.total * 100, 2),
-                    "threads": self.process.num_threads(),
-                    "open_files": len(self.process.open_files()) if hasattr(self.process, 'open_files') else 0
+                    "memory_percent": round(((memory_info.rss / system_memory.total * 100) if (memory_info and system_memory.total > 0) else 0), 2),
+                    "threads": self._get_safe_metric(self.process.num_threads) if self.process else 0,
+                    "open_files": len(self._get_safe_metric(self.process.open_files, default=[])) if self.process else 0
                 },
                 "system": {
                     "cpu_percent": round(system_cpu, 2),
@@ -101,8 +127,9 @@ class HealthMonitor:
     def get_health_summary(self) -> str:
         """Get human-readable health summary"""
         try:
-            cpu_percent = self.process.cpu_percent(interval=0.1)
-            memory_mb = self.process.memory_info().rss / 1024 / 1024
+            cpu_percent = self._get_safe_metric(self.process.cpu_percent, interval=0.1) if self.process else 0
+            memory_info = self._get_safe_metric(lambda: self.process.memory_info()) if self.process else None
+            memory_mb = (memory_info.rss / 1024 / 1024) if memory_info else 0
             
             status_emoji = {
                 "healthy": "✅",
