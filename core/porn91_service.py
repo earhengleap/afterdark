@@ -78,7 +78,7 @@ class Porn91Service:
                         # 91porn encodes the real video source in a strencode2() call inside the player's script.
                         # This is the MOST RELIABLE method because the VIDs are session-randomized
                         # but the strencode2 payload always contains the actual video's MP4 URL.
-                        strencode_payload = await page.evaluate('''() => {
+                        strencode_payload = await page.evaluate(r'''() => {
                             // Find scripts inside the player container that call strencode2
                             const playerContainer = document.querySelector('#player_one_html5_api');
                             if (playerContainer && playerContainer.parentElement) {
@@ -128,7 +128,7 @@ class Porn91Service:
                                     await page.set_extra_http_headers({'Referer': 'https://91porn.com/'})
                                     await page.goto(embed_url, wait_until="domcontentloaded", timeout=30_000)
                                     await page.wait_for_timeout(3000)
-                                    video_src = await page.evaluate('''() => {
+                                    video_src = await page.evaluate(r'''() => {
                                         const video = document.querySelector('video');
                                         if (video) return video.getAttribute('src') || video.querySelector('source')?.getAttribute('src');
                                         const m = document.documentElement.innerHTML.match(/src='(https?:\/\/[^']+\.mp4[^']*?)'/);

@@ -4,7 +4,11 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Project root = parent of core/ directory (d:/AfterDark/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class XMediaService:
@@ -153,6 +157,12 @@ class XMediaService:
         if not username:
             return {"post_urls": [], "image_count": 0, "video_count": 0, "unknown_count": 0}
 
+        # Resolve cookies path to absolute so it works regardless of CWD.
+        cookies_path = Path(cookies_file)
+        if not cookies_path.is_absolute():
+            cookies_path = _PROJECT_ROOT / cookies_file
+        cookies_file_abs = str(cookies_path)
+
         target_url = f"https://x.com/{username}/media"
         cmd = [
             sys.executable,
@@ -164,8 +174,8 @@ class XMediaService:
             target_url,
         ]
 
-        if cookies_file and os.path.exists(cookies_file) and os.path.getsize(cookies_file) > 0:
-            cmd.extend(["--cookies", cookies_file])
+        if cookies_file_abs and os.path.exists(cookies_file_abs) and os.path.getsize(cookies_file_abs) > 0:
+            cmd.extend(["--cookies", cookies_file_abs])
 
         completed = await asyncio.to_thread(
             subprocess.run,
