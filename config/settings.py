@@ -10,6 +10,7 @@ BOT_TOKEN = config_instance.bot_token
 API_ID = config_instance.api_id
 API_HASH = config_instance.api_hash
 CHAT_ID = config_instance.chat_id
+SESSION_STRING = config_instance.session_string
 
 # ==================== BOT METADATA ====================
 
@@ -46,7 +47,7 @@ CHANGELOG = {
 # ==================== COOKIE CONFIGURATION ====================
 
 # Cookie file handling
-cookies_content = os.environ.get("TWITTER_COOKIES")
+cookies_content = config_instance.twitter_cookies
 if cookies_content:
     tmp_cookies_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix=".txt")
     tmp_cookies_file.write(cookies_content)
@@ -56,13 +57,35 @@ if cookies_content:
 else:
     COOKIE_FILE = 'config/twitter_cookies.txt'
 
-FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
+def _resolve_ffmpeg_path() -> str:
+    """
+    Resolve the ffmpeg binary path.
+    Priority:
+      1. FFMPEG_PATH from config/config.py
+      2. 'ffmpeg' on PATH (Linux / Docker / any OS)
+      3. Windows default install location
+    """
+    import shutil
+    # Try config/config.py first
+    if config_instance.ffmpeg_path:
+        return config_instance.ffmpeg_path
+        
+    # Check if ffmpeg is on the system PATH
+    on_path = shutil.which("ffmpeg")
+    if on_path:
+        return on_path
+        
+    # Fallback: Windows default install
+    return r"C:\ffmpeg\bin\ffmpeg.exe"
+
+
+FFMPEG_PATH = _resolve_ffmpeg_path()
 
 # ==================== BOT USERNAME ====================
 # Bot username for deep linking (without @)
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "Vuploads_bot")
+BOT_USERNAME = config_instance.bot_username
 
 # ==================== WEB APP URL ====================
 # Dashboard/webapp URL for tracking
-WEB_APP_URL = os.environ.get("WEB_APP_URL", "http://localhost:5000")
+WEB_APP_URL = config_instance.web_app_url
 

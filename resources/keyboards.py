@@ -486,4 +486,44 @@ class Keyboards:
                 InlineKeyboardButton(f"❌ {get_text(user_id, 'cancel', 'Cancel')}", callback_data="history:1")
             ]
         ])
+    @staticmethod
+    def cleanup_menu(user_id=None, min_age_days: int = 7):
+        """Keyboard for /cleanup storage management screen."""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    f"🔄 Refresh Report",
+                    callback_data="cleanup:scan"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    f"♻️ Delete Files Older Than {min_age_days}d",
+                    callback_data="cleanup:confirm"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🏠 Main Menu",
+                    callback_data="main_menu"
+                )
+            ]
+        ])
 
+    @staticmethod
+    def cleanup_confirm(user_id=None, min_age_days: int = 7):
+        """Confirmation keyboard before actually deleting old media files."""
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    f"✅ Yes, Delete Files Older Than {min_age_days}d",
+                    callback_data="cleanup:delete"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "❌ Cancel",
+                    callback_data="cleanup:scan"
+                )
+            ]
+        ])

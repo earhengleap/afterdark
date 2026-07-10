@@ -74,7 +74,7 @@ ROOT_DIR = WEB_DIR.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from config.settings import API_HASH, API_ID, BOT_TOKEN, BOT_USERNAME, CHAT_ID  # noqa: E402
+from config.settings import API_HASH, API_ID, BOT_TOKEN, BOT_USERNAME, CHAT_ID, SESSION_STRING  # noqa: E402
 
 try:  # noqa: E402
     from config.settings import FFMPEG_PATH as SETTINGS_FFMPEG_PATH
@@ -105,8 +105,12 @@ try:
     LIVE_SYNC_SECONDS = max(3, int(os.getenv("TWA_LIVE_SYNC_SECONDS", "5").strip() or "5"))
 except ValueError:
     LIVE_SYNC_SECONDS = 5
-# Live sync - sync all new messages (no limit) 
-LIVE_SYNC_LIMIT = None  # Sync ALL new messages
+# Live sync — only scan the most recent N messages each cycle so it stays fast.
+# New uploads from the bot appear at the top of history, so 50 is plenty.
+try:
+    LIVE_SYNC_LIMIT = max(10, int(os.getenv("TWA_LIVE_SYNC_LIMIT", "50").strip() or "50"))
+except ValueError:
+    LIVE_SYNC_LIMIT = 50
 AI_TITLE_ENABLED = os.getenv("TWA_AI_TITLES", "1").strip().lower() not in {"0", "off", "false", "disabled", "no"}
 AI_TITLE_PROVIDER = os.getenv("TWA_AI_TITLE_PROVIDER", "ollama").strip().lower() or "ollama"
 AI_TITLE_OLLAMA_URL = os.getenv("TWA_AI_OLLAMA_URL", "http://127.0.0.1:11434/api/generate").strip()
@@ -400,6 +404,8 @@ class TelegramGalleryService:
         if GALLERY_AUTH_MODE in {"bot", "user"}:
             return GALLERY_AUTH_MODE
 
+        if SESSION_STRING:
+            return "user"
         user_session_path = self.cache_dir / f"{GALLERY_USER_SESSION}.session"
         if user_session_path.exists():
             return "user"
@@ -413,6 +419,8 @@ class TelegramGalleryService:
                 name=resolved_name,
                 api_id=API_ID,
                 api_hash=API_HASH,
+                session_string=SESSION_STRING if SESSION_STRING else None,
+                in_memory=bool(SESSION_STRING), # Only in-memory if we have a string
                 workdir=str(self.cache_dir),
             )
 
@@ -621,96 +629,104 @@ class TelegramGalleryService:
         from pyrogram import filters
         from pyrogram.handlers import MessageHandler
 
-        async def _on_new_media(client: Any, message: Any) -> None:
-            """Called instantly when a new message with media is posted in the source group."""
-            try:
-                media_tuple = self._extract_media(message)
-                if not media_tuple:
-                    return
+    async def process_realtime_message(self, chat_id: int, message_id: int) -> None:
+        """Process a specific message from Telegram and add it to the index if it contains media."""
+        try:
+            if not self._started:
+                await self.start()
+            
+            message = await self.client.get_messages(chat_id, message_id)
+            if not message:
+                logger.warning(f"[REALTIME] Could not fetch message {message_id} from chat {chat_id}")
+                return
 
-                media_kind, media_obj, mime_type, ext = media_tuple
-                message_id = message.id
+            media_tuple = self._extract_media(message)
+            if not media_tuple:
+                logger.debug(f"[REALTIME] No media extracted from message {message_id}")
+                return
 
-                # Skip if already in index
-                existing_ids = {int(x.get("message_id", 0)) for x in self.media_index}
-                if message_id in existing_ids:
-                    return
+            media_kind, media_obj, mime_type, ext = media_tuple
+            
+            # Skip if already in index
+            existing_ids = {int(x.get("message_id", 0)) for x in self.media_index}
+            if message_id in existing_ids:
+                return
 
-                local_name = f"{message_id}_{media_kind}{ext}"
+            local_name = f"{message_id}_{media_kind}{ext}"
 
-                msg_date = message.date
-                if msg_date and msg_date.tzinfo is None:
-                    msg_date = msg_date.replace(tzinfo=timezone.utc)
+            msg_date = message.date
+            if msg_date and msg_date.tzinfo is None:
+                msg_date = msg_date.replace(tzinfo=timezone.utc)
 
-                # In CDN-only mode, always use streaming proxy (no local download)
-                # In normal mode, use the API file endpoint as fallback
-                item_url = f"/api/file/{message_id}"
-                cdn_url: Optional[str] = ""
+            item_url = f"/api/file/{message_id}"
+            cdn_url: Optional[str] = ""
 
-                # Build thumb URL
-                if media_kind == "image":
-                    thumb_url = cdn_url or item_url
+            # Build thumb URL
+            if media_kind == "image":
+                thumb_url = cdn_url or item_url
+            else:
+                thumb_obj = self._pick_best_thumb(media_obj)
+                if thumb_obj:
+                    thumb_url = f"/api/thumb/{message_id}"
                 else:
-                    thumb_obj = self._pick_best_thumb(media_obj)
-                    if thumb_obj:
-                        thumb_url = f"/api/thumb/{message_id}"
-                    else:
-                        thumb_url = "/assets/video-placeholder.svg"
+                    thumb_url = "/assets/video-placeholder.svg"
 
-                media_size = getattr(media_obj, "file_size", None) or 0
+            media_size = getattr(media_obj, "file_size", None) or 0
 
-                new_item: Dict[str, Any] = {
-                    "message_id": message_id,
-                    "media_kind": media_kind,
-                    "mime_type": mime_type or "",
-                    "file_name": local_name,
-                    "url": item_url,
-                    "cdn_url": cdn_url or "",
-                    "thumb_url": thumb_url,
-                    "size": media_size,
-                    "date": msg_date.isoformat() if msg_date else "",
-                    "caption": str(message.caption or ""),
-                    "is_cached": False,
-                    "ai_title": "",
-                    "ai_description": "",
-                    "duration": getattr(media_obj, "duration", None) or 0,
-                    "width": getattr(media_obj, "width", None) or 0,
-                    "height": getattr(media_obj, "height", None) or 0,
-                }
+            new_item: Dict[str, Any] = {
+                "message_id": message_id,
+                "media_kind": media_kind,
+                "mime_type": mime_type or "",
+                "file_name": local_name,
+                "url": item_url,
+                "cdn_url": cdn_url or "",
+                "thumb_url": thumb_url,
+                "size": media_size,
+                "date": msg_date.isoformat() if msg_date else "",
+                "caption": str(message.caption or ""),
+                "is_cached": False,
+                "ai_title": "",
+                "ai_description": "",
+                "duration": getattr(media_obj, "duration", None) or 0,
+                "width": getattr(media_obj, "width", None) or 0,
+                "height": getattr(media_obj, "height", None) or 0,
+            }
 
-                # Add to index (newest first)
-                self.media_index.insert(0, new_item)
-                logger.info(f"[REALTIME] New {media_kind} detected: message_id={message_id}")
+            # Add to index (newest first)
+            self.media_index.insert(0, new_item)
+            logger.info(f"[REALTIME] New {media_kind} detected: message_id={message_id}")
 
-                # Queue AI title generation
-                self._enqueue_ai_title(message_id)
+            # Queue AI title generation
+            self._enqueue_ai_title(message_id)
 
-                # Try to get thumbnail in background
-                try:
-                    if media_kind == "video":
-                        thumb = await self._ensure_video_thumb(message, media_obj, message_id)
-                        if thumb and thumb.exists():
-                            new_item["thumb_url"] = f"/media/{thumb.name}"
-                    elif media_kind == "image":
-                        thumb = await self._ensure_image_thumb(message, media_obj, message_id)
-                        if thumb and thumb.exists():
-                            new_item["thumb_url"] = f"/media/{thumb.name}"
-                except Exception as e:
-                    logger.debug(f"[REALTIME] Thumb error for {message_id}: {e}")
-
-                # Persist index to disk so it survives restarts
-                self._save_index()
-
+            # Try to get thumbnail in background
+            try:
+                if media_kind == "video":
+                    thumb = await self._ensure_video_thumb(message, media_obj, message_id)
+                    if thumb and thumb.exists():
+                        new_item["thumb_url"] = f"/media/{thumb.name}"
+                elif media_kind == "image":
+                    thumb = await self._ensure_image_thumb(message, media_obj, message_id)
+                    if thumb and thumb.exists():
+                        new_item["thumb_url"] = f"/media/{thumb.name}"
             except Exception as e:
-                logger.warning(f"[REALTIME] Error processing new message: {e}")
+                logger.debug(f"[REALTIME] Thumb error for {message_id}: {e}")
 
-        # Filter: only messages in the source group that contain media
-        media_filter = (
-            filters.chat(int(CHAT_ID))
-            & (filters.photo | filters.video | filters.document | filters.animation)
-        )
+            # Persist index to disk
+            self._save_index()
 
-        self.client.add_handler(MessageHandler(_on_new_media, media_filter))
+        except Exception as e:
+            logger.warning(f"[REALTIME] Error processing realtime message {message_id}: {e}")
+
+    def _register_realtime_handler(self) -> None:
+        """
+        [DISABLED] Direct on_message handler in the dashboard process.
+        Delegated to the Main Bot to avoid session update conflicts.
+        The Main Bot calls /api/internal/notify when new media is seen.
+        """
+        pass
+        # logger.info("[REALTIME] Listening for new media updates...")
+        # self.client.add_handler(MessageHandler(_on_new_media, media_filter))
 
     def _load_index(self) -> None:
         if not self.index_path.exists():
@@ -728,8 +744,14 @@ class TelegramGalleryService:
             self.media_index = []
             self._load_index_from_cache_files()
         else:
-            # Scrub any previously-stored unsafe titles (e.g., "teen/school") so they never reach the UI.
+            # Scrub any previously-stored unsafe titles and ensure AI fields exist.
+            normalized = False
+            for entry in self.media_index:
+                if self._ensure_item_ai_fields(entry):
+                    normalized = True
             self._scrub_blocked_ai_titles()
+            if normalized:
+                self._save_index()
 
     def _load_index_from_cache_files(self) -> None:
         # Fallback index path for fast UI boot when no JSON index exists yet.
@@ -3162,6 +3184,9 @@ class TelegramGalleryService:
                         "ai_description_model": str(existing_item.get("ai_description_model", "")).strip(),
                         "ai_description_generated_at": existing_item.get("ai_description_generated_at"),
                         "date": (msg_date or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
+                        "timestamp": int((msg_date or datetime.now(timezone.utc)).timestamp()),
+                        "file_type": media_kind,
+                        "file_size": int(media_size or 0),
                     }
                     self._ensure_item_ai_fields(item)
                     messages_map[message.id] = message
@@ -3314,11 +3339,21 @@ async def lifespan(_: FastAPI):
         if not LIVE_SYNC_ENABLED:
             return
 
+        # Warn early if running in bot-session mode — bots cannot read group history.
+        if service.session_mode == "bot":
+            logger.warning(
+                "[LIVE-SYNC] Running in BOT session mode. "
+                "Bots cannot read group chat history via get_chat_history. "
+                "Set SESSION_STRING (user session) or set TELEGRAM_GALLERY_AUTH=user "
+                "to enable full media sync from the group."
+            )
+
         # Let startup sync warm cache first, then keep recent messages updated.
         await asyncio.sleep(3)
         while True:
             try:
-                # Enable real-time AI title generation for new messages
+                # Only scan the latest LIVE_SYNC_LIMIT messages — new uploads are
+                # always at the top of history, so a small window is sufficient.
                 await service.sync_group_media(limit=LIVE_SYNC_LIMIT, force_redownload=False, process_ai_realtime=True)
             except HTTPException:
                 pass
@@ -3506,7 +3541,7 @@ app.add_middleware(
 )
 
 app.mount("/media", CachedStaticFiles(directory=str(service.cache_dir)), name="media")
-app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR)), name="assets")
+app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR / "public" / "assets")), name="assets")
 
 
 
@@ -3563,6 +3598,84 @@ def cached_file_response(path: Path, media_type: str = "auto") -> FileResponse:
     return response
 
 
+def _stream_file_range(path: Path, start: int, end: int):
+    """Sync generator that yields bytes [start, end] inclusive from a file."""
+    with open(path, "rb") as f:
+        f.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            chunk = f.read(min(65536, remaining))
+            if not chunk:
+                break
+            yield chunk
+            remaining -= len(chunk)
+
+
+async def _ranged_video_response(path: Path, request: Request) -> Response:
+    """Serve a video file with proper Range-request support so mobile browsers can seek."""
+    try:
+        file_size = path.stat().st_size
+    except OSError:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    ext = path.suffix.lower().lstrip(".")
+    _MIME = {
+        "mp4": "video/mp4", "webm": "video/webm", "mov": "video/quicktime",
+        "m4v": "video/mp4", "avi": "video/x-msvideo", "mkv": "video/x-matroska",
+    }
+    media_type = _MIME.get(ext, "video/mp4")
+
+    base_headers: dict = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=2592000, immutable",
+        "Content-Disposition": f'inline; filename="{path.name}"',
+    }
+    try:
+        mtime = int(path.stat().st_mtime)
+        base_headers["ETag"] = f'"{mtime}-{path.name}"'
+    except OSError:
+        pass
+
+    range_header = request.headers.get("Range")
+    if not range_header:
+        return StreamingResponse(
+            _stream_file_range(path, 0, file_size - 1),
+            media_type=media_type,
+            headers={**base_headers, "Content-Length": str(file_size)},
+        )
+
+    try:
+        m = re.search(r"bytes=(\d+)-(\d*)", range_header)
+        if not m:
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) else file_size - 1
+        if start >= file_size:
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+        end = min(end, file_size - 1)
+        length = end - start + 1
+        return StreamingResponse(
+            _stream_file_range(path, start, end),
+            status_code=206,
+            media_type=media_type,
+            headers={
+                **base_headers,
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Content-Length": str(length),
+            },
+        )
+    except Exception as exc:
+        logger.warning(f"[RANGE] Error handling range for {path.name}: {exc}")
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+
+@app.get("/favicon.svg")
+async def favicon() -> FileResponse:
+    return FileResponse(WEB_DIR / "public" / "favicon.svg")
+
+
 @app.get("/")
 async def index(request: Request) -> FileResponse:
     await _auto_track(request, "/")
@@ -3602,6 +3715,7 @@ def _require_visitors_password(request: Request) -> None:
         )
 
 
+# SPA routing - support client-side navigation for /visitors
 @app.get("/visitors", include_in_schema=False)
 @app.get("/visitors.html", include_in_schema=False)
 @app.get("/visitors.hmtl", include_in_schema=False)
@@ -3609,18 +3723,11 @@ def _require_visitors_password(request: Request) -> None:
 @app.get("/vistors.html", include_in_schema=False)
 @app.get("/vistors.hmtl", include_in_schema=False)
 async def visitors_page(request: Request) -> FileResponse:
-    _require_visitors_password(request)
-    response = FileResponse(WEB_DIR / "public" / "visitors.html")
+    await _auto_track(request, "/visitors")
+    response = FileResponse(WEB_DIR / "public" / "index.html")
     response.headers["Cache-Control"] = "no-cache"
     return response
 
-
-app.mount("/css", CachedStaticFiles(directory=str(WEB_DIR / "public" / "css")), name="css")
-app.mount("/js", CachedStaticFiles(directory=str(WEB_DIR / "public" / "js")), name="js")
-app.mount("/assets", CachedStaticFiles(directory=str(WEB_DIR / "public" / "assets")), name="assets")
-
-# We no longer need individual @app.get("/style.css") handles 
-# since app.mount handles the entire directories automatically.
 
 @app.get("/api/webapp/context")
 async def api_webapp_context(
@@ -3631,7 +3738,7 @@ async def api_webapp_context(
 
 
 @app.get("/api/file/{message_id}")
-async def api_file(message_id: int) -> Response:
+async def api_file(message_id: int, request: Request) -> Response:
     try:
         if not service._started:
             await asyncio.wait_for(service.start(), timeout=SERVICE_START_TIMEOUT_SECONDS)
@@ -3650,6 +3757,8 @@ async def api_file(message_id: int) -> Response:
     if local_path.exists():
         item["is_cached"] = True
         item["url"] = f"/media/{local_path.name}"
+        if str(item.get("media_kind") or item.get("file_type") or "").lower() == "video":
+            return await _ranged_video_response(local_path, request)
         return cached_file_response(local_path)
 
     # CDN-only mode: stream from Telegram without saving to disk
@@ -3662,21 +3771,107 @@ async def api_file(message_id: int) -> Response:
 
             media_kind, media_obj, mime_type, ext = media_tuple
 
+            file_size = item.get("file_size") or item.get("size") or 0
+            
+            # Support for Range requests (seeking)
+            range_header = request.headers.get("Range")
+            start_byte = 0
+            end_byte = file_size - 1 if file_size > 0 else 0
+            
+            if range_header and file_size > 0:
+                try:
+                    range_match = re.search(r"bytes=(\d+)-(\d*)", range_header)
+                    if range_match:
+                        start_byte = int(range_match.group(1))
+                        if range_match.group(2):
+                            end_byte = int(range_match.group(2))
+                except Exception:
+                    pass
+
+            # Ensure bounds
+            if file_size > 0:
+                start_byte = max(0, min(start_byte, file_size - 1))
+                end_byte = max(start_byte, min(end_byte, file_size - 1))
+
+            bytes_to_serve = (end_byte - start_byte + 1) if file_size > 0 else 0
+
+            # High-Speed Buffered Streamer
+            chunk_size_mb = 1024 * 1024
+            offset_blocks = start_byte // chunk_size_mb
+            bytes_to_skip = start_byte % chunk_size_mb
+            buffer_queue = asyncio.Queue(maxsize=8) # Buffer up to 8MB ahead
+            
+            async def fill_buffer():
+                try:
+                    async for chunk in service.client.stream_media(
+                        message, 
+                        offset=offset_blocks,
+                        limit=0
+                    ):
+                        await buffer_queue.put(chunk)
+                    await buffer_queue.put(None) # Sentinel for end of stream
+                except Exception as e:
+                    if "connection reset" not in str(e).lower():
+                        logger.warning(f"[CDN-BUFFER] Error filling buffer for {message_id}: {e}")
+                    await buffer_queue.put(None)
+
+            # Start pre-fetching in the background
+            buffer_task = asyncio.create_task(fill_buffer())
+
             async def media_stream():
                 try:
-                    async for chunk in service.client.stream_media(message):
-                        yield chunk
-                except Exception as stream_err:
-                    logger.warning(f"[CDN-STREAM] Error mid-stream for {message_id}: {stream_err}")
+                    skipped = 0
+                    sent = 0
+                    while True:
+                        if bytes_to_serve > 0 and sent >= bytes_to_serve:
+                            break
+                            
+                        chunk = await buffer_queue.get()
+                        if chunk is None:
+                            break
+                            
+                        if skipped < bytes_to_skip:
+                            if skipped + len(chunk) > bytes_to_skip:
+                                valid_chunk = chunk[bytes_to_skip - skipped:]
+                                skipped = bytes_to_skip
+                                
+                                # Trim to end_byte
+                                if bytes_to_serve > 0 and sent + len(valid_chunk) > bytes_to_serve:
+                                    valid_chunk = valid_chunk[:bytes_to_serve - sent]
+                                    
+                                yield valid_chunk
+                                sent += len(valid_chunk)
+                            else:
+                                skipped += len(chunk)
+                                continue
+                        else:
+                            valid_chunk = chunk
+                            if bytes_to_serve > 0 and sent + len(valid_chunk) > bytes_to_serve:
+                                valid_chunk = valid_chunk[:bytes_to_serve - sent]
+                            yield valid_chunk
+                            sent += len(valid_chunk)
+                finally:
+                    buffer_task.cancel()
+
+            headers = {
+                "Cache-Control": "public, max-age=86400",
+                "Content-Disposition": f'inline; filename="{item.get("file_name", "media")}"',
+                "Accept-Ranges": "bytes",
+            }
+            
+            status_code = 200
+            if range_header and file_size > 0:
+                status_code = 206
+                headers["Content-Range"] = f"bytes {start_byte}-{end_byte}/{file_size}"
+                headers["Content-Length"] = str(bytes_to_serve)
+            elif file_size > 0:
+                headers["Content-Length"] = str(file_size)
 
             return StreamingResponse(
                 media_stream(),
+                status_code=status_code,
                 media_type=mime_type or "application/octet-stream",
-                headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Content-Disposition": f'inline; filename="{item.get("file_name", "media")}"',
-                    "Accept-Ranges": "bytes",
-                },
+                headers=headers,
             )
         except HTTPException:
             raise
@@ -3685,10 +3880,13 @@ async def api_file(message_id: int) -> Response:
             raise HTTPException(status_code=502, detail=f"Failed to stream media: {e}")
 
     # Normal mode: download and cache locally
+    _is_video = str(item.get("media_kind") or item.get("file_type") or "").lower() == "video"
     async with service._lock:
         if local_path.exists():
             item["is_cached"] = True
             item["url"] = f"/media/{local_path.name}"
+            if _is_video:
+                return await _ranged_video_response(local_path, request)
             return cached_file_response(local_path)
 
         message = await service.client.get_messages(CHAT_ID, message_id)
@@ -3703,8 +3901,10 @@ async def api_file(message_id: int) -> Response:
                 item["is_cached"] = True
                 item["url"] = f"/media/{local_path.name}"
                 service._save_index()
+                if _is_video:
+                    return await _ranged_video_response(local_path, request)
                 return cached_file_response(local_path)
-                
+
             try:
                 downloaded_path = await asyncio.wait_for(
                     service.client.download_media(message, file_name=str(local_path)),
@@ -3725,15 +3925,17 @@ async def api_file(message_id: int) -> Response:
             item["url"] = f"/media/{local_path.name}"
             service._save_index()
 
+    if _is_video:
+        return await _ranged_video_response(local_path, request)
     return cached_file_response(local_path)
 
 
 @app.get("/api/cdn/{message_id}")
-async def api_cdn_file(message_id: int) -> Response:
+async def api_cdn_file(message_id: int, request: Request) -> Response:
     """Stream media directly from Telegram (no local cache needed)."""
     # CDN endpoint now acts as a streaming proxy — identical to /api/file/{id}
     # in CDN mode.  This avoids broken CDN URL redirects.
-    return await api_file(message_id)
+    return await api_file(message_id, request)
 
 
 @app.get("/api/{message_id}_{media_kind}.{ext}")
@@ -3827,7 +4029,8 @@ async def api_image_thumb(message_id: int) -> FileResponse:
                     item["thumb_url"] = f"/media/{img_thumb_path.name}"
                     service._save_index()
                     return cached_file_response(img_thumb_path)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[THUMB] Failed to optimize image thumbnail for message_id={message_id}: {e}")
                 return cached_file_response(local_path)
 
         # CDN mode path: fetch image from Telegram and build thumb on demand.
@@ -3846,8 +4049,8 @@ async def api_image_thumb(message_id: int) -> FileResponse:
                         item["thumb_url"] = f"/media/{generated.name}"
                         service._save_index()
                         return cached_file_response(generated)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[THUMB] Failed to generate image thumbnail for message_id={message_id}: {e}")
 
     raise HTTPException(status_code=404, detail="Image thumbnail not available")
 
@@ -3857,6 +4060,9 @@ async def api_media(
     limit: str = Query("all"),
     offset: int = Query(0, ge=0),
     refresh: bool = Query(False),
+    filter: str = Query("all"),
+    sort: str = Query("newest"),
+    search: str = Query(""),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
@@ -3867,9 +4073,8 @@ async def api_media(
         raise HTTPException(status_code=422, detail=f"Invalid limit '{limit}': {exc}") from exc
 
     sync_error: Optional[str] = None
-    
-    # Use cached media index instead of auto-syncing
-    # Only sync if explicitly requested with refresh=True
+
+    # Use cached media index; only re-sync when explicitly requested
     if refresh:
         try:
             items = await service.sync_group_media(limit=limit_value, force_redownload=False, process_ai_realtime=True)
@@ -3880,29 +4085,47 @@ async def api_media(
             items = service.media_index
             sync_error = str(e)
     else:
-        items = service.media_index
+        items = list(service.media_index)
 
-    # Unconditional normalization: every media must have title + description.
-    async with service._lock:
-        normalized = False
-        for entry in service.media_index:
-            if service._ensure_item_ai_fields(entry):
-                normalized = True
-        if normalized:
-            service._save_index()
+    # (Removed redundant normalization loop — now handled during index load)
 
-    # Get total from cached index BEFORE applying offset
-    total_items = len(service.media_index)
+    # --- Search filter ---
+    search_q = search.strip().lower()
+    if search_q:
+        items = [
+            x for x in items
+            if search_q in str(x.get("ai_title", "")).lower()
+            or search_q in str(x.get("caption", "")).lower()
+            or search_q in str(x.get("file_name", "")).lower()
+        ]
 
-    # Apply offset before applying limit
-    if offset > 0 and offset < len(items):
+    # --- Type filter ---
+    if filter == "video":
+        items = [x for x in items if x.get("file_type") == "video" or x.get("media_kind") == "video"]
+    elif filter == "image":
+        items = [x for x in items if x.get("file_type") == "image" or x.get("media_kind") == "image"]
+
+    # Total count AFTER search/type filtering but BEFORE pagination
+    total_items = len(items)
+
+    # --- Sort ---
+    if sort == "oldest":
+        items = sorted(items, key=lambda x: int(x.get("timestamp", 0) or x.get("message_id", 0)))
+    elif sort == "largest":
+        items = sorted(items, key=lambda x: int(x.get("file_size", 0) or 0), reverse=True)
+    elif sort == "ai":
+        # AI-titled items first, then by newest
+        items = sorted(items, key=lambda x: (0 if x.get("ai_title") else 1, -int(x.get("message_id", 0))))
+    # else "newest" — already ordered newest-first in the index
+
+    # --- Pagination ---
+    if offset > 0:
         items = items[offset:]
 
     response_items = apply_limit(items, limit_value)
 
     effective_sync_error = sync_error or service.last_sync_error
     if items and not refresh:
-        # Avoid noisy warnings for normal reads when cached media is available.
         effective_sync_error = None
 
     return {
@@ -4044,14 +4267,7 @@ async def api_media_recent(
     else:
         items = service.media_index
 
-    # Unconditional normalization: every media must have title + description.
-    async with service._lock:
-        normalized = False
-        for entry in service.media_index:
-            if service._ensure_item_ai_fields(entry):
-                normalized = True
-        if normalized:
-            service._save_index()
+    # (Removed redundant normalization loop — now handled during index load)
 
     response_items = apply_limit(items, limit_value)
 
@@ -5025,6 +5241,8 @@ async def api_health() -> Dict[str, Any]:
         "ok": True,
         "started": service._started,
         "cached_items": len(service.media_index),
+        "total_media": len(service.media_index),
+        "total_count": len(service.media_index),
         "synced_at": service.last_sync_at,
         "stats": stats,
         "cdn_mode": CDN_ONLY_MODE,
@@ -5062,6 +5280,21 @@ async def api_health() -> Dict[str, Any]:
         "ai_queue_length": len(service._ai_queue),
         "ai_titled_count": count_ai_titled_items(service.media_index),
     }
+
+
+@app.post("/api/internal/notify")
+async def api_internal_notify(
+    message_id: int = Query(...),
+    chat_id: int = Query(...)
+) -> Dict[str, Any]:
+    """Internal endpoint for the main bot to notify the dashboard of new media."""
+    logger.info(f"[INTERNAL] Notification received for message_id={message_id}")
+    
+    # Run in background to avoid blocking the main bot's notification call
+    asyncio.create_task(service.process_realtime_message(chat_id, message_id))
+    
+    return {"ok": True}
+
 
 
 @app.post("/api/reset-cache")
@@ -5128,10 +5361,10 @@ async def api_reset_cache(
 @app.get("/view/{message_id}", include_in_schema=False)
 async def serve_view_page(request: Request, message_id: int):
     await _auto_track(request, f"/view/{message_id}")
-    view_path = WEB_DIR / "public" / "view.html"
-    if not view_path.exists():
-        return Response("view.html not found", status_code=404)
-    return FileResponse(view_path, headers={"Cache-Control": "no-cache"})
+    index_path = WEB_DIR / "public" / "index.html"
+    if not index_path.exists():
+        return Response("index.html not found", status_code=404)
+    return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/media/{message_id}")
@@ -5401,12 +5634,17 @@ async def api_track_bot(request: Request) -> Dict[str, Any]:
 
 @app.get("/api/visitors")
 async def api_visitors(
+    password: str = Query(...),
     limit: int = Query(100, ge=1, le=1000),
     init_data: Optional[str] = Header(default=None, alias="X-Telegram-Init-Data"),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ) -> Dict[str, Any]:
-    """Return visitor log (newest first)."""
+    """Return visitor log (newest first) — password protected."""
+    if not hmac.compare_digest(password, VISITORS_PAGE_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
     async with _visitors_lock:
+
         visitors = _load_visitors()
 
     total = len(visitors)

@@ -474,6 +474,10 @@ class VideoDownloader:
         # All profiles failed
         return None, None
     
+    # Maximum simultaneous downloads during a bulk operation.
+    # Keeps memory/IO/network pressure manageable without sacrificing throughput.
+    _BULK_CONCURRENCY = 5
+
     @staticmethod
     async def download_multiple(urls: List[str], message: Message, user_id: int,
                         detection_msg: Optional[Message] = None) -> None:
@@ -654,8 +658,15 @@ class VideoDownloader:
             finally:
                 state["processed"] += 1
 
-        # Execute all tasks concurrently
-        tasks = [process_url(url, idx) for idx, url in enumerate(urls, 1)]
+        # Execute all tasks concurrently but cap parallelism with a semaphore
+        # so we never hammer disk I/O / yt-dlp with unbounded simultaneous jobs.
+        semaphore = asyncio.Semaphore(VideoDownloader._BULK_CONCURRENCY)
+
+        async def _guarded(url: str, idx: int):
+            async with semaphore:
+                await process_url(url, idx)
+
+        tasks = [_guarded(url, idx) for idx, url in enumerate(urls, 1)]
         await asyncio.gather(*tasks)
         
         # Stop UI updater

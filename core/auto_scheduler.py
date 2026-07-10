@@ -1,6 +1,7 @@
 import asyncio
+import logging
 import time
-from typing import Union, List, Optional, Any
+from typing import Union, List, Optional, Any, Dict
 from pyrogram import Client
 from pyrogram.types import Message
 from core.uploader import VideoUploader
@@ -8,12 +9,20 @@ from core.image_uploader import ImageUploader
 from core.uploader import safe_edit_text
 from resources.keyboards import Keyboards
 
+logger = logging.getLogger("AfterDark.AutoScheduler")
+
+
 class AutoScheduler:
     """
     Manages auto-upload timers and tasks.
-    Singleton-like usage.
+
+    Class-level _tasks has been replaced with a module-level dict protected
+    by an asyncio.Lock so concurrent coroutines cannot corrupt it.
     """
-    _tasks = {}  # Stores current tasks: {user_id_type_id: asyncio.Task}
+
+    # Module-level task registry: {task_key: asyncio.Task}
+    _tasks: Dict[str, asyncio.Task] = {}
+    _lock: asyncio.Lock = asyncio.Lock()
 
     @staticmethod
     def get_task_key(user_id: int, type_id: str) -> str:
@@ -30,33 +39,36 @@ class AutoScheduler:
     ):
         """
         Starts a countdown timer for auto-upload.
+        Any previously running timer for the same user+type is cancelled first.
         """
         task_key = AutoScheduler.get_task_key(user_id, content_type)
-        
-        # Cancel existing task if any
-        if task_key in AutoScheduler._tasks:
-            AutoScheduler._tasks[task_key].cancel()
 
-        # Create new task
-        task = asyncio.create_task(
-            AutoScheduler._countdown_and_upload(
-                client, message, user_id, content_type, content_path, duration, task_key
+        async with AutoScheduler._lock:
+            existing = AutoScheduler._tasks.get(task_key)
+            if existing and not existing.done():
+                existing.cancel()
+
+            task = asyncio.create_task(
+                AutoScheduler._countdown_and_upload(
+                    client, message, user_id, content_type, content_path, duration, task_key
+                )
             )
-        )
-        AutoScheduler._tasks[task_key] = task
+            AutoScheduler._tasks[task_key] = task
 
     @staticmethod
-    def cancel_task(user_id: int, content_type: str):
+    async def cancel_task(user_id: int, content_type: str) -> bool:
         """
         Cancels a pending auto-upload task.
+        Returns True if a task was found and cancelled.
         """
         task_key = AutoScheduler.get_task_key(user_id, content_type)
-        if task_key in AutoScheduler._tasks:
-            task = AutoScheduler._tasks[task_key]
-            if not task.done():
-                task.cancel()
-            del AutoScheduler._tasks[task_key]
-            return True
+        async with AutoScheduler._lock:
+            task = AutoScheduler._tasks.get(task_key)
+            if task:
+                if not task.done():
+                    task.cancel()
+                del AutoScheduler._tasks[task_key]
+                return True
         return False
 
     @staticmethod
@@ -74,39 +86,34 @@ class AutoScheduler:
         """
         original_caption = message.caption or message.text or ""
         target_chat_id = message.chat.id
-        # Remove any existing clean signature if it exists to avoid duplication issues
-        # (Though we usually just append)
 
         end_time = time.time() + duration
         last_update_time = time.time()
 
         try:
             from pyrogram.errors import FloodWait, MessageNotModified
-            
-            # Adaptive update intervals to prevent FloodWait
-            # > 30s remaining: Update every 5s
-            # < 30s remaining: Update every 3s
-            # < 10s remaining: Update every 2s
-            
+
+            # Adaptive update intervals to prevent FloodWait:
+            # > 30s remaining: update every 5 s
+            # < 30s remaining: update every 3 s
+            # < 10s remaining: update every 2 s
+
             while time.time() < end_time:
                 remaining = int(end_time - time.time())
-                
-                # Determine safe update interval
+
                 if remaining > 30:
                     update_interval = 5
                 elif remaining > 10:
                     update_interval = 3
                 else:
                     update_interval = 2
-                
+
                 if time.time() - last_update_time >= update_interval:
                     mins, secs = divmod(remaining, 60)
                     timer_text = f"\n\n⏳ **Auto-sending to Group in {mins}:{secs:02d}**"
-                    
+
                     try:
-                        # Determine content to update (caption vs text)
                         if message.caption:
-                            # Append to original caption (most robust method)
                             await message.edit_caption(
                                 caption=original_caption + timer_text,
                                 reply_markup=message.reply_markup
@@ -118,22 +125,19 @@ class AutoScheduler:
                                 disable_web_page_preview=True
                             )
                         last_update_time = time.time()
-                        
+
                     except FloodWait as e:
-                        # CRITICAL: Respect Telegram's wait request
-                        print(f"⚠️ Timer FloodWait: Pausing updates for {e.value}s")
+                        logger.warning(f"Timer FloodWait: pausing updates for {e.value}s")
                         await asyncio.sleep(e.value)
-                        last_update_time = time.time() # Reset to avoid instant retry
+                        last_update_time = time.time()
                     except MessageNotModified:
                         pass
-                    except Exception as e:
-                        # print(f"Timer update error: {e}")
+                    except Exception:
                         pass
-                        
-                await asyncio.sleep(1) # Check cancellation every second
 
-            # Time is up!
-            # Notify user
+                await asyncio.sleep(1)  # Check cancellation every second
+
+            # Time is up — notify user
             try:
                 if message.caption:
                     await message.edit_caption(
@@ -146,41 +150,28 @@ class AutoScheduler:
                         reply_markup=message.reply_markup,
                         disable_web_page_preview=True
                     )
-            except:
+            except Exception:
                 pass
 
             # Trigger Upload
             if content_type == "video_single":
-                # status_msg=message might overwrite the video message, better send a new small status msg?
-                # Or re-use. VideoUploader updates the status_msg.
-                # If we pass 'message', VideoUploader might try to edit it. 
-                # If 'message' is the video itself, we can't 'edit' it into a text status easily if type differs.
-                # VideoUploader expects a text message to edit usually. 
-                
-                # So we should send a new status message "Auto uploading..."
                 status_msg = await client.send_message(
                     chat_id=target_chat_id,
                     text="🚀 **Auto-upload triggered...**"
                 )
-                
-                # Check upload result and update status accordingly
+
                 success, result_msg = await VideoUploader.upload_to_group(content_path, user_id, status_msg, client)
-                
+
                 if success:
-                    # Construct success message info (like file name/size if available)
-                    # For simplicity, we just show success. 
-                    # If we wanted details, we'd need to re-fetch/pass them or let VideoUploader helper do it.
-                    # VideoUploader.upload_to_group returns (True, "Upload successful") but doesn't edit status to final state.
-                    
                     filename = content_path.split("/")[-1] if "/" in content_path else content_path
                     try:
                         import os
                         from core.formatting.formatters import Formatter
                         file_size = os.path.getsize(content_path)
                         size_text = Formatter.size(file_size)
-                    except:
+                    except Exception:
                         size_text = "Unknown"
-                        
+
                     await safe_edit_text(
                         status_msg,
                         "✅ **Video Uploaded Successfully!**\n\n"
@@ -192,8 +183,7 @@ class AutoScheduler:
                 else:
                     await safe_edit_text(
                         status_msg,
-                        f"❌ **Upload Failed**\n\n"
-                        f"Error: {result_msg}",
+                        f"❌ **Upload Failed**\n\nError: {result_msg}",
                         reply_markup=Keyboards.back_to_main()
                     )
 
@@ -212,34 +202,29 @@ class AutoScheduler:
                 await ImageUploader.upload_multiple_images(content_path, status_msg, user_id)
 
             elif content_type == "mixed_bulk":
-                # content_path is expected to be a dict or tuple containing lists: {'videos': [], 'images': []}
-                # But start_timer args type hint say Union[str, List[str]]. 
-                # We can pass a list of ALL paths, but we need to distinguish them.
-                # Or pass a dict. The type hint in start_timer is just a hint, python is dynamic.
-                
+                # content_path is a dict: {'videos': [...], 'images': [...]}
                 status_msg = await client.send_message(
                     chat_id=target_chat_id,
                     text="🚀 **Mixed Content Auto-upload triggered...**"
                 )
-                
+
                 video_paths = content_path.get('videos', [])
                 image_paths = content_path.get('images', [])
-                
+
                 if video_paths:
                     await VideoUploader.upload_multiple(video_paths, status_msg, user_id)
-                
+
                 if image_paths:
                     if video_paths:
                         await asyncio.sleep(2)
                     await ImageUploader.upload_multiple_images(image_paths, status_msg, user_id)
 
         except asyncio.CancelledError:
-            # Clean up the timer text if cancelled?
-            # User clicked upload manually, so that flow handles UI updates.
+            # User clicked upload manually — that flow handles UI updates.
             pass
         except Exception as e:
-            print(f"Auto-upload scheduler error: {e}")
+            logger.error(f"Auto-upload scheduler error: {e}", exc_info=True)
         finally:
-            # Remove from task list
-            if task_key in AutoScheduler._tasks:
-                del AutoScheduler._tasks[task_key]
+            # Remove from task registry under lock
+            async with AutoScheduler._lock:
+                AutoScheduler._tasks.pop(task_key, None)

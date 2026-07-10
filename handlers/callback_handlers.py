@@ -584,8 +584,8 @@ def setup_callback_handlers(app: Client):
         elif data.startswith("upload_to_group_"):
             # Cancel auto-upload if pending
             from core.auto_scheduler import AutoScheduler
-            AutoScheduler.cancel_task(user_id, "video_single")
-            AutoScheduler.cancel_task(user_id, "video_bulk")
+            await AutoScheduler.cancel_task(user_id, "video_single")
+            await AutoScheduler.cancel_task(user_id, "video_bulk")
             
             # Handle both single video and multiple videos
             video_path = user_downloads.get(user_id)
@@ -650,7 +650,7 @@ def setup_callback_handlers(app: Client):
         elif data.startswith("upload_images_to_group_"):
             # Cancel auto-upload if pending
             from core.auto_scheduler import AutoScheduler
-            AutoScheduler.cancel_task(user_id, "image_bulk")
+            await AutoScheduler.cancel_task(user_id, "image_bulk")
             
             image_paths = user_downloads.get(user_id, [])
             if not image_paths:
@@ -695,7 +695,7 @@ def setup_callback_handlers(app: Client):
         elif data == "upload_bulk_downloaded" or data == "upload_bulk_videos_downloaded":
             # Cancel auto-upload if pending
             from core.auto_scheduler import AutoScheduler
-            AutoScheduler.cancel_task(user_id, "video_bulk")
+            await AutoScheduler.cancel_task(user_id, "video_bulk")
             
             # Handle multiple videos from bulk downloads
             downloaded_paths = user_downloads.get(f"{user_id}_bulk_downloaded", [])
@@ -718,7 +718,7 @@ def setup_callback_handlers(app: Client):
         elif data == "upload_bulk_images_downloaded":
             # Cancel auto-upload if pending
             from core.auto_scheduler import AutoScheduler
-            AutoScheduler.cancel_task(user_id, "image_bulk")
+            await AutoScheduler.cancel_task(user_id, "image_bulk")
             
             # Try multiple possible keys for bulk images
             downloaded_paths = None
@@ -752,9 +752,9 @@ def setup_callback_handlers(app: Client):
         elif data == "upload_bulk_all_downloaded":
             # Cancel ALL potential auto-uploads
             from core.auto_scheduler import AutoScheduler
-            AutoScheduler.cancel_task(user_id, "video_bulk")
-            AutoScheduler.cancel_task(user_id, "image_bulk")
-            AutoScheduler.cancel_task(user_id, "mixed_bulk")
+            await AutoScheduler.cancel_task(user_id, "video_bulk")
+            await AutoScheduler.cancel_task(user_id, "image_bulk")
+            await AutoScheduler.cancel_task(user_id, "mixed_bulk")
             
             # Get both videos and images from multiple sources
             video_paths = user_downloads.get(f"{user_id}_bulk_downloaded_videos", [])
@@ -804,9 +804,9 @@ def setup_callback_handlers(app: Client):
             # Cancel auto-upload if pending (specifically single video key or bulk)
             from core.auto_scheduler import AutoScheduler
             if video_key == f"{user_id}_bulk_videos":
-                AutoScheduler.cancel_task(user_id, "video_bulk")
+                await AutoScheduler.cancel_task(user_id, "video_bulk")
             else:
-                AutoScheduler.cancel_task(user_id, "video_single")
+                await AutoScheduler.cancel_task(user_id, "video_single")
             
             # Check if this is a bulk videos key
             if video_key == f"{user_id}_bulk_videos":
@@ -1025,6 +1025,74 @@ def setup_callback_handlers(app: Client):
             
             await callback_query.answer("? History exported!")
             logger.info(f"User {user_id} exported {len(all_history)} history entries as {format_type}")
+
+        # ── Storage / Cleanup callbacks ────────────────────────────────────────
+        elif data.startswith("cleanup:"):
+            from core.media_cleaner import (
+                get_disk_report, delete_old_files, AUTO_CLEANUP_MIN_AGE_DAYS
+            )
+
+            action = data.split(":", 1)[1]
+
+            if action == "scan":
+                await callback_query.answer("🔍 Scanning...")
+                report = await asyncio.to_thread(get_disk_report)
+                try:
+                    await callback_query.message.edit_text(
+                        report,
+                        reply_markup=Keyboards.cleanup_menu(user_id, AUTO_CLEANUP_MIN_AGE_DAYS),
+                        disable_web_page_preview=True,
+                    )
+                except MessageNotModified:
+                    pass
+
+            elif action == "confirm":
+                await callback_query.answer()
+                await callback_query.message.edit_text(
+                    f"⚠️ **Confirm Cleanup**\n\n"
+                    f"This will permanently delete all downloaded media files "
+                    f"older than **{AUTO_CLEANUP_MIN_AGE_DAYS} days** from "
+                    f"`media/videos` and `media/images`.\n\n"
+                    f"Files currently in use will **not** be touched.\n\n"
+                    f"Are you sure?",
+                    reply_markup=Keyboards.cleanup_confirm(user_id, AUTO_CLEANUP_MIN_AGE_DAYS),
+                )
+
+            elif action == "delete":
+                await callback_query.answer("♻️ Cleaning up...")
+                try:
+                    result = await asyncio.to_thread(
+                        delete_old_files, AUTO_CLEANUP_MIN_AGE_DAYS
+                    )
+                    if result.deleted_files == 0:
+                        status = "✅ **Nothing to clean!**\n\nNo files older than " \
+                                 f"{AUTO_CLEANUP_MIN_AGE_DAYS} days were found."
+                    else:
+                        err_note = f"\n⚠️ {result.errors} error(s) skipped." if result.errors else ""
+                        status = (
+                            f"✅ **Cleanup Complete!**\n\n"
+                            f"🗑️ Deleted: **{result.deleted_files}** file(s)\n"
+                            f"💾 Freed: **{result.freed_mb:.1f} MB**"
+                            f"{err_note}"
+                        )
+                    logger.info(
+                        f"User {user_id} triggered cleanup: "
+                        f"{result.deleted_files} files, {result.freed_mb:.1f} MB freed"
+                    )
+                    # Show updated report after deletion
+                    report = await asyncio.to_thread(get_disk_report)
+                    await callback_query.message.edit_text(
+                        status + "\n\n" + report,
+                        reply_markup=Keyboards.cleanup_menu(user_id, AUTO_CLEANUP_MIN_AGE_DAYS),
+                        disable_web_page_preview=True,
+                    )
+                except Exception as e:
+                    logger.error(f"Cleanup callback error: {e}")
+                    await callback_query.message.edit_text(
+                        f"❌ Cleanup failed: {e}",
+                        reply_markup=Keyboards.back_to_main(user_id=user_id),
+                    )
+
 
 
 

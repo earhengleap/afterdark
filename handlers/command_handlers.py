@@ -20,23 +20,27 @@ logger = logging.getLogger("XVideoBot")
 
 
 async def track_bot_action(action: str, user_id: int, username: str = None):
-    """Track bot actions to visitors log."""
-    try:
-        track_url = f"{WEB_APP_URL}/api/track/bot"
-        data = json.dumps({
-            "action": action,
-            "user_id": user_id,
-            "username": username
-        }).encode('utf-8')
-        
-        req = urllib.request.Request(
-            track_url,
-            data=data,
-            headers={'Content-Type': 'application/json'}
-        )
-        urllib.request.urlopen(req, timeout=5)
-    except Exception as e:
-        logger.debug(f"Bot tracking error: {e}")
+    """Track bot actions to visitors log (non-blocking)."""
+    def _post() -> None:
+        try:
+            track_url = f"{WEB_APP_URL}/api/track/bot"
+            data = json.dumps({
+                "action": action,
+                "user_id": user_id,
+                "username": username,
+            }).encode('utf-8')
+            req = urllib.request.Request(
+                track_url,
+                data=data,
+                headers={'Content-Type': 'application/json'},
+            )
+            urllib.request.urlopen(req, timeout=5)
+        except Exception as e:
+            logger.debug(f"Bot tracking error: {e}")
+
+    # Fire-and-forget: run the blocking HTTP POST in a thread pool
+    # so it never blocks the asyncio event loop.
+    asyncio.create_task(asyncio.to_thread(_post))
 from core.parsing.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
@@ -662,7 +666,47 @@ def setup_command_handlers(app: Client):
             except Exception as exc:
                 logger.warning(f"Mini App direct button send failed for chat {user_id}: {exc}")
 
+    @app.on_message(filters.private & filters.command(["gallery", "twa", "app"]))
+    async def gallery_command_handler(client: Client, message: Message) -> None:
+        """Handle /gallery command to open the Mini App"""
+        user_id = message.from_user.id
+        metrics.increment_commands("gallery")
+        
+        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
+        if web_app_url:
+            await message.reply_text(
+                "🚀 **AfterDark Gallery**\n\nUse this fresh launcher inside Telegram. If you still see an old Open Vault button, ignore it and use `/gallery`.",
+                reply_markup=_mini_app_inline_keyboard(web_app_url),
+            )
+        else:
+            await message.reply_text(
+                "❌ **Mini App Not Ready**\n\nThe dashboard server or tunnel might be starting up. Please try again in a moment."
+            )
+
+    @app.on_message(filters.private & filters.command(["visitors", "stats_web", "logs"]))
+    async def visitors_command_handler(client: Client, message: Message) -> None:
+        """Handle /visitors command to open Analytics"""
+        user_id = message.from_user.id
+        metrics.increment_commands("visitors_web")
+        
+        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
+        if web_app_url:
+            from dashboard.server import VISITORS_PAGE_PASSWORD
+            # Deep link directly to the visitors page with the password
+            analytics_url = web_app_url.rstrip("/") + f"/visitors?password={urllib.parse.quote(VISITORS_PAGE_PASSWORD)}"
+            
+            await message.reply_text(
+                "📈 **Visitor Analytics**\n\nOpen the live tracking dashboard:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Open Analytics", web_app=WebAppInfo(url=analytics_url))]
+                ]),
+            )
+        else:
+            await message.reply_text("❌ Dashboard URL not found. Ensure the bot is running on a public tunnel.")
+
     @app.on_message(filters.private & filters.command("help"))
+
+
     async def help_handler(client: Client, message: Message) -> None:
         """Handle /help command"""
         metrics.increment_commands("help")
@@ -817,31 +861,54 @@ def setup_command_handlers(app: Client):
 
     @app.on_message(filters.private & filters.command(["x_media", "xmedia"]))
     async def x_media_handler(client: Client, message: Message) -> None:
-        """Handle /x_media <username> [limit] command."""
+        """Handle /x_media <username> [limit|all] [order] command.
+
+        Order values: newest (default), oldest, random.
+        """
         if len(message.command) < 2:
             await message.reply_text(
-                "Example:\n"
+                "Examples:\n"
                 "/x_media LZYWT02\n"
-                "/x_media LZYWT02 10"
+                "/x_media LZYWT02 10\n"
+                "/x_media LZYWT02 oldest\n"
+                "/x_media LZYWT02 10 oldest\n"
+                "/x_media LZYWT02 random\n"
+                "/x_media LZYWT02 all oldest\n\n"
+                "Order: newest (default), oldest, random"
             )
             return
 
         username = message.command[1].strip().replace("@", "")
         limit = None
-        if len(message.command) >= 3:
-            try:
-                limit = int(message.command[2])
-                if limit <= 0:
-                    raise ValueError
-            except ValueError:
-                await message.reply_text("Limit must be a positive number, e.g. /x_media LZYWT02 10")
-                return
+        order = "newest"
+        valid_orders = {"newest", "oldest", "random"}
+
+        for token in message.command[2:]:
+            tok = token.strip().lower()
+            if tok in valid_orders:
+                order = tok
+            elif tok == "all":
+                limit = None
+            else:
+                try:
+                    n = int(tok)
+                    if n <= 0:
+                        raise ValueError
+                    limit = n
+                except ValueError:
+                    await message.reply_text(
+                        f"Invalid argument: '{token}'.\n\n"
+                        "Usage: /x_media <username> [limit|all] [order]\n"
+                        "Order can be: newest, oldest, random"
+                    )
+                    return
 
         status_msg = await message.reply_text(
             f"Scanning media timeline...\n\n"
             f"Username: @{username}\n"
             f"Source: https://x.com/{username}/media\n"
-            f"Limit: {limit if limit else 'ALL'}\n\n"
+            f"Limit: {limit if limit else 'ALL'}\n"
+            f"Order: {order}\n\n"
             f"Collecting media posts..."
         )
 
@@ -850,6 +917,7 @@ def setup_command_handlers(app: Client):
                 username=username,
                 limit=limit,
                 cookies_file="config/twitter_cookies.txt",
+                order=order,
             )
             urls = media_data.get("post_urls", [])
             # Ensure /x_media never downloads the same status URL twice.
@@ -864,7 +932,7 @@ def setup_command_handlers(app: Client):
                 return
 
             logger.info(
-                f"/x_media scrape success for @{username}: posts={len(urls)}, videos={video_count}, images={image_count}, limit={limit or 'ALL'}"
+                f"/x_media scrape success for @{username}: posts={len(urls)}, videos={video_count}, images={image_count}, limit={limit or 'ALL'}, order={order}"
             )
             for link in urls:
                 logger.info(f"/x_media link @{username}: {link}")
@@ -875,12 +943,13 @@ def setup_command_handlers(app: Client):
                 f"Posts found: {len(urls)}\n"
                 f"Videos found: {video_count}\n"
                 f"Images found: {image_count}\n"
-                f"Limit: {limit if limit else 'ALL'}\n\n"
+                f"Limit: {limit if limit else 'ALL'}\n"
+                f"Order: {order}\n\n"
                 f"Preparing links and starting download..."
             )
 
             max_len = 3800
-            header = f"Media Post Links for @{username}\n\n"
+            header = f"Media Post Links for @{username} ({order})\n\n"
             chunk = header
             for idx, link in enumerate(urls, 1):
                 line = f"{idx}. {link}\n"
@@ -1091,6 +1160,27 @@ def setup_command_handlers(app: Client):
             logger.error(f"/papalah_media failed for {username}: {e}", exc_info=True)
             await status_msg.edit_text(f"Failed to process /papalah_media: {str(e)[:200]}")
 
+    @app.on_message(filters.command(["cleanup", "storage"]) & filters.private)
+    async def cleanup_handler(client: Client, message: Message) -> None:
+        """Show disk usage report and offer cleanup options."""
+        from core.media_cleaner import get_disk_report, delete_old_files, AUTO_CLEANUP_MIN_AGE_DAYS
+        from resources.keyboards import Keyboards
+
+        user_id = message.from_user.id
+        status_msg = await message.reply_text("🔍 Scanning media folders...")
+
+        try:
+            # get_disk_report does blocking I/O — run in thread
+            report = await asyncio.to_thread(get_disk_report)
+            await status_msg.edit_text(
+                report,
+                reply_markup=Keyboards.cleanup_menu(user_id, AUTO_CLEANUP_MIN_AGE_DAYS),
+                disable_web_page_preview=True,
+            )
+        except Exception as e:
+            logger.error(f"/cleanup failed: {e}")
+            await status_msg.edit_text(f"❌ Could not scan storage: {e}")
+
     @app.on_message(filters.command(["chat", "ai", "ask"]) & filters.private)
     async def chat_handler(client: Client, message: Message) -> None:
         """Handle explicit AI chat commands"""
@@ -1163,7 +1253,23 @@ def setup_command_handlers(app: Client):
         
         # Single URL download - NOW HANDLES REDDIT
         url = urls[0]
-        
+
+        # ── Deduplication guard ───────────────────────────────────────────────
+        # If this exact URL was already downloaded successfully by this user
+        # in the last 5 minutes, skip re-downloading and show a quick notice.
+        from core.database import history_db as _hdb
+        if _hdb.is_recent_duplicate(user_id, url, within_seconds=300):
+            await message.reply_text(
+                f"⚡ **Already Downloaded Recently**\n\n"
+                f"🔗 `{url[:60]}{'...' if len(url) > 60 else ''}`\n\n"
+                f"This URL was downloaded successfully in the last 5 minutes.\n"
+                f"Check your recent messages above, or send again to force re-download.",
+                disable_web_page_preview=True,
+                reply_markup=Keyboards.back_to_main(user_id=user_id)
+            )
+            return
+        # ─────────────────────────────────────────────────────────────────────
+
         # Reddit Handler
         # Reddit Handler - PARITY UPGRADE
         if RedditService.is_reddit_url(url):

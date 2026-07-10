@@ -1,89 +1,176 @@
 """
-Constants and enums
+In-memory state stores for the bot session.
+
+user_downloads  — ephemeral mapping of keys → file paths / lists.
+                  Previously a PersistentDict backed by pickle that wrote to
+                  disk on *every* assignment, causing hidden I/O overhead and
+                  growing unboundedly.  It's now a plain dict with a lightweight
+                  TTL eviction layer so stale entries (paths that no longer
+                  exist on disk) are automatically purged.
+
+user_selections — transient UI selection state (no persistence needed).
+upload_progress — transient upload progress state (no persistence needed).
 """
 
-import pickle
+import time
+import threading
+import logging
 from pathlib import Path
-from threading import RLock
+from typing import Any, Optional
+
+logger = logging.getLogger("AfterDark.State")
 
 
-class PersistentDict(dict):
-    """Dictionary that persists mutations to disk."""
+class TTLDict:
+    """
+    A thread-safe dict with per-key TTL expiry.
 
-    def __init__(self, file_path: Path):
-        super().__init__()
-        self._file_path = Path(file_path)
-        self._lock = RLock()
-        self._load()
+    • Entries expire silently after `default_ttl` seconds.
+    • An optional background reaper thread prunes stale keys every
+      `reap_interval` seconds so memory doesn't grow forever.
+    • The public API is dict-compatible (get / __setitem__ / __getitem__ /
+      __delitem__ / __contains__) so existing call-sites need zero changes.
+    """
 
-    def _load(self) -> None:
+    def __init__(self, default_ttl: int = 3600, reap_interval: int = 300):
+        self._store: dict[str, tuple[Any, float]] = {}  # key → (value, expires_at)
+        self._lock = threading.Lock()
+        self._default_ttl = default_ttl
+        self._reap_interval = reap_interval
+        self._start_reaper()
+
+    # ── internal ──────────────────────────────────────────────────────────────
+
+    def _expires_at(self, ttl: Optional[int] = None) -> float:
+        return time.monotonic() + (ttl if ttl is not None else self._default_ttl)
+
+    def _is_alive(self, expires_at: float) -> bool:
+        return time.monotonic() < expires_at
+
+    def _start_reaper(self) -> None:
+        t = threading.Thread(target=self._reap_loop, daemon=True, name="TTLDict-reaper")
+        t.start()
+
+    def _reap_loop(self) -> None:
+        while True:
+            time.sleep(self._reap_interval)
+            self._reap()
+
+    def _reap(self) -> None:
+        now = time.monotonic()
         with self._lock:
-            try:
-                if not self._file_path.exists():
-                    return
-                with self._file_path.open("rb") as f:
-                    data = pickle.load(f)
-                if isinstance(data, dict):
-                    super().update(data)
-            except Exception:
-                # Ignore corrupted state and continue with empty cache.
-                pass
+            dead = [k for k, (_, exp) in self._store.items() if now >= exp]
+            for k in dead:
+                del self._store[k]
+        if dead:
+            logger.debug(f"TTLDict: reaped {len(dead)} expired key(s)")
 
-    def _save(self) -> None:
+    # ── dict-compatible public API ────────────────────────────────────────────
+
+    def set(self, key: Any, value: Any, ttl: Optional[int] = None) -> None:
+        """Store *value* under *key* with an optional custom TTL (seconds)."""
+        str_key = str(key)
         with self._lock:
-            self._file_path.parent.mkdir(parents=True, exist_ok=True)
-            tmp_path = self._file_path.with_suffix(self._file_path.suffix + ".tmp")
-            with tmp_path.open("wb") as f:
-                pickle.dump(dict(self), f, protocol=pickle.HIGHEST_PROTOCOL)
-            tmp_path.replace(self._file_path)
+            self._store[str_key] = (value, self._expires_at(ttl))
 
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        self._save()
-
-    def __delitem__(self, key):
-        super().__delitem__(key)
-        self._save()
-
-    def clear(self):
-        super().clear()
-        self._save()
-
-    def update(self, *args, **kwargs):
-        super().update(*args, **kwargs)
-        self._save()
-
-    def pop(self, key, default=None):
-        if key in self:
-            value = super().pop(key)
-            self._save()
+    def get(self, key: Any, default: Any = None) -> Any:
+        str_key = str(key)
+        with self._lock:
+            entry = self._store.get(str_key)
+            if entry is None:
+                return default
+            value, expires_at = entry
+            if not self._is_alive(expires_at):
+                del self._store[str_key]
+                return default
             return value
-        return default
 
-    def popitem(self):
-        item = super().popitem()
-        self._save()
-        return item
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self.set(key, value)
 
-    def setdefault(self, key, default=None):
-        if key in self:
-            return self[key]
-        super().__setitem__(key, default)
-        self._save()
-        return default
-
-    def append_list_item(self, key, item):
-        """Atomically append an item to a list value and persist."""
+    def __getitem__(self, key: Any) -> Any:
+        str_key = str(key)
         with self._lock:
-            existing = super().get(key, [])
-            if not isinstance(existing, list):
-                existing = []
-            existing.append(item)
-            super().__setitem__(key, existing)
-            self._save()
+            entry = self._store.get(str_key)
+            if entry is None:
+                raise KeyError(key)
+            value, expires_at = entry
+            if not self._is_alive(expires_at):
+                del self._store[str_key]
+                raise KeyError(key)
+            return value
+
+    def __delitem__(self, key: Any) -> None:
+        str_key = str(key)
+        with self._lock:
+            if str_key in self._store:
+                del self._store[str_key]
+
+    def __contains__(self, key: Any) -> bool:
+        return self.get(key) is not None
+
+    def pop(self, key: Any, default: Any = None) -> Any:
+        str_key = str(key)
+        with self._lock:
+            entry = self._store.pop(str_key, None)
+            if entry is None:
+                return default
+            value, expires_at = entry
+            if not self._is_alive(expires_at):
+                return default
+            return value
+
+    def clear(self) -> None:
+        with self._lock:
+            self._store.clear()
+
+    def __len__(self) -> int:
+        now = time.monotonic()
+        with self._lock:
+            return sum(1 for _, (_, exp) in self._store.items() if now < exp)
+
+    def stats(self) -> dict:
+        """Return live / expired counts for diagnostics."""
+        now = time.monotonic()
+        with self._lock:
+            alive = sum(1 for _, (_, exp) in self._store.items() if now < exp)
+            total = len(self._store)
+        return {"alive": alive, "expired": total - alive, "total_stored": total}
+
+    def append_list_item(self, key: Any, item: Any, ttl: Optional[int] = None) -> None:
+        """Atomically append *item* to the list stored at *key*.
+
+        If the key does not exist (or has expired), a new list ``[item]`` is
+        created.  The TTL is refreshed on every append so the list stays alive
+        as long as it keeps receiving items.
+        """
+        str_key = str(key)
+        with self._lock:
+            entry = self._store.get(str_key)
+            if entry is not None:
+                current, exp = entry
+                if time.monotonic() < exp and isinstance(current, list):
+                    current.append(item)
+                    # Refresh the TTL so active lists don't expire mid-use
+                    self._store[str_key] = (current, self._expires_at(ttl))
+                    return
+            # Key missing, expired, or value wasn't a list — start fresh
+            self._store[str_key] = ([item], self._expires_at(ttl))
+
+    def get_list(self, key: Any, default: Optional[list] = None) -> list:
+        """Return the list stored at *key*, or *default* (empty list) if absent."""
+        value = self.get(key, default)
+        if isinstance(value, list):
+            return value
+        return [] if default is None else default
 
 
-# Global state dictionaries (persisted where needed)
-user_downloads = PersistentDict(Path("data/runtime/user_downloads.pkl"))
-user_selections = {}
-upload_progress = {}
+# ── Global state stores ───────────────────────────────────────────────────────
+
+# File-path / list store: keys expire after 2 hours of inactivity.
+# 2 h is plenty of time for the user to hit "Upload" after a download.
+user_downloads: TTLDict = TTLDict(default_ttl=7200, reap_interval=300)
+
+# Transient UI state — plain dicts, no TTL needed
+user_selections: dict = {}
+upload_progress: dict = {}

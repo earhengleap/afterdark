@@ -1,11 +1,14 @@
 import asyncio
 import json
 import os
+import random
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+VALID_ORDERS = ("newest", "oldest", "random")
 
 # Project root = parent of core/ directory (d:/AfterDark/)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -81,17 +84,33 @@ class XMediaService:
         return "unknown"
 
     @staticmethod
-    def _extract_from_payload(username: str, payload: Any, limit: Optional[int]) -> Dict[str, Any]:
+    def _apply_order(status_ids: List[str], order: str) -> List[str]:
+        if order == "oldest":
+            return list(reversed(status_ids))
+        if order == "random":
+            shuffled = list(status_ids)
+            random.shuffle(shuffled)
+            return shuffled
+        return list(status_ids)
+
+    @staticmethod
+    def _extract_from_payload(
+        username: str,
+        payload: Any,
+        limit: Optional[int],
+        order: str = "newest",
+    ) -> Dict[str, Any]:
         status_ids: List[str] = []
         seen_ids = set()
-        image_count = 0
-        video_count = 0
-        unknown_count = 0
+        # Track media per status so counts stay accurate after we reorder/slice.
+        status_media: Dict[str, Dict[str, int]] = {}
 
         # Try event stream shape first: [ [2, metadata], [3, media_url, ...], ... ]
         if isinstance(payload, list) and payload and isinstance(payload[0], list):
             current_status_id: Optional[str] = None
             include_current = False
+            # Only "newest" with a limit can early-stop; oldest/random need the full list.
+            early_stop = (order == "newest")
 
             for event in payload:
                 if not isinstance(event, list) or not event:
@@ -101,18 +120,19 @@ class XMediaService:
                 if event_type == 2 and len(event) > 1:
                     sid = XMediaService._extract_status_id(event[1])
                     if sid and sid.isdigit() and len(sid) >= 18 and sid not in seen_ids:
-                        if limit and len(status_ids) >= limit:
+                        if early_stop and limit and len(status_ids) >= limit:
                             current_status_id = None
                             include_current = False
                             continue
                         seen_ids.add(sid)
                         status_ids.append(sid)
+                        status_media[sid] = {"image": 0, "video": 0, "unknown": 0}
                         current_status_id = sid
                         include_current = True
                     else:
                         current_status_id = None
                         include_current = False
-                elif event_type == 3 and include_current:
+                elif event_type == 3 and include_current and current_status_id:
                     media_url = None
                     # gallery-dl commonly emits [3, "<url>", {...}]
                     if len(event) > 1 and isinstance(event[1], str):
@@ -121,15 +141,18 @@ class XMediaService:
                         media_url = event[2]
                     if media_url:
                         kind = XMediaService._classify_media_url(media_url)
-                        if kind == "image":
-                            image_count += 1
-                        elif kind == "video":
-                            video_count += 1
-                        else:
-                            unknown_count += 1
+                        status_media[current_status_id][kind] += 1
+
+            ordered_ids = XMediaService._apply_order(status_ids, order)
+            if limit:
+                ordered_ids = ordered_ids[:limit]
+
+            image_count = sum(status_media.get(sid, {}).get("image", 0) for sid in ordered_ids)
+            video_count = sum(status_media.get(sid, {}).get("video", 0) for sid in ordered_ids)
+            unknown_count = sum(status_media.get(sid, {}).get("unknown", 0) for sid in ordered_ids)
 
             return {
-                "post_urls": [f"https://x.com/{username}/status/{sid}" for sid in status_ids],
+                "post_urls": [f"https://x.com/{username}/status/{sid}" for sid in ordered_ids],
                 "image_count": image_count,
                 "video_count": video_count,
                 "unknown_count": unknown_count,
@@ -138,10 +161,11 @@ class XMediaService:
         # Generic fallback: recursive status extraction only.
         XMediaService._collect_status_ids(payload, status_ids, seen_ids)
         status_ids = [sid for sid in status_ids if sid.isdigit() and len(sid) >= 18]
+        ordered_ids = XMediaService._apply_order(status_ids, order)
         if limit:
-            status_ids = status_ids[:limit]
+            ordered_ids = ordered_ids[:limit]
         return {
-            "post_urls": [f"https://x.com/{username}/status/{sid}" for sid in status_ids],
+            "post_urls": [f"https://x.com/{username}/status/{sid}" for sid in ordered_ids],
             "image_count": 0,
             "video_count": 0,
             "unknown_count": 0,
@@ -152,10 +176,15 @@ class XMediaService:
         username: str,
         limit: Optional[int] = None,
         cookies_file: str = "config/twitter_cookies.txt",
+        order: str = "newest",
     ) -> Dict[str, Any]:
         username = (username or "").strip().lstrip("@")
         if not username:
             return {"post_urls": [], "image_count": 0, "video_count": 0, "unknown_count": 0}
+
+        order = (order or "newest").strip().lower()
+        if order not in VALID_ORDERS:
+            order = "newest"
 
         # Resolve cookies path to absolute so it works regardless of CWD.
         cookies_path = Path(cookies_file)
@@ -193,9 +222,11 @@ class XMediaService:
 
         try:
             payload = json.loads(output)
-            return XMediaService._extract_from_payload(username, payload, limit)
+            return XMediaService._extract_from_payload(username, payload, limit, order)
         except json.JSONDecodeError:
             # If not a single JSON blob, parse line by line and merge.
+            # Collect everything in gallery-dl's native (newest-first) order,
+            # then apply the requested ordering + limit once at the end.
             merged_urls: List[str] = []
             seen = set()
             for raw_line in output.splitlines():
@@ -206,11 +237,17 @@ class XMediaService:
                     payload = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                partial = XMediaService._extract_from_payload(username, payload, None)
+                partial = XMediaService._extract_from_payload(username, payload, None, "newest")
                 for url in partial["post_urls"]:
                     if url not in seen:
                         seen.add(url)
                         merged_urls.append(url)
+
+            if order == "oldest":
+                merged_urls = list(reversed(merged_urls))
+            elif order == "random":
+                random.shuffle(merged_urls)
+
             if limit:
                 merged_urls = merged_urls[:limit]
             return {"post_urls": merged_urls, "image_count": 0, "video_count": 0, "unknown_count": 0}
@@ -220,6 +257,12 @@ class XMediaService:
         username: str,
         limit: Optional[int] = None,
         cookies_file: str = "config/twitter_cookies.txt",
+        order: str = "newest",
     ) -> List[str]:
-        data = await XMediaService.fetch_media_data(username=username, limit=limit, cookies_file=cookies_file)
+        data = await XMediaService.fetch_media_data(
+            username=username,
+            limit=limit,
+            cookies_file=cookies_file,
+            order=order,
+        )
         return data.get("post_urls", [])

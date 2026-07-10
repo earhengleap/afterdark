@@ -10,52 +10,64 @@ class BotConfig:
     api_hash: str
     chat_id: int
     twitter_cookies: Optional[str] = None
+    neon_database_url: Optional[str] = None
+    uploadthing_token: Optional[str] = None
+    uploadthing_app_id: Optional[str] = None
+    ffmpeg_path: Optional[str] = None
+    bot_username: str = "Vuploads_bot"
+    web_app_url: str = "http://localhost:5000"
+    notify_usernames: str = ""
+    session_string: Optional[str] = None
 
     @classmethod
     def load(cls) -> 'BotConfig':
-        """Load configuration from environment variables or config files"""
+        """Load configuration prioritizing config/config.py, then environment variables"""
         
-        # Try importing from local config.py first
+        # Load local config.py if it exists
+        local_config = None
         try:
-            # We use dynamic import to avoid hard dependency at top level
             sys.path.append(os.getcwd())
-            import config.config as local_config
-            
-            return cls(
-                bot_token=getattr(local_config, "BOT_TOKEN", os.environ.get("BOT_TOKEN", "")),
-                api_id=int(getattr(local_config, "API_ID", os.environ.get("API_ID", 0))),
-                api_hash=getattr(local_config, "API_HASH", os.environ.get("API_HASH", "")),
-                chat_id=int(getattr(local_config, "CHAT_ID", os.environ.get("CHAT_ID", 0)))
-            )
+            import config.config as local_cfg
+            local_config = local_cfg
         except ImportError:
-            pass # Fallback to environment variables
-            
-        except ValueError as e:
-            print(f"Error parsing configuration values: {e}")
-            sys.exit(1)
+            pass
 
-        # Fallback to pure environment variables
-        bot_token = os.environ.get("BOT_TOKEN", "")
-        api_id_str = os.environ.get("API_ID", "0")
-        api_hash = os.environ.get("API_HASH", "")
-        chat_id_str = os.environ.get("CHAT_ID", "0")
-        
+        def get_val(key, default=None):
+            if local_config and hasattr(local_config, key):
+                return getattr(local_config, key)
+            return os.environ.get(key, default)
+
+        # Basic credentials
+        bot_token = get_val("BOT_TOKEN", "")
+        api_id = int(get_val("API_ID", 0))
+        api_hash = get_val("API_HASH", "")
+        chat_id = int(get_val("CHAT_ID", 0))
+
         # Validate critical configs
         missing = []
         if not bot_token: missing.append("BOT_TOKEN")
-        if not api_id_str or api_id_str == "0": missing.append("API_ID")
+        if not api_id: missing.append("API_ID")
         if not api_hash: missing.append("API_HASH")
         
         if missing:
             print(f"CRITICAL ERROR: Missing configuration for: {', '.join(missing)}")
-            print("Please ensure config/config.py exists or environment variables are set.")
+            print("Please ensure config/config.py has these values.")
             sys.exit(1)
             
         return cls(
             bot_token=bot_token,
-            api_id=int(api_id_str),
+            api_id=api_id,
             api_hash=api_hash,
-            chat_id=int(chat_id_str)
+            chat_id=chat_id,
+            twitter_cookies=get_val("TWITTER_COOKIES"),
+            neon_database_url=get_val("NEON_DATABASE_URL"),
+            uploadthing_token=get_val("UPLOADTHING_TOKEN"),
+            uploadthing_app_id=get_val("UPLOADTHING_APP_ID"),
+            ffmpeg_path=get_val("FFMPEG_PATH"),
+            bot_username=get_val("BOT_USERNAME", "Vuploads_bot"),
+            web_app_url=get_val("WEB_APP_URL", "http://localhost:5000"),
+            notify_usernames=get_val("NOTIFY_USERNAMES", ""),
+            session_string=get_val("SESSION_STRING")
         )
 
 # Create a singleton instance
