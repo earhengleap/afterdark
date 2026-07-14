@@ -1,0 +1,172 @@
+
+
+2026-07-14 16:28:50.46
+fd438548
+System
+starting up user application
+
+2026-07-14 16:28:50.47
+fd438548
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+
+2026-07-14 16:29:34.70
+fd438548
+User
+2026-07-14 09:29:34 | INFO | HistoryDB | Database initialized successfully
+
+
+2026-07-14 16:29:35.51
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark | Using in-memory bot session (BOT_SESSION_IN_MEMORY=1).
+
+2026-07-14 16:29:35.52
+fd438548
+User
++==================================================================================+
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| Release : February 2026 |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| AfterDark |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+2026-07-14 09:29:35 | WARNING | AfterDark | Stale PID file found (PID: 506), cleaning up...
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| System : Linux |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| PID : 20 |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| Production Ready - Stable Build |
+
+2026-07-14 16:29:35.52
+fd438548
+User
++==================================================================================+
+
+2026-07-14 16:29:35.52
+fd438548
+User
+|----------------------------------------------------------------------------------|
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| Version : 1.1.0 |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| Started : 2026-07-14 09:29:35 |
+
+2026-07-14 16:29:35.52
+fd438548
+User
+| Workdir : /home/runner/workspace |
+
+2026-07-14 16:29:35.61
+fd438548
+User
+Video processing may fail without FFmpeg
+
+2026-07-14 16:29:35.61
+fd438548
+User
+2026-07-14 09:29:35 | WARNING | AfterDark.ConfigValidator | Configuration warning: FFmpeg not found at: /usr/bin/ffmpeg
+
+2026-07-14 16:29:35.61
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark | ✓ Configuration validated successfully
+
+2026-07-14 16:29:35.61
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark | Initializing system directories...
+
+2026-07-14 16:29:35.62
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark | Setting up command and callback handlers...
+
+2026-07-14 16:29:35.62
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark | ✓ Directories initialized
+
+2026-07-14 16:29:35.62
+fd438548
+User
+2026-07-14 09:29:35 | INFO | AfterDark.Sync | ✓ Media Sync Handlers registered
+
+2026-07-14 16:29:40.90
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | 📅 Start Time: 2026-07-14 09:29:40
+
+2026-07-14 16:29:40.90
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | ✅ Bot 'AfterDark' (@Vuploads_bot) is now LIVE!
+
+2026-07-14 16:29:40.90
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | ⌨️ Press Ctrl+C to stop
+
+2026-07-14 16:29:40.90
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | 🆔 Bot ID: 8396142955
+
+2026-07-14 16:29:40.90
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | Starting health monitor...
+
+2026-07-14 16:29:40.91
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | Auto-cleanup task scheduled
+
+2026-07-14 16:29:40.91
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | 📊 Metrics tracking enabled
+
+2026-07-14 16:29:40.91
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark | ℹ️ History sync skipped (bot-only mode).
+
+2026-07-14 16:29:40.91
+fd438548
+User
+2026-07-14 09:29:40 | INFO | AfterDark.HealthMonitor | Health monitor started (check interval: 300s)
+
+2026-07-14 16:29:41.12
+fd438548
+User
+2026-07-14 09:29:41 | INFO | AfterDark.MediaCleaner | Auto-cleanup task started (interval: 6h, min age: 7d)
+
+2026-07-14 16:29:50.47
+fd438548
+System
+an open port was not detected

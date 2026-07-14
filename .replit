@@ -4,19 +4,19 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cacert", "cargo", "libiconv", "libuv", "libxcrypt", "libyaml", "rustc"]
+packages = [
+  "cacert",
+  "cargo",
+  "libiconv",
+  "libuv",
+  "libxcrypt",
+  "libyaml",
+  "rustc",
+  "ffmpeg",
+]
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Telegram Bot"
+runButton = "Telegram Bot"
 
 [[workflows.workflow]]
 name = "Telegram Bot"
@@ -29,18 +29,14 @@ args = "python afterdark.py"
 [workflows.workflow.metadata]
 outputType = "console"
 
-[[ports]]
-localPort = 5000
-externalPort = 80
-
 [deployment]
 deploymentTarget = "vm"
-run = ["python", "afterdark.py"]
+run = [
+  "bash",
+  "-c",
+  "TWA_AUTOSTART=0 FFMPEG_PATH=/usr/bin/ffmpeg python afterdark.py",
+]
 
 [userenv]
 
 [userenv.shared]
-API_HASH = "6764e4d6dd12108e82105f355c6309d8"
-CHAT_ID = "-1001816303239"
-API_ID = "22268900"
-BOT_TOKEN = "8396142955:AAHTFHGai_SNUAooPOzmyNG1Y-wp6G5IXNo"
