@@ -1,0 +1,176 @@
+
+2026-07-14 15:35:49.73
+9c74840d
+System
+command finished with error [bash -c python dashboard/server.py & python afterdark.py]: exit status 1
+
+2026-07-14 15:35:50.32
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:51.16
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:52.12
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:52.24
+9c74840d
+System
+a port configuration was specified but the required port was never opened, expected port 5000
+
+2026-07-14 15:35:52.77
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:53.66
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.36
+79b600c2
+System
+starting up user application
+
+2026-07-14 15:54:04.36
+79b600c2
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+
+2026-07-14 15:54:04.36
+79b600c2
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+
+2026-07-14 15:54:04.36
+79b600c2
+System
+healthcheck failed error=healthcheck /: Get "http://127.0.0.1:1104/": dial tcp 127.0.0.1:1104: connect: connection refused
+
+2026-07-14 15:54:04.37
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.39
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.44
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.52
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.53
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:04.77
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:05.37
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:06.38
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:06.59
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:06.65
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:07.93
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:09.91
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:10.34
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:12.17
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:12.69
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:13.26
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+
+2026-07-14 15:54:13.67
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:15.26
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:17.07
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:17.86
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:19.63
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:21.36
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:22.58
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:54:23.65
+79b600c2
+System
+healthcheck failed error=healthcheck / returned status 500
