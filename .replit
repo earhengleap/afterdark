@@ -4,6 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
+packages = ["cacert", "cargo", "libiconv", "libuv", "libxcrypt", "libyaml", "rustc"]
 
 [workflows]
 runButton = "Project"
@@ -15,23 +16,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Video Gallery Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Telegram Bot"
-
-[[workflows.workflow]]
-name = "Video Gallery Server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python dashboard/server.py"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow]]
 name = "Telegram Bot"
@@ -50,7 +35,7 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "python dashboard/server.py & python afterdark.py"]
+run = ["python", "afterdark.py"]
 
 [userenv]
 
