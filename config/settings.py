@@ -2,9 +2,6 @@ import os
 import tempfile
 from .config_loader import config_instance
 
-# Force user session auth mode so dashboard can read full group history
-os.environ["TELEGRAM_GALLERY_AUTH"] = "user"
-
 # ==================== BOT CONFIGURATION ====================
 BOT_TOKEN = config_instance.bot_token
 API_ID = config_instance.api_id
@@ -20,7 +17,7 @@ VERSION_DATE = "February 2026"
 
 CHANGELOG = {
     "1.1.0": [
-        "Premium UI upgrade with dashboard layout",
+        "Enhanced bulk download capabilities",
         "Bulk Content Hub for advanced link processing",
         "Social community integration",
         "Performance optimizations for bulk downloads"

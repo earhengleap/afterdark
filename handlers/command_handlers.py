@@ -8,39 +8,16 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 from pyrogram import Client, filters
-from pyrogram.types import Message, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from pyrogram.types import Message, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 
-from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME, BOT_TOKEN, WEB_APP_URL
+from config.settings import BOT_VERSION, VERSION_DATE, BOT_NAME, BOT_TOKEN
 from core.log_manager import LogManager
 from core.file_manager import FileManager
 from core.metrics import metrics
 
 logger = logging.getLogger("XVideoBot")
 
-
-async def track_bot_action(action: str, user_id: int, username: str = None):
-    """Track bot actions to visitors log (non-blocking)."""
-    def _post() -> None:
-        try:
-            track_url = f"{WEB_APP_URL}/api/track/bot"
-            data = json.dumps({
-                "action": action,
-                "user_id": user_id,
-                "username": username,
-            }).encode('utf-8')
-            req = urllib.request.Request(
-                track_url,
-                data=data,
-                headers={'Content-Type': 'application/json'},
-            )
-            urllib.request.urlopen(req, timeout=5)
-        except Exception as e:
-            logger.debug(f"Bot tracking error: {e}")
-
-    # Fire-and-forget: run the blocking HTTP POST in a thread pool
-    # so it never blocks the asyncio event loop.
-    asyncio.create_task(asyncio.to_thread(_post))
 from core.parsing.url_extractor import URLExtractor
 from core.downloader import VideoDownloader
 from core.image_downloader import ImageDownloader
@@ -128,63 +105,7 @@ async def send_direct_video_to_user(video_url: str, message: Message, user_id: i
         )
 
 
-def _read_cached_twa_public_url() -> str | None:
-    custom_path = os.getenv("TWA_PUBLIC_URL_FILE", "").strip()
-    if custom_path:
-        target = Path(custom_path).expanduser()
-    else:
-        target = Path(__file__).resolve().parent.parent / "data" / "twa_public_url.txt"
-
-    try:
-        if not target.exists():
-            return None
-        url = target.read_text(encoding="utf-8", errors="ignore").strip()
-    except Exception:
-        return None
-
-    if url.startswith("https://"):
-        return url.rstrip("/") + "/"
-    return None
-
-
-def _is_twa_public_url_healthy(url: str) -> bool:
-    normalized = url.strip().rstrip("/")
-    if not normalized.startswith("https://"):
-        return False
-
-    health_url = normalized + "/api/health"
-    try:
-        with urllib.request.urlopen(health_url, timeout=8) as response:
-            if response.status != 200:
-                return False
-            body = json.loads(response.read().decode("utf-8"))
-        return bool(body.get("ok"))
-    except Exception:
-        return False
-
-
-def _discover_twa_public_url() -> str | None:
-    explicit_url = os.getenv("TWA_PUBLIC_URL", "").strip()
-    if explicit_url.startswith("https://"):
-        if _is_twa_public_url_healthy(explicit_url):
-            return explicit_url.rstrip("/") + "/"
-        logger.warning(f"Ignoring unhealthy explicit TWA_PUBLIC_URL: {explicit_url[:50]}...")
-
-    cached_url = _read_cached_twa_public_url()
-    if cached_url:
-        if _is_twa_public_url_healthy(cached_url):
-            return cached_url
-        logger.warning(f"Ignoring unhealthy cached TWA_PUBLIC_URL: {cached_url[:50]}...")
-
-    return None
-
-
-def _set_chat_menu_button(chat_id: int, web_app_url: str, text: str = "Open Vault") -> None:
-    menu_button = {
-        "type": "web_app",
-        "text": text,
-        "web_app": {"url": web_app_url.rstrip("/") + "/"},
-    }
+async def get_remote_file_size(url: str) -> float:
     payload = urllib.parse.urlencode(
         {
             "chat_id": str(chat_id),
@@ -203,33 +124,6 @@ def _set_chat_menu_button(chat_id: int, web_app_url: str, text: str = "Open Vaul
     if not body.get("ok"):
         raise RuntimeError(f"setChatMenuButton failed: {body}")
 
-
-async def _refresh_menu_for_chat(chat_id: int) -> None:
-    if not str(chat_id).strip():
-        return
-
-    web_app_url = await asyncio.to_thread(_discover_twa_public_url)
-    if not web_app_url:
-        return
-
-    try:
-        await asyncio.to_thread(_set_chat_menu_button, chat_id, web_app_url)
-        logger.info(f"Mini App menu refreshed for chat {chat_id}: {web_app_url}")
-    except Exception as exc:
-        logger.warning(f"Mini App menu refresh failed for chat {chat_id}: {exc}")
-
-
-def _mini_app_inline_keyboard(web_app_url: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "Open Vault (Mini App)",
-                    web_app=WebAppInfo(url=web_app_url.rstrip("/") + "/"),
-                )
-            ]
-        ]
-    )
 
 def get_version_info() -> str:
     """Get formatted version information"""
@@ -606,9 +500,6 @@ def setup_command_handlers(app: Client):
         metrics.increment_commands("start")
         metrics.add_user(user_id)
         
-        # Track bot action
-        await track_bot_action("start", user_id, username)
-        
         # Check for deep link parameter
         if len(message.command) > 1:
             param = message.command[1]
@@ -654,55 +545,6 @@ def setup_command_handlers(app: Client):
         welcome_text = Messages.welcome(user_name, user_id=user_id)
         version_footer = f"\n\n📦 **Version {BOT_VERSION}** • {VERSION_DATE}"
         await message.reply_text(welcome_text + version_footer, reply_markup=keyboard)
-
-        # Fallback launcher: helps when Telegram still caches an old menu button URL.
-        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
-        if web_app_url:
-            try:
-                await message.reply_text(
-                    "Open the Mini App directly:",
-                    reply_markup=_mini_app_inline_keyboard(web_app_url),
-                )
-            except Exception as exc:
-                logger.warning(f"Mini App direct button send failed for chat {user_id}: {exc}")
-
-    @app.on_message(filters.private & filters.command(["gallery", "twa", "app"]))
-    async def gallery_command_handler(client: Client, message: Message) -> None:
-        """Handle /gallery command to open the Mini App"""
-        user_id = message.from_user.id
-        metrics.increment_commands("gallery")
-        
-        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
-        if web_app_url:
-            await message.reply_text(
-                "🚀 **AfterDark Gallery**\n\nUse this fresh launcher inside Telegram. If you still see an old Open Vault button, ignore it and use `/gallery`.",
-                reply_markup=_mini_app_inline_keyboard(web_app_url),
-            )
-        else:
-            await message.reply_text(
-                "❌ **Mini App Not Ready**\n\nThe dashboard server or tunnel might be starting up. Please try again in a moment."
-            )
-
-    @app.on_message(filters.private & filters.command(["visitors", "stats_web", "logs"]))
-    async def visitors_command_handler(client: Client, message: Message) -> None:
-        """Handle /visitors command to open Analytics"""
-        user_id = message.from_user.id
-        metrics.increment_commands("visitors_web")
-        
-        web_app_url = await asyncio.to_thread(_discover_twa_public_url)
-        if web_app_url:
-            from dashboard.server import VISITORS_PAGE_PASSWORD
-            # Deep link directly to the visitors page with the password
-            analytics_url = web_app_url.rstrip("/") + f"/visitors?password={urllib.parse.quote(VISITORS_PAGE_PASSWORD)}"
-            
-            await message.reply_text(
-                "📈 **Visitor Analytics**\n\nOpen the live tracking dashboard:",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("Open Analytics", web_app=WebAppInfo(url=analytics_url))]
-                ]),
-            )
-        else:
-            await message.reply_text("❌ Dashboard URL not found. Ensure the bot is running on a public tunnel.")
 
     @app.on_message(filters.private & filters.command("help"))
 
@@ -1201,13 +1043,10 @@ def setup_command_handlers(app: Client):
         username = message.from_user.username or message.from_user.first_name
         user_id = message.from_user.id
         
-        # Track user
+# Track user
         metrics.add_user(user_id)
         metrics.increment_commands("download_request")
         
-        # Track bot action
-        await track_bot_action("download", user_id, message.from_user.username)
-
         urls = URLExtractor.extract(text)
         
         if not urls:

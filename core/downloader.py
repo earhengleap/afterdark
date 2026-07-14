@@ -906,7 +906,7 @@ class VideoDownloader:
             keyboard = Keyboards.bulk_download_complete_mixed(user_id, video_paths, image_paths)
         else:
             summary_text += "No videos or images were downloaded successfully.\n\n"
-            summary_text += "💡 **Tip:** Check if the link exists in the dashboard/media_cache folder and are publicly accessible."
+            summary_text += "💡 **Tip:** Check if the link exists in the media_cache folder and are publicly accessible."
             keyboard = Keyboards.back_to_main(user_id=user_id)
         
         sent_msg = await message.reply_text(summary_text, reply_markup=keyboard, disable_web_page_preview=True)

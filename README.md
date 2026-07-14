@@ -6,9 +6,7 @@
   <img src="https://img.shields.io/badge/Telegram-Bot_API-v20-orange.svg" alt="Telegram API">
 </p>
 
-A robust and feature-rich Telegram bot platform designed originally for downloading media from X (Twitter), expanded into a comprehensive media management system. Features include bulk downloads, AI-powered media categorization, advanced tunnel setups, and a beautiful locally-hosted Telegram Mini App (TWA) gallery dashboard for browsing your synced media.
-
-![AfterDark Vault](https://img.shields.io/badge/AfterDark_Vault-TWA_Dashboard-blueviolet)
+A robust and feature-rich Telegram bot for downloading media from X (Twitter), RedGifs, and other platforms. Features include bulk downloads, AI-powered media categorization, group synchronization, and Videy CDN uploads.
 
 ## Features
 
@@ -17,15 +15,15 @@ A robust and feature-rich Telegram bot platform designed originally for download
 - **Bulk Processing & Queues**: Process multiple links concurrently with rate limiting and progress tracking.
 - **Group Synchronization**: Automatically scrape and cache media from specified Telegram groups.
 - **Auto-Scheduler**: Periodic scheduling for health checks and synchronizations. 
+- **Videy CDN Upload**: Automatically upload downloaded videos to Videy CDN for easy sharing.
+- **AI Chat Assistant**: Built-in AI chat functionality.
 
-### Telegram Mini App (TWA) Dashboard
-- **Web-based Gallery**: A responsive Mini App Dashboard deployed directly through the bot for intuitive media browsing.
-- **Filtering & AI Search**: Filter media explicitly by type (video/image), and search collections using an AI-generated title and description base.
-- **Background Sync**: Live-syncs new media dropped in your configured groups directly into the dashboard.
-- **Secure Authentication Options**: Selectable session handling between bot auth or explicit user auth for greater history retention.
-
-### Tunnels and Connectivity
-Built-in advanced tunnel proxies (`Serveo`, `Localhost.run`, `Pinggy`, `Localtunnel`, and Cloudflare options) allow you to serve the TWA locally while securely exposing it to Telegram, managed directly through the bot runner (`afterdark.py`).
+### Advanced Features
+- **X/Twitter Media Scraping**: Download all media from a user's timeline (`/x_media`)
+- **RedGifs Profile Downloads**: Download all gifs from a RedGifs user (`/redgifs_media`)
+- **Twitter Following Scraper**: Scrape a user's following list (`/get_following`)
+- **Media Cleanup**: Automatic disk space management (`/cleanup`)
+- **Health Monitoring**: System health checks (`/health`)
 
 ## Prerequisites
 
@@ -73,55 +71,48 @@ API_HASH=your_api_hash
 BOT_TOKEN=your_bot_token
 CHAT_ID=your_chat_id
 
-# Mini App Tunnel and Hosting 
-TWA_PORT=5000
-TWA_MENU_SYNC_AUTOSTART=1
-TWA_GALLERY_AUTH=auto
-
-# Optional - Tunnel Providers (serveo, localhost.run, pinggy)
-TWA_TUNNEL_PROVIDER=serveo
-
 # Optional - AI features (Ollama)
 TWA_AI_TITLES=1
 TWA_AI_OLLAMA_URL=http://127.0.0.1:11434/api/generate
 TWA_AI_MODEL=moondream:latest
 ```
 
-### 5. Start the Bot & Mini App Server
-
-Running the primary bot startup will invoke both the Telegram MTProto client and the background dashboard web server, initializing your configured tunnels automatically.
+### 5. Start the Bot
 
 ```bash
 python afterdark.py
 ```
 
-*For manual control over the Mini App server independently:*
-```bash
-python dashboard/server.py
-```
-*To test tunnels directly via the dashboard backend:*
-```bash
-python dashboard/scripts/start_with_tunnel.py
-```
+## Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/start` | Start the bot |
+| `/help` | Get help instructions |
+| `/stats` | View download statistics |
+| `/videy` | View your Videy CDN links |
+| `/version` | Check bot version |
+| `/health` | System health status |
+| `/cleanup` | View & manage disk storage |
+| `/chat` | Chat with the AI Assistant |
+| `/get_following` | Scrape a Twitter user's following list |
+| `/x_media` | Download media from an X username |
+| `/redgifs_media` | Download all gifs from a RedGifs username |
 
 ## Project Structure
 
 ```
 AfterDark/
-├── afterdark.py            # Primary bot entrypoint & multi-process bootstrapper
+├── afterdark.py            # Primary bot entrypoint
 ├── config/                 # Core settings, constants, and Path validations
 ├── core/                   # Service layer and internal systems
 │   ├── downloader.py       # Core media download pipeline
 │   ├── database.py         # SQLite persistence operations
 │   ├── auto_scheduler.py   # Background job management
-│   ├── health_monitor.py   # TWA Server & Tunnel health checks
+│   ├── health_monitor.py   # Health checks
+│   ├── media_cleaner.py    # Disk space management
 │   └── *_service.py        # Independent downloaders (Twitter, Redgifs, etc.)
-├── dashboard/              # TWA Backend and Web components (Replaced 'telegram-bot-websites')
-│   ├── server.py           # FastAPI Web Server for Mini App
-│   ├── scripts/            # Build pipelines, index rebuilders, auth login
-│   ├── public/             # CSS/JS frontend components
-│   └── media_cache/        # Target disk for downloaded files
-├── data/                   # PIDs, state files, tunnel URLs
+├── data/                   # PIDs, state files
 ├── handlers/               # Command and Callback pyrogram callbacks
 ├── media/                  # Shared thumbnail definitions
 ├── models/                 # Data Enums and typing 
@@ -130,18 +121,6 @@ AfterDark/
 ├── tests/                  # Unit test framework
 └── ui/                     # Shared UI/Keyboards elements
 ```
-
-## API Highlights (Dashboard)
-
-The `dashboard/server.py` runs a FastAPI service exposing routes to your Mini App.
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Validates server routing & tunnel stability |
-| `/api/media` | GET | Generates the active media list for the TWA |
-| `/api/sync` | POST | Triggers forced history alignment from the Chat |
-| `/api/ai-titles`| POST | Manually invokes Ollama for pending items |
-| `/api/file/{id}`| GET | Serves media proxy from Local System/CDN |
 
 ## Support
 

@@ -13,7 +13,7 @@ from core.image_downloader import ImageDownloader
 logger = logging.getLogger("AfterDark.Sync")
 
 async def handle_group_media(client: Client, message: Message):
-    """Detect links in group messages and download them (delegating media files to website)"""
+    """Detect links in group messages and download them"""
     chat_id = message.chat.id
     message_id = message.id
     user_id = message.from_user.id if message.from_user else chat_id
@@ -29,43 +29,8 @@ async def handle_group_media(client: Client, message: Message):
                 logger.info(f"🔗 Group link detected: {url}")
                 asyncio.create_task(process_group_link(client, message, url))
 
-        # 2. Handle direct media (photos, videos, etc.)
-        # We notify the Dashboard to index them instantly.
-        has_direct_media = bool(message.photo or message.video or message.document or message.animation)
-        if has_direct_media:
-            logger.info(f"📁 Direct media detected: message_id={message_id}")
-            asyncio.create_task(notify_dashboard_of_media(message.chat.id, message_id))
-
     except Exception as e:
         logger.error(f"Error in handle_group_media processing: {e}")
-
-async def notify_dashboard_of_media(chat_id: int, message_id: int):
-    """Notify the local Dashboard server that new media is available to index."""
-    import urllib.request
-    import urllib.parse
-    
-    # Port is typically 5000 unless overridden in env
-    port = os.getenv("TWA_PORT", "5000").strip()
-    url = f"http://127.0.0.1:{port}/api/internal/notify?chat_id={chat_id}&message_id={message_id}"
-    
-    try:
-        def _call():
-            try:
-                req = urllib.request.Request(url, method="POST")
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    return response.status == 200
-            except Exception:
-                return False
-
-        # Run in thread pool to avoid blocking the event loop
-        success = await asyncio.to_thread(_call)
-        if success:
-            logger.debug(f"Successfully notified dashboard of message {message_id}")
-        else:
-            logger.debug(f"Dashboard notification failed for message {message_id} (server might be down)")
-    except Exception as e:
-        logger.debug(f"Notification error: {e}")
-
 
 async def process_group_link(client: Client, message: Message, url: str):
     """Background task to download media from a link found in the group"""
