@@ -1,0 +1,175 @@
+2026-07-14 15:34:52.24
+9c74840d
+System
+healthcheck failed error=healthcheck /: Get "http://127.0.0.1:1104/": dial tcp 127.0.0.1:1104: connect: connection refused
+
+
+2026-07-14 15:34:52.26
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:52.26
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:52.27
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:52.29
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:52.43
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:52.46
+9c74840d
+User
+python: can't open file '/home/runner/workspace/dashboard/server.py': [Errno 2] No such file or directory
+
+2026-07-14 15:34:52.64
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:53.16
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:53.93
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:54.64
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:56.04
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:57.65
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:57.81
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:58.25
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:58.89
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:59.58
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:34:59.66
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:00.65
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:01.70
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:01.82
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:03.07
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:04.29
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:04.40
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:05.33
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:07.20
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:07.36
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:07.48
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:08.20
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:08.67
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:10.57
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:11.21
+9c74840d
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-07-14 15:35:12.14
+9c74840d
+User
+2026-07-14 08:35:12 | INFO | HistoryDB | Database initialized successfully
+
+2026-07-14 15:35:12.50
+9c74840d
+User
+from handlers.command_handlers import setup_command_handlers
+
+2026-07-14 15:35:12.50
+9c74840d
+User
+File "/home/runner/workspace/handlers/command_handlers.py", line 35, in <module>
